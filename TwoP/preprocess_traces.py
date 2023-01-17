@@ -294,4 +294,23 @@ def _linear(x, a, b):
 
 
 def zero_signal(F):
+    """
+   This function adds the value 19520 to all ROIs across time.This value represents the absolute zero signal 
+   and was obtained by averaging the darkest frame over many imaging sessions. It is important to note 
+   that the absolute zero value is arbitrary and depends on the voltage range of the PMTs.
+   
+   
+
+   Parameters
+   ----------
+   F : np.ndarray [t x nROIs]
+   Calcium traces (measured signal) of ROIs.
+
+   Returns
+   -------
+   F : np.ndarray [t x nROIs]
+   Calcium traces (measured signal) of ROIs with the addition of the absolute
+   zero signal.
+
+   """
     return F + 19520
