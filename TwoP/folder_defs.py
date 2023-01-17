@@ -19,12 +19,12 @@ def define_directories():
            - ZStack directory number (within each experiment, which folder contains the Z stack).
            - IgnorePlanes (which planes to ignore, such as the flyback plane).
            - Save directory (where to save the preprocessed files, if left blank will save in the suite2p folder).
-           - whether to process the specified experiment or not (TRUE or FALSE)           
+           - Whether to process the specified experiment or not (TRUE or FALSE).         
            
     s2pDir : str ["Drive:\\DirectoryName\\"]
         The directory where the suite2p folders are located; have to contain these files for each plane:
             - Registered movie in the form of a binary file (data.bin). Make sure this is
-                present as it is IMPORTANT FOR Z STACK REGISTRATION but bear in mind it is a very large file.
+              present as it is IMPORTANT FOR Z STACK REGISTRATION but bear in mind it is a very large file.
             - Fluorescence traces for each ROI (F.npy).
             - Neuropil traces for each ROI (Fneu.npy).
             - The iscell file which indicates whether an ROI was classified as a cell or not (iscell.npy).
