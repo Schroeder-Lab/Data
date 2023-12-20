@@ -513,7 +513,7 @@ def process_s2p_directory(
     # Saves the results as individual npy files.
     np.save(os.path.join(saveDirectory, "calcium.dff.npy"), signals)
     np.save(os.path.join(saveDirectory, "rois.planes.npy"), planes)
-    np.save(os.path.join(saveDirectory, "calcium.Ids.npy"), cellIds)
+    np.save(os.path.join(saveDirectory, "rois.Ids.npy"), cellIds)
     np.save(os.path.join(saveDirectory, "rois.xyz.npy"), locs)
     np.save(os.path.join(saveDirectory, "rois.zProfiles.npy"), zProfile)
     np.save(os.path.join(saveDirectory, "calcium.isZCorrected.npy"), isZcorrected)
