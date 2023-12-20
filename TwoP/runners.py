@@ -174,7 +174,7 @@ def _process_s2p_singlePlane(
     # Unless there is no Z stack path specified, does Z correction.
     if not (zstackPath is None):
         try:
-            refImg = ops["refImg"]  # Gets the reference image from Suite2P.
+            refImg = ops["meanImg"]  # Gets the reference image from Suite2P.
             # Creates registered Z stack path.
             zFileName = os.path.join(
                 saveDirectory, "zstackAngle_plane" + str(plane) + ".tif"
