@@ -506,19 +506,19 @@ def process_s2p_directory(
     locs = np.vstack(signalLocs)
     zProfile = np.hstack(zProfiles)
     zTrace = np.vstack(zTraces)
-    zCorrs = np.vstack(zCorrs)
+    zCorrs = np.swapaxes(np.dstack([a,a,a]).T,1,2)
     cellIds = np.hstack(cellIds)
     isZcorrected = np.hstack(isZcorrectedList)
 
     # Saves the results as individual npy files.
     np.save(os.path.join(saveDirectory, "calcium.dff.npy"), signals)
     np.save(os.path.join(saveDirectory, "rois.planes.npy"), planes)
-    np.save(os.path.join(saveDirectory, "rois.Ids.npy"), cellIds)
+    np.save(os.path.join(saveDirectory, "rois.id.npy"), cellIds)
     np.save(os.path.join(saveDirectory, "rois.xyz.npy"), locs)
-    np.save(os.path.join(saveDirectory, "rois.zProfiles.npy"), zProfile)
+    np.save(os.path.join(saveDirectory, "rois.zProfiles.npy"), zProfile.T)
     np.save(os.path.join(saveDirectory, "calcium.isZCorrected.npy"), isZcorrected)
     np.save(os.path.join(saveDirectory, "planes.zTrace"), zTrace)
-    np.save(os.path.join(saveDirectory, "planes.zcorrStack"), zCorrs)
+    np.save(os.path.join(saveDirectory, "planes.zcorrelation"), zCorrs)
 
 
 # bonsai + arduino
