@@ -83,7 +83,12 @@ def _process_s2p_singlePlane(
     ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
     # TODO: why an empty dict here?
     processing_metadata = {}
-
+    
+    # remove bad frames
+    badFrames = ops['badframes'] 
+    F[badFrames,:] = np.nan
+    N[badFrames,:] = np.nan
+    
     # Gets the acquisition frame rate.
     fs = ops["fs"]
     # Updates F to only include the ROIs considered cells.
