@@ -84,6 +84,14 @@ def _process_s2p_singlePlane(
     # TODO: why an empty dict here?
     processing_metadata = {}
     
+    if pops["plot"]:
+        saveDirectoryPlot = os.path.join(saveDirectory,'plots')
+        if not os.path.isdir(saveDirectoryPlot):
+            os.makedirs(saveDirectoryPlot)
+        
+    
+    
+    
     # remove bad frames
     badFrames = ops['badframes'] 
     F[badFrames,:] = np.nan
@@ -308,7 +316,7 @@ def _process_s2p_singlePlane(
             manager.full_screen_toggle()
             plt.savefig(
                 os.path.join(
-                    saveDirectory,
+                    saveDirectoryPlot,
                     "Plane" + str(plane) + "Neuron" + str(i) + ".png",
                 ),
                 format="png",
@@ -316,7 +324,7 @@ def _process_s2p_singlePlane(
 
             with open(
                 os.path.join(
-                    saveDirectory,
+                    saveDirectoryPlot,
                     "Plane" + str(plane) + "Neuron" + str(i) + ".fig.pickle",
                 ),
                 "wb",
@@ -364,7 +372,7 @@ def _process_s2p_singlePlane(
 
             plt.savefig(
                 os.path.join(
-                    saveDirectory,
+                    saveDirectoryPlot,
                     "Plane" + str(plane) + "Neuron" + str(i) + "_zoom.png",
                 ),
                 format="png",
@@ -372,7 +380,7 @@ def _process_s2p_singlePlane(
 
             with open(
                 os.path.join(
-                    saveDirectory,
+                    saveDirectoryPlot,
                     "Plane"
                     + str(plane)
                     + "Neuron"
