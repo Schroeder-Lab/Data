@@ -480,7 +480,7 @@ def get_stimulus_info(filePath, props=None):
         allLog = csvfile.read()
     # Gets the values for each stimulus repetition for all the parameters.
     for p in range(len(props)):
-        m = re.findall(props[p] + "=([a-zA-Z0-9_.-\\\\]*)", allLog)
+        m = re.findall(props[p] + "=([.-a-zA-Z0-9_\\\\]*)", allLog)
         # Appends the list of each parameter into a dictionary.
         if len(m) > 0:
             StimProperties[props[p]] = m
