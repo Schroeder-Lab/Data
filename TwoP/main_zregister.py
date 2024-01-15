@@ -24,7 +24,7 @@ dataEntries = directories_to_register()
 #     except:
         
     
-Parallel(n_jobs=4, verbose=5, max_nbytes=5000, backend='threading')(
+Parallel(n_jobs=4, verbose=5, backend='threading')(
     delayed(run_single_registration)(dataEntries.iloc[i])
     for i in range(len(dataEntries))
 )

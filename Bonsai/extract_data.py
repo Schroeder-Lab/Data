@@ -402,7 +402,8 @@ def get_log_entry(filePath, entryString):
     if len(exactLogPath) == 0:
         return None
     else:
-        filePath = exactLogPath[0]
+        filePath = exactLogPath[0]      
+    
     with open(filePath, newline="") as csvfile:
         reader = csv.reader(csvfile, delimiter=" ", quotechar="|")
 
@@ -930,33 +931,49 @@ def get_recorded_video_times(di, searchTerms, cleanNames):
     # make smaller database without the other non Ni events
     colNiTimes = {}
     for i in range(len(Inds) - 1):
-        removeInds = pd.Index([])
-        mini_inds = np.setdiff1d(range(len(Inds) - 1), i)
-        dropInds = pd.Index([], dtype=np.int64).append(
-            Inds[int(mini_inds)]
-        )
-        mini_df = log_df.drop(dropInds).reset_index()
+        # removeInds = pd.Index([])
+        # mini_inds = np.setdiff1d(range(len(Inds) - 1), i)
+        # dropInds = pd.Index([], dtype=np.int64).append(
+        #     Inds[int(mini_inds)]
+        # )
+        # mini_df = log_df.drop(dropInds).reset_index()
 
         # get ni frames
-        occurenceInds = mini_df[cleanNames[i]].index[
-            mini_df[cleanNames[i]].notna()
+        occurenceInds = log_df[cleanNames[i]].index[
+            log_df[cleanNames[i]].notna()
         ]
 
-        logTimeValues = mini_df.iloc[occurenceInds - 1][cleanNames[-1]].values
-        # the points that probably had two videos recorded in a row
-        nanInds = np.where(logTimeValues.astype(str) == "nan")[0]
-
-        for nind in nanInds:
-            plus = 2
-            logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
-                cleanNames[-1]
-            ]
-            # carry on until finding the first that is not nan
-            while str(logTimeValues[nind]) == "nan":
-                plus += 1
-                logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
-                    cleanNames[-1]
-                ]
+        logTimeValues = log_df.iloc[occurenceInds - 1][cleanNames[-1]].values          
+        
+        
+        # go through cases where there was a video before or after that prevented
+        # registering the nidaq time. to take the surest time
+        for plus in [-1,-2,-3,-4,1,2,3,4]:
+            nanInds = np.where(logTimeValues.astype(str) == "nan")[0]  
+            possibleOccurunce = occurenceInds.copy()
+            possibleOccurunce = possibleOccurunce[(possibleOccurunce+plus)<(len(log_df)-1)]
+            logTimeValues_wherenan = log_df.iloc[possibleOccurunce +plus][cleanNames[-1]].values  
+            lostFrames = len(logTimeValues) - len(logTimeValues_wherenan)
+            if (lostFrames>0):
+                logTimeValues_wherenan = np.append(logTimeValues_wherenan,np.ones(lostFrames)*np.nan)
+            logTimeValues[nanInds] = logTimeValues_wherenan[nanInds]
+        
+            
+            
+        
+        
+        
+        # for nind in nanInds:
+        #     plus = 2            
+        #     logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
+        #         cleanNames[-1]
+        #     ]
+        #     # carry on until finding the first that is not nan
+        #     while str(logTimeValues[nind]) == "nan":
+        #         plus += 1
+        #         logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
+        #             cleanNames[-1]
+        #         ]
         logFrames = logTimeValues
         # logFrames = np.zeros(len(logTimeValues)) * np.nan
         # for j in range(len(logTimeValues)):
