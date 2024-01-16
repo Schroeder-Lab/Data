@@ -7,6 +7,9 @@ Created on Fri Oct 21 08:39:57 2022
 
 """Runner functions"""
 
+
+
+
 from suite2p.registration.zalign import compute_zpos
 from joblib import Parallel, delayed
 import numpy as np
@@ -20,14 +23,12 @@ import glob
 import pickle
 import scipy as sp
 import warnings
-
 from Data.TwoP.process_tiff import *
 from Data.TwoP.preprocess_traces import *
 from Data.Bonsai.extract_data import *
+from Data.Bonsai.behaviour_protocol_functions import *
 from Data.TwoP.general import *
 from Data.user_defs import create_2p_processing_ops, directories_to_register
-
-
 def _process_s2p_singlePlane(
     pops, planeDirs, zstackPath, saveDirectory, piezo, plane
 ):
@@ -83,20 +84,17 @@ def _process_s2p_singlePlane(
     ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
     # TODO: why an empty dict here?
     processing_metadata = {}
-    
+
     if pops["plot"]:
-        saveDirectoryPlot = os.path.join(saveDirectory,'plots')
+        saveDirectoryPlot = os.path.join(saveDirectory, 'plots')
         if not os.path.isdir(saveDirectoryPlot):
             os.makedirs(saveDirectoryPlot)
-        
-    
-    
-    
+
     # remove bad frames
-    badFrames = ops['badframes'] 
-    F[badFrames,:] = np.nan
-    N[badFrames,:] = np.nan
-    
+    badFrames = ops['badframes']
+    F[badFrames, :] = np.nan
+    N[badFrames, :] = np.nan
+
     # Gets the acquisition frame rate.
     fs = ops["fs"]
     # Updates F to only include the ROIs considered cells.
@@ -181,9 +179,9 @@ def _process_s2p_singlePlane(
     # ops file (Hack to avoid random reg directories).
     ops["reg_file"] = os.path.join(currDir, "data.bin")
     ops["ops_path"] = os.path.join(currDir, "ops.npy")
-    
+
     isZcorrected = np.zeros(F.shape[1]).astype(bool)
-    
+
     # Unless there is no Z stack path specified, does Z correction.
     if not (zstackPath is None):
         try:
@@ -199,7 +197,7 @@ def _process_s2p_singlePlane(
                     spacing=1,
                     piezo=piezo,
                     target_image=refImg,
-                    channel=1#ops["align_by_chan"],
+                    channel=1  # ops["align_by_chan"],
                 )
                 # Saves registered Z stack in the specified or default saveDir.
                 skimage.io.imsave(zFileName, zstack)
@@ -230,10 +228,10 @@ def _process_s2p_singlePlane(
                 neuropil_correction=regPars[:, :],
                 metadata=processing_metadata,
                 smoothing_factor=2,
-                abs_zero = pops["absZero"])
-            
+                abs_zero=pops["absZero"])
+
             # quantify how many z profiles are at 0 (meaning the neuropil was stronger)
-            isZcorrected = ~np.all(zprofiles==0,axis=0)
+            isZcorrected = ~np.all(zprofiles == 0, axis=0)
             # Corrects traces for z motion based on the Z profiles.
             Fcz = correct_zmotion(
                 dF,
@@ -435,7 +433,7 @@ def process_s2p_directory(
         os.makedirs(saveDirectory)
     # Creates a list which contains the directories to the subfolders for each
     # plane.
-    planeDirs = glob.glob(os.path.join(suite2pDirectory, "plane*"))   
+    planeDirs = glob.glob(os.path.join(suite2pDirectory, "plane*"))
     # Loads the ops dictionary from the combined directory.
     ops = np.load(
         os.path.join(planeDirs[0], "ops.npy"), allow_pickle=True
@@ -480,7 +478,7 @@ def process_s2p_directory(
     signalLocs = []
     zTraces = []
     zProfiles = []
-    isZcorrectedList= []
+    isZcorrectedList = []
     zCorrs = []
     cellIds = []
     # Appends lists with the results for all the planes.
@@ -519,7 +517,7 @@ def process_s2p_directory(
     locs = np.vstack(signalLocs)
     zProfile = np.hstack(zProfiles)
     zTrace = np.vstack(zTraces)
-    zCorrs = np.swapaxes(np.dstack([a,a,a]).T,1,2)
+    zCorrs = np.swapaxes(np.dstack([a, a, a]).T, 1, 2)
     cellIds = np.hstack(cellIds)
     isZcorrected = np.hstack(isZcorrectedList)
 
@@ -591,6 +589,9 @@ def process_metadata_directory(
         saveDirectory = os.path.join(suite2pDirectory, "ProcessedData")
     # metadataDirectory_dirList = glob.glob(os.path.join(metadataDirectory,'*'))
 
+    if not os.path.isdir(saveDirectory):
+        os.makedirs(saveDirectory)
+
     metadataDirectory_dirList = ops["data_path"]
 
     # Gets the length of each experiment in frames.
@@ -610,40 +611,8 @@ def process_metadata_directory(
     # The velocity given by the rotary encoder information.
     velocity = []
 
-    # The sparse noise start + end times and the RF maps.
-    sparseSt = []
-    sparseEt = []
-    sparseMaps = []
-    sparseEdges = []
-
-    # Retinal protocol stimulus start + end times and stim identity.
-    retinalSt = []
-    retinalEt = []
-    retinalStim = []
-
-    # Gratings start + end times + stim identities for all the different params.
-    gratingsSt = []
-    gratingsEt = []
-    gratingsOri = []
-    gratingsSfreq = []
-    gratingsTfreq = []
-    gratingsContrast = []
-    gratingsReward = []
-
-    # Circles start + end times + stim identities for all the different params.
-    circleSt = []
-    circleEt = []
-    circleX = []
-    circleY = []
-    circleDiameter = []
-    circleWhite = []
-    circleDuration = []
-    
-    # natural images file, start and end time
-    naturalSt = []
-    naturalEt = []
-    naturalFiles = []
-    
+    stimulusProps = []
+    stimulusTypes = []
 
     for dInd, di in enumerate(metadataDirectory_dirList):
         sparseNoise = False
@@ -706,7 +675,7 @@ def process_metadata_directory(
             propsFile[0], dtype=str, delimiter=",", ndmin=2
         ).T
 
-        if propTitles[0] == "Spont":
+        if (propTitles[0] == "Spont") | (len(sparseFile) != 0):
             sparseNoise = True
 
         try:
@@ -721,207 +690,15 @@ def process_metadata_directory(
             # TODO: Have one long st and et list with different identities so a
             # list of st,et and a list with the event type
 
-            # Gets the sparse map.
-            if len(sparseFile) != 0:
-                sparseMap = get_sparse_noise(di)
-                sparseMap = sparseMap[: len(frameChanges), :, :]
-                sparseNoise = True
-
-                # Calculates the end of the final frame.
-                sparse_et = np.append(
-                    frameChanges[1::],
-                    frameChanges[-1] + np.median(np.diff(frameChanges)),
-                )
-                # Adds the data from above to the respective lists.
-                sparseSt.append(frameChanges.reshape(-1, 1).copy())
-                sparseEt.append(sparse_et.reshape(-1, 1).copy())
-                sparseMaps.append(sparseMap.copy())
-                # get the edges information from the props file
-                sparseEdges = propTitles[2:].astype(int)
-
-                # np.save(os.path.join(saveDirectory,'sparse.st.npy'),frameChanges)
-
-            # Gets the retinal classification metadata.
-            if propTitles[0] == "Retinal":
-                # Calculates the end of the final frame.
-                retinal_et = np.append(
-                    frameChanges[1::],
-                    frameChanges[-1] + (frameChanges[14] - frameChanges[13]),
-                )
-                # Gets the stimulus types (assumes 1st stim is On, 2nd off, etc).
-                retinal_stimType = np.empty(
-                    (len(frameChanges), 1), dtype=object
-                )
-                # retinal_stimType[::13] = "Off"
-                # retinal_stimType[1::13] = "On"
-                # retinal_stimType[2::13] = "Off"
-                # retinal_stimType[3::13] = "Grey"
-                # retinal_stimType[4::13] = "ChirpF"
-                # retinal_stimType[5::13] = "Grey"
-                # retinal_stimType[6::13] = "ChirpC"
-                # retinal_stimType[7::13] = "Grey"
-                # retinal_stimType[8::13] = "Off"
-                # retinal_stimType[9::13] = "Blue"
-                # retinal_stimType[10::13] = "Off"
-                # retinal_stimType[11::13] = "Green"
-                # retinal_stimType[12::13] = "Off"
-
-                retinal_stimType[12::13] = "Off"
-                retinal_stimType[0::13] = "On"
-                retinal_stimType[1::13] = "Off"
-                retinal_stimType[2::13] = "Grey"
-                retinal_stimType[3::13] = "ChirpF"
-                retinal_stimType[4::13] = "Grey"
-                retinal_stimType[5::13] = "ChirpC"
-                retinal_stimType[6::13] = "Grey"
-                retinal_stimType[7::13] = "Off"
-                retinal_stimType[8::13] = "Blue"
-                retinal_stimType[9::13] = "Off"
-                retinal_stimType[10::13] = "Green"
-                retinal_stimType[11::13] = "Off"        
-                
-
-                # Adds the data from above to the respective lists.
-                retinalSt.append(frameChanges.reshape(-1, 1).copy())
-                retinalEt.append(retinal_et.reshape(-1, 1).copy())
-                retinalStim.append(retinal_stimType.copy())
-                
-            if propTitles[0] == "NaturalImages":
-                stimProps = get_stimulus_info(di)
-                # Gets the start times of each stimulus.
-                st = frameChanges[::2].reshape(-1, 1).copy()
-                # Gets the end times  of each stimulus.
-                et = frameChanges[1::2].reshape(-1, 1).copy()
-                naturalSt.append(st)
-                naturalEt.append(et)
-                naturalFiles.append(
-                    stimProps.FileName.to_numpy()
-                    .reshape(-1, 1)
-                    .astype(str)
-                    .copy()
-                )
-                
-
-            # Gets the circles metadata.
-            # TODO: run this in debug mode to see what exact data it gets.
-            if len(propTitles) >= 3:
-                if propTitles[2] == "Diameter":
-                    # Gets the identity of the stimuli (see function for
-                    # further details).
-                    stimProps = get_stimulus_info(di)
-
-                    # Calculates the end of the final frame.
-                    circle_et = np.append(
-                        frameChanges[1::],
-                        frameChanges[-1] + np.median(np.diff(frameChanges)),
-                    )
-                    # Adds the start and end times from above to the respective
-                    # lists.
-                    circleSt.append(frameChanges.reshape(-1, 1).copy())
-                    circleEt.append(circle_et.reshape(-1, 1).copy())
-
-                    # Adds the data from the stimProps dictionary to the respective
-                    # lists.
-                    circleX.append(
-                        stimProps.X.to_numpy()
-                        .reshape(-1, 1)
-                        .astype(float)
-                        .copy()
-                    )
-
-                    circleY.append(
-                        stimProps.Y.to_numpy()
-                        .reshape(-1, 1)
-                        .astype(float)
-                        .copy()
-                    )
-
-                    circleDiameter.append(
-                        stimProps.Diameter.to_numpy()
-                        .reshape(-1, 1)
-                        .astype(float)
-                        .copy()
-                    )
-
-                    circleWhite.append(
-                        stimProps.White.to_numpy()
-                        .reshape(-1, 1)
-                        .astype(float)
-                        .copy()
-                    )
-
-                    circleDuration.append(
-                        stimProps.Dur.to_numpy()
-                        .reshape(-1, 1)
-                        .astype(float)
-                        .copy()
-                    )
-
-            if propTitles[0] == "Ori":
-                # Gets the identity of the stimuli (see function for
-                # further details).
-                stimProps = get_stimulus_info(di)
-                # Gets the start times of each stimulus.
-                st = frameChanges[::2].reshape(-1, 1).copy()
-                # Gets the end times  of each stimulus.
-                et = frameChanges[1::2].reshape(-1, 1).copy()
-
-                # Checks if number of frames and stimuli match (if not, there
-                # could have been an issue with the photodiode, check if there
-                # are irregular frames in the photodiode trace).
-                if len(stimProps) != len(st):
-                    # raise ValueError(
-                    #     "Number of frames and stimuli do not match. Skpping"
-                    # )
-                    warnings.warn("Number of frames and stimuli do not match")
-                # Adds the start and end times from above to the respective
-                # lists.
-
-                gratingsSt.append(st)
-                gratingsEt.append(et)
-                # Adds the data from the stimProps dictionary to the respective
-                # lists (all the parameters: Ori, SFreq, TFreq, Contrast).
-                gratingsOri.append(
-                    stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy()
-                )
-                gratingsSfreq.append(
-                    stimProps.SFreq.to_numpy()
-                    .reshape(-1, 1)
-                    .astype(float)
-                    .copy()
-                )
-                gratingsTfreq.append(
-                    stimProps.TFreq.to_numpy()
-                    .reshape(-1, 1)
-                    .astype(float)
-                    .copy()
-                )
-                gratingsContrast.append(
-                    stimProps.Contrast.to_numpy()
-                    .reshape(-1, 1)
-                    .astype(float)
-                    .copy()
-                )
-                # If a reward experiment was performed, gets the rewarded
-                # stimulus data.
-                if "Reward" in stimProps.columns:
-                    gratingsReward.append(
-                        np.array(
-                            [x in "True" for x in np.array(stimProps.Reward)]
-                        )
-                        .reshape(-1, 1)
-                        .astype(bool)
-                        .copy()
-                    )
-                else:
-                    gratingsReward.append(np.zeros_like(st) * np.nan)
-
+            # process stimuli
+            stimulusResults = process_stimulus(propTitles, di, frameChanges)
+            stimulusProps.append(stimulusResults)
+            stimulusTypes.append(propTitles[0][0])
         except:
             print("Error in stimulus processing in directory: " + di)
             print(traceback.format_exc())
         # Arduino data handling.
         try:
-
             # Gets the arduino data (see function for details).
             ardData, ardChans, at = get_arduino_data(di)
             # make sure everything is in small letters
@@ -935,74 +712,85 @@ def process_metadata_directory(
             # (see function for details).
             at_new = arduino_delay_compensation(nidaqSync, ardSync, nt, at)
 
-            # Gets the (assumed to be) forward movement.
-            movement1 = ardData[:, ardChans == "rotary1"][:, 0]
-            # Gets the (assumed to be) backward movement.
-            movement2 = ardData[:, ardChans == "rotary2"][:, 0]
-            # Gets the wheel velocity in cm/s and the distance travelled in cm
-            # (see function for details).
-            v, d = detect_wheel_move(movement1, movement2, at_new)
-            # Adds the wheel times to the wheelTimes list.
-            wheelTimes.append(at_new + lastFrame)
-            # Adds the velocity to the velocity list.
-            velocity.append(v)
+            try:
+                # Gets the (assumed to be) forward movement.
+                movement1 = ardData[:, ardChans == "rotary1"][:, 0]
+                # Gets the (assumed to be) backward movement.
+                movement2 = ardData[:, ardChans == "rotary2"][:, 0]
+                # Gets the wheel velocity in cm/s and the distance travelled in cm
+                # (see function for details).
+                v, d = detect_wheel_move(movement1, movement2, at_new)
+                # Adds the wheel times to the wheelTimes list.
+                wheelTimes.append(at_new + lastFrame)
+                # Adds the velocity to the velocity list.
+                velocity.append(v)
+            except:
+                print("Error in wheel processing in directory: " + di)
+                print(traceback.format_exc())
 
-            # Gets the (assumed to be) face camera data.
-            camera1 = ardData[:, ardChans == "camera1"][:, 0]
-            # Gets the (assumed to be) body camera data.
-            camera2 = ardData[:, ardChans == "camera2"][:, 0]
-            # Assigns frame times to the face camera.
-            # cam1Frames = assign_frame_time(camera1, fs=1, plot=False)
-            # # Assigns frame times to the body camera.
-            # cam2Frames = assign_frame_time(camera2, fs=1, plot=False)
-            # # Uses the above frame times to get the corrected arduino frame
-            # # times for the face camera.
-            # cam1Frames = at_new[cam1Frames.astype(int)]
-            # # Uses the above frame times to get the corrected arduino frame
-            # # times for the body camera.
-            # cam2Frames = at_new[cam2Frames.astype(int)]
+            try:
+                # Gets the (assumed to be) face camera data.
+                camera1 = ardData[:, ardChans == "camera1"][:, 0]
+                # Gets the (assumed to be) body camera data.
+                camera2 = ardData[:, ardChans == "camera2"][:, 0]
+                # Assigns frame times to the face camera.
+                # cam1Frames = assign_frame_time(camera1, fs=1, plot=False)
+                # # Assigns frame times to the body camera.
+                # cam2Frames = assign_frame_time(camera2, fs=1, plot=False)
+                # # Uses the above frame times to get the corrected arduino frame
+                # # times for the face camera.
+                # cam1Frames = at_new[cam1Frames.astype(int)]
+                # # Uses the above frame times to get the corrected arduino frame
+                # # times for the body camera.
+                # cam2Frames = at_new[cam2Frames.astype(int)]
 
-            # look in log for video times
-            # for some reason column names were different in sparse protocol
-            if sparseNoise:
-                logColNames = ["VideoFrame", "Video,[0-9]*", "NiDaq*"]
-            else:
-                logColNames = ["Video$", "Video,[0-9]*", "Analog*"]
+                # look in log for video times
+                # for some reason column names were different in sparse protocol
+                if sparseNoise:
+                    logColNames = ["VideoFrame", "Video,[0-9]*", "NiDaq*"]
+                else:
+                    logColNames = ["Video$", "Video,[0-9]*", "Analog*"]
 
-            colNiTimes = get_recorded_video_times(
-                di,
-                logColNames,
-                ["EyeVid", "BodyVid", "NI"],
-            )
-            cam1Frames = colNiTimes["EyeVid"].astype(float) / 1000
-            cam2Frames = colNiTimes["BodyVid"].astype(float) / 1000
-            # Get actual video data
-            vfile = a = glob.glob(os.path.join(di, "Video*.avi"))[0]  # eye
-            video1 = cv2.VideoCapture(vfile)
-            vfile = a = glob.glob(os.path.join(di, "Video*.avi"))[1]  # body
-            video2 = cv2.VideoCapture(vfile)
-            # number of frames
-            nframes1 = int(video1.get(cv2.CAP_PROP_FRAME_COUNT))
-            nframes2 = int(video2.get(cv2.CAP_PROP_FRAME_COUNT))
-            # add time stamp buffer for unknown frames
-            addFrames1 = nframes1 - len(cam1Frames)
-            addFrames2 = nframes2 - len(cam2Frames)
-            cam1Frames = np.append(cam1Frames, np.ones(addFrames1) * np.nan)
-            cam2Frames = np.append(cam2Frames, np.ones(addFrames2) * np.nan)
+                colNiTimes = get_recorded_video_times(
+                    di,
+                    logColNames,
+                    ["EyeVid", "BodyVid", "NI"],
+                )
+                cam1Frames = colNiTimes["EyeVid"].astype(float) / 1000
+                cam2Frames = colNiTimes["BodyVid"].astype(float) / 1000
+                # Get actual video data
+                vfile = a = glob.glob(os.path.join(di, "Video*.avi"))[0]  # eye
+                video1 = cv2.VideoCapture(vfile)
+                vfile = a = glob.glob(os.path.join(
+                    di, "Video*.avi"))[1]  # body
+                video2 = cv2.VideoCapture(vfile)
+                # number of frames
+                nframes1 = int(video1.get(cv2.CAP_PROP_FRAME_COUNT))
+                nframes2 = int(video2.get(cv2.CAP_PROP_FRAME_COUNT))
+                # add time stamp buffer for unknown frames
+                addFrames1 = nframes1 - len(cam1Frames)
+                addFrames2 = nframes2 - len(cam2Frames)
+                cam1Frames = np.append(
+                    cam1Frames, np.ones(addFrames1) * np.nan)
+                cam2Frames = np.append(
+                    cam2Frames, np.ones(addFrames2) * np.nan)
 
-            if nframes1 > len(cam1Frames):
-                c1f = np.ones(nframes1) * np.nan
-                c1f[: len(cam1Frames)] = cam1Frames
-                cam1Frames = c1f
-            if nframes2 > len(cam1Frames):
-                c2f = np.ones(nframes2) * np.nan
-                c2f[: len(cam2Frames)] = cam2Frames
-                cam2Frames = c2f
+                if nframes1 > len(cam1Frames):
+                    c1f = np.ones(nframes1) * np.nan
+                    c1f[: len(cam1Frames)] = cam1Frames
+                    cam1Frames = c1f
+                if nframes2 > len(cam2Frames):
+                    c2f = np.ones(nframes2) * np.nan
+                    c2f[: len(cam2Frames)] = cam2Frames
+                    cam2Frames = c2f
 
-            # Adds the face times to the faceTimes list.
-            faceTimes.append(cam1Frames + lastFrame)
-            # Adds the body times to the bodyTimes list.
-            bodyTimes.append(cam2Frames + lastFrame)
+                # Adds the face times to the faceTimes list.
+                faceTimes.append(cam1Frames + lastFrame)
+                # Adds the body times to the bodyTimes list.
+                bodyTimes.append(cam2Frames + lastFrame)
+            except:
+                print("Error in camera processing in directory: " + di)
+                print(traceback.format_exc())
         except:
             print("Error in arduino processing in directory: " + di)
             print(traceback.format_exc())
@@ -1022,104 +810,9 @@ def process_metadata_directory(
         planeTimeDelta.reshape(-1, 1),
     )
 
-    if len(sparseMaps) > 0:
-        np.save(
-            os.path.join(saveDirectory, "sparse.map.npy"),
-            np.vstack(sparseMaps),
-        )
-        np.save(
-            os.path.join(saveDirectory, "sparse.startTime.npy"), np.vstack(sparseSt)
-        )
-        np.save(
-            os.path.join(saveDirectory, "sparse.endTime.npy"), np.vstack(sparseEt)
-        )
-        np.save(os.path.join(saveDirectory, "sparseArea.edges.npy"), sparseEdges)
-    if len(retinalStim) > 0:
-        np.save(
-            os.path.join(saveDirectory, "fullField.startTime.npy"), np.vstack(retinalSt)
-        )
-        np.save(
-            os.path.join(saveDirectory, "fullField.endTime.npy"), np.vstack(retinalEt)
-        )
-        np.save(
-            os.path.join(saveDirectory, "fullField.stim.npy"),
-            np.vstack(retinalStim),
-        )
-    if len(gratingsSt) > 0:
-        np.save(
-            os.path.join(saveDirectory, "gratings.startTime.npy"),
-            np.vstack(gratingsSt),
-        )
-        np.save(
-            os.path.join(saveDirectory, "gratings.endTime.npy"),
-            np.vstack(gratingsEt),
-        )
-        np.save(
-            os.path.join(saveDirectory, "gratings.direction.npy"),
-            np.vstack(gratingsOri),
-        )
-        np.save(
-            os.path.join(saveDirectory, "gratings.spatialF.npy"),
-            np.vstack(gratingsSfreq),
-        )
-        np.save(
-            os.path.join(saveDirectory, "gratings.temporalF.npy"),
-            np.vstack(gratingsTfreq),
-        )
-        np.save(
-            os.path.join(saveDirectory, "gratings.contrast.npy"),
-            np.vstack(gratingsContrast),
-        )
-        
-    if len(naturalSt) > 0:
-        np.save(
-            os.path.join(saveDirectory, "natural.startTime.npy"),
-            np.vstack(naturalSt),
-        )
-        np.save(
-            os.path.join(saveDirectory, "natural.endTime.npy"),
-            np.vstack(naturalEt),
-        )
-        np.save(
-            os.path.join(saveDirectory, "natural.fileNames.npy"),
-            np.vstack(naturalFiles),
-        )        
+    # concatante stimuli and save them
+    save_stimuli(saveDirectory, stimulusTypes, stimulusProps)
 
-    if len(circleSt) > 0:
-        np.save(
-            os.path.join(saveDirectory, "circles.startTime.npy"),
-            np.vstack(circleSt),
-        )
-        np.save(
-            os.path.join(saveDirectory, "circles.endTime.npy"),
-            np.vstack(circleEt),
-        )
-        np.save(
-            os.path.join(saveDirectory, "circles.x.npy"),
-            np.vstack(circleX),
-        )
-        np.save(
-            os.path.join(saveDirectory, "circles.y.npy"),
-            np.vstack(circleY),
-        )
-        np.save(
-            os.path.join(saveDirectory, "circles.diameter.npy"),
-            np.vstack(circleDiameter),
-        )
-        np.save(
-            os.path.join(saveDirectory, "circles.isWhite.npy"),
-            np.vstack(circleWhite),
-        )
-        np.save(
-            os.path.join(saveDirectory, "circles.duration.npy"),
-            np.vstack(circleDuration),
-        )
-
-    if len(gratingsReward) > 0:
-        np.save(
-            os.path.join(saveDirectory, "gratings.reward.npy"),
-            np.vstack(gratingsReward),
-        )
     if len(wheelTimes) > 0:
         np.save(
             os.path.join(saveDirectory, "wheel.timestamps.npy"),
@@ -1129,10 +822,12 @@ def process_metadata_directory(
             os.path.join(saveDirectory, "wheel.velocity.npy"),
             np.hstack(velocity).reshape(-1, 1),
         )
+    if (len(faceTimes) > 0):
         np.save(
             os.path.join(saveDirectory, "eye.timestamps.npy"),
             np.hstack(faceTimes).reshape(-1, 1),
         )
+    if (len(bodyTimes) > 0):
         np.save(
             os.path.join(saveDirectory, "body.timestamps.npy"),
             np.hstack(bodyTimes).reshape(-1, 1),

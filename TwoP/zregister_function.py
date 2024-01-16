@@ -155,8 +155,8 @@ def z_register_one_file(ops):
         
         # M:this part of the code above just does registration etc (what is done with the GUI usually)
         # grab frames
-        with BinaryFile(Ly=Ly, Lx=Lx, filename=align_file_raw) as f_align_in:
-            n_frames = f_align_in.shape[0]
+        with BinaryFile(Ly=Ly, Lx=Lx, filename=align_file_raw,n_frames=n_frames) as f_align_in:
+            # n_frames = f_align_in.shape[0]
             frames = f_align_in[
                 np.linspace(
                     0,

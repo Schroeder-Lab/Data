@@ -11,6 +11,7 @@ from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 import os
 from Data.TwoP.general import *
+from Data.Bonsai.stimulus_extraction_functions import *
 
 
 """Pre-process data recorded with Bonsai."""
@@ -136,7 +137,6 @@ def detect_photodiode_changes(
     fs=1000,
     waitTime=10000,
 ):
-
     """
     The function detects photodiode changes using a 'Schmitt Trigger', that is,
     by detecting the signal going up at an earlier point than the signal going
@@ -337,7 +337,6 @@ def detect_wheel_move(
 
 
 def get_sparse_noise(filePath, size=None):
-
     """
     Pulls the sparse noise from the directory.
 
@@ -366,7 +365,8 @@ def get_sparse_noise(filePath, size=None):
             print("ERROR: no props file given")
             return None
         # Gets the size of the squares from the props.
-        size = np.loadtxt(dirs[0], delimiter=",", dtype=int)
+        size = np.loadtxt(dirs[0], delimiter=",", dtype=str)
+        size = size[1:].astype(int)
     # Reassigns values in the sparse array.
     sparse[sparse == -128] = 0.5
     sparse[sparse == -1] = 1
@@ -377,7 +377,6 @@ def get_sparse_noise(filePath, size=None):
     )
     # Rearranges the sparse map.
     return np.moveaxis(np.flip(sparse, 2), -1, 1)
-
 
 def get_log_entry(filePath, entryString):
     """
@@ -402,8 +401,8 @@ def get_log_entry(filePath, entryString):
     if len(exactLogPath) == 0:
         return None
     else:
-        filePath = exactLogPath[0]      
-    
+        filePath = exactLogPath[0]
+
     with open(filePath, newline="") as csvfile:
         reader = csv.reader(csvfile, delimiter=" ", quotechar="|")
 
@@ -456,6 +455,7 @@ def get_stimulus_info(filePath, props=None):
             return None
 
         props = np.loadtxt(dirs[0], delimiter=",", dtype=str)
+        props = props[1:]
     # Gets the log file which contains all the parameters for each stimulus
     # presentation.
     logPath = glob.glob(os.path.join(filePath, "Log*"))
@@ -541,7 +541,7 @@ def get_arduino_data(arduinoDirectory, plot=False):
     # normalTimeDiff = np.where(arduinoTimeDiff>-100)[0]
     # csvChannels = csvChannels[normalTimeDiff,:]
     # # convert time to second (always in ms)
-    arduinoTime = csvChannels[:,-1]/1000
+    arduinoTime = csvChannels[:, -1]/1000
 
     # Starts arduino time at zero.
     arduinoTime -= arduinoTime[0]
@@ -690,8 +690,8 @@ def arduino_delay_compensation(
             if i >= len(ardChangeTime):
                 continue
 
-            x = ardChangeTime[i : np.min([len(ardChangeTime), i + batchSize])]
-            y = niChangeTime[i : np.min([len(ardChangeTime), i + batchSize])]
+            x = ardChangeTime[i: np.min([len(ardChangeTime), i + batchSize])]
+            y = niChangeTime[i: np.min([len(ardChangeTime), i + batchSize])]
 
             a, b, mse = linear_analytical_solution(x, y)
 
@@ -779,8 +779,8 @@ def get_piezo_trace_for_plane(
 
         # Determines the time at which the piezo starts and ends for each plane but ignoring the first frame
         # because the location of the first frame is when the piezo starts moving so it is inaccurate.
-        piezoStarts = frameTimes[imagingPlanes + plane :: imagingPlanes]
-        piezoEnds = frameTimes[imagingPlanes + plane + 1 :: imagingPlanes]
+        piezoStarts = frameTimes[imagingPlanes + plane:: imagingPlanes]
+        piezoEnds = frameTimes[imagingPlanes + plane + 1:: imagingPlanes]
         # Determines the range over which to sample over the piezo trace given the batchFactor specified.
         piezoBatchRange = range(0, len(piezoStarts), batchFactor)
         # Creates the array for the piezo location for each milisecond in each batch.
@@ -924,8 +924,7 @@ def get_recorded_video_times(di, searchTerms, cleanNames):
     Inds = []
     for i in range(len(cleanNames)):
         Inds.append(log_df[cleanNames[i]].index[log_df[cleanNames[i]].notna()])
-        
-    
+
     #Inds = pd.array(Inds)
 
     # make smaller database without the other non Ni events
@@ -943,28 +942,25 @@ def get_recorded_video_times(di, searchTerms, cleanNames):
             log_df[cleanNames[i]].notna()
         ]
 
-        logTimeValues = log_df.iloc[occurenceInds - 1][cleanNames[-1]].values          
-        
-        
+        logTimeValues = log_df.iloc[occurenceInds - 1][cleanNames[-1]].values
+
         # go through cases where there was a video before or after that prevented
         # registering the nidaq time. to take the surest time
-        for plus in [-1,-2,-3,-4,1,2,3,4]:
-            nanInds = np.where(logTimeValues.astype(str) == "nan")[0]  
+        for plus in [-1, -2, -3, -4, 1, 2, 3, 4]:
+            nanInds = np.where(logTimeValues.astype(str) == "nan")[0]
             possibleOccurunce = occurenceInds.copy()
-            possibleOccurunce = possibleOccurunce[(possibleOccurunce+plus)<(len(log_df)-1)]
-            logTimeValues_wherenan = log_df.iloc[possibleOccurunce +plus][cleanNames[-1]].values  
+            possibleOccurunce = possibleOccurunce[(
+                possibleOccurunce+plus) < (len(log_df)-1)]
+            logTimeValues_wherenan = log_df.iloc[possibleOccurunce +
+                                                 plus][cleanNames[-1]].values
             lostFrames = len(logTimeValues) - len(logTimeValues_wherenan)
-            if (lostFrames>0):
-                logTimeValues_wherenan = np.append(logTimeValues_wherenan,np.ones(lostFrames)*np.nan)
+            if (lostFrames > 0):
+                logTimeValues_wherenan = np.append(
+                    logTimeValues_wherenan, np.ones(lostFrames)*np.nan)
             logTimeValues[nanInds] = logTimeValues_wherenan[nanInds]
-        
-            
-            
-        
-        
-        
+
         # for nind in nanInds:
-        #     plus = 2            
+        #     plus = 2
         #     logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
         #         cleanNames[-1]
         #     ]
