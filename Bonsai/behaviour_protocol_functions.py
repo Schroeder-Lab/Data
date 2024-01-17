@@ -5,7 +5,7 @@ Created on Fri Jan 12 09:51:58 2024
 @author: liad0
 """
 import numpy as np
-from Data.Bonsai.extract_data import get_stimulus_info, get_sparse_noise
+from Data.Bonsai.log_extraction_functions import get_stimulus_info, get_sparse_noise
 import glob
 import os
 import warnings
@@ -152,10 +152,15 @@ def stimulus_naturalImages(directory, frameChanges):
             }
 
 
+def stimulus_spont(directory, frameChanges):
+    return {"Spont.intervals": [frameChanges[0], frameChanges[-1]]}
+
+
 stimulus_prcoessing_dictionary = {
     "Gratings": stimulus_gratings,
     "Circles": stimulus_circles,
     "Retinal": stimulus_classification,
     "NaturalImages": stimulus_naturalImages,
-    "Sparse": stimulus_sparse
+    "Sparse": stimulus_sparse,
+    "Spont": stimulus_spont,
 }

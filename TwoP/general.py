@@ -17,6 +17,34 @@ Created on Wed Aug 31 15:37:13 2022
 """
 
 
+def get_file_in_directory(directory, simpleName):
+    """
+    Gets the file path of the first file with the same name.
+    For example,if a directory contains two ArduinoInput files, such as
+    ArduinoInput0.csv and ArduinoInput1.csv, it will return the file path of
+    ArduinoInput0.csv.
+
+    Parameters
+    ----------
+    directory : str
+        The directory where the respective files are located.
+    simpleName : str
+        a keyword that describes the file. For example, for the arduino input
+        file mentioned above, such a keyword would be "ArduinoInput".
+
+    Returns
+    -------
+    file[0] : str
+       The file path of the first file with the same name. .
+
+    """
+    file = glob.glob(os.path.join(directory, simpleName + "*"), recursive=True)
+    if len(file) > 0:
+        return file[0]
+    else:
+        return None
+
+
 def get_ops_file(suite2pDir):
     """
     Loads the ops file from the first plane folder in the suite2p folder. Ops file

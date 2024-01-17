@@ -646,7 +646,7 @@ def process_metadata_directory(
         except Exception as e:
             print("Error is directory: " + di)
             print("Could not load nidaq data")
-            print(e)
+            print(traceback.format_exc())
         try:
             # Gets the frame clock data.
             frameclock = nidaq[:, chans == "frameclock"]
@@ -687,9 +687,12 @@ def process_metadata_directory(
             )
             frameChanges += lastFrame
 
-            # TODO: Have one long st and et list with different identities so a
-            # list of st,et and a list with the event type
-
+        except:
+            print("Error in frame time extraction in directory: " + di)
+            print("\nresorting to giving first and last frame")
+            print(traceback.format_exc())
+            frameChanges = [lastFrame, nt[-1]+lastFrame]
+        try:
             # process stimuli
             stimulusResults = process_stimulus(propTitles, di, frameChanges)
             stimulusProps.append(stimulusResults)
@@ -697,6 +700,7 @@ def process_metadata_directory(
         except:
             print("Error in stimulus processing in directory: " + di)
             print(traceback.format_exc())
+
         # Arduino data handling.
         try:
             # Gets the arduino data (see function for details).
@@ -759,10 +763,11 @@ def process_metadata_directory(
                 cam1Frames = colNiTimes["EyeVid"].astype(float) / 1000
                 cam2Frames = colNiTimes["BodyVid"].astype(float) / 1000
                 # Get actual video data
-                vfile = a = glob.glob(os.path.join(di, "Video*.avi"))[0]  # eye
+                vfile = glob.glob(os.path.join(
+                    di, "Video[0-9]*.avi"))[0]  # eye
                 video1 = cv2.VideoCapture(vfile)
-                vfile = a = glob.glob(os.path.join(
-                    di, "Video*.avi"))[1]  # body
+                vfile = glob.glob(os.path.join(
+                    di, "Video[a-zA-Z]*.avi"))[0]  # body
                 video2 = cv2.VideoCapture(vfile)
                 # number of frames
                 nframes1 = int(video1.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -770,10 +775,6 @@ def process_metadata_directory(
                 # add time stamp buffer for unknown frames
                 addFrames1 = nframes1 - len(cam1Frames)
                 addFrames2 = nframes2 - len(cam2Frames)
-                cam1Frames = np.append(
-                    cam1Frames, np.ones(addFrames1) * np.nan)
-                cam2Frames = np.append(
-                    cam2Frames, np.ones(addFrames2) * np.nan)
 
                 if nframes1 > len(cam1Frames):
                     c1f = np.ones(nframes1) * np.nan
