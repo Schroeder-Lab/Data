@@ -28,3 +28,5 @@ def save_stimuli(saveDirectory, stimulusTypes, stimulusProps):
         # save all filenames in the save directory
         for f in fileNames:
             np.save(os.path.join(saveDirectory, f), np.vstack(props_df[f]))
+            
+
