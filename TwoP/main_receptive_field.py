@@ -13,7 +13,7 @@ Remember to set create_ops_boutton_registration for the options that suit your r
 Set  get_sparsenoise_info with only one session and the save directory 
 
 """
-
+import scipy as sp
 
 from Data.TwoP.runners import read_directory_dictionary
 from Data.user_defs import (
@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 import time, os, shutil
 from suite2p.registration import register, rigid, bidiphase
-from suite2p.io import tiff_to_binary, BinaryRWFile
+from suite2p.io import tiff_to_binary
 from suite2p import io
 from suite2p import default_ops
 from tifffile import imread
@@ -212,7 +212,7 @@ process_metadata_directory(
 ts = np.load(os.path.join(ops["save_path0"], "calcium.timestamps.npy"))
 st = np.load(os.path.join(ops["save_path0"], "sparse.st.npy"))
 smap = np.load(os.path.join(ops["save_path0"], "sparse.map.npy"))
-edges = np.load(os.path.join(ops["save_path0"], "sparse.edges.npy"))
+edges = np.load(os.path.join(ops["save_path0"], "sparseArea.edges.npy"))
 
 
 readDir = os.path.join(ops["save_path0"], "suite2p", f"plane{plane}")
@@ -235,7 +235,7 @@ for y in range(smap.shape[1]):
             # find the first instance where s is after the clock time
             firstInd = np.where(s >= ts)[0][-1]
             sw = wt + firstInd
-            with BinaryRWFile(
+            with BinaryFile(
                 Ly=ops["Ly"], Lx=ops["Lx"], filename=binPath
             ) as f_bin:
                 frames = f_bin[t + firstInd]
@@ -248,7 +248,7 @@ for y in range(smap.shape[1]):
 
 #%%
 averageMap_ncd = sp.signal.convolve2d(
-    averageMap_n[0, 0, :, :], np.ones((16, 16)), mode="same"
+    averageMap[0, 0, :, :], np.ones((16, 16)), mode="same"
 )
 #%%
 averageMap_n = averageMap - np.nanmin(averageMap)

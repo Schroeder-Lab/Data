@@ -61,8 +61,8 @@ def define_directories():
     """
 
     directoryDb = {
-        "dataDefFile": "D:\\preprocess.csv",
-        "preprocessedDataDir": "Z:\\RawData\\", # "D:\\Test\\",
+        "dataDefFile": "D:\\preprocess_tara.csv",
+        "preprocessedDataDir": "D:\\ProcessedData\\", # "D:\\Test\\",
         # "preprocessedDataDir": "Z://ProcessedData//",
         "zstackDir": "Z:\\RawData\\",
         "metadataDir": "Z:\\RawData\\"#"D:\\Test\\" #",
@@ -114,7 +114,7 @@ def create_2p_processing_ops():
         "f0_window": 300,
         "Npil_f0_window": 60,
         "zcorrect_mode": "Stack",
-        "remove_z_extremes": False,
+        "remove_z_extremes": True,
         "process_suite2p": False,
         "process_bonsai": True,
         "absZero": None,
@@ -132,7 +132,7 @@ def create_ops_boutton_registration(filePath, saveDir = None):
 
     ops["look_one_level_down"] = False
     ops["ignore_flyback"] = [0]
-    ops["nchannels"] = 1
+    ops["nchannels"] = 2
     ops["nplanes"] = 8
     ops["functional_chan"] = 1
 
@@ -173,15 +173,15 @@ def create_ops_boutton_registration(filePath, saveDir = None):
 
 def create_fitting_ops():
     ops = {
-        "debug": False,
+        "debug": True,
         "plot": True,
-        "active_quantile": 0.2,
-        "quiet_quantile": 0.01,
-        "save_dir": r"D:\fitting_test\plots",
-        "fitOri": True,
+        "active_velocity": 2,
+        "quiet_velocity": 0.5,
+        "save_dir": "C:\\OneDrive\\OneDrive - University of Sussex\\PreprocessedData",
+        "fitOri": False,
         "fitTf": True,
         "fitSf": True,
-        "fitContrast": True
+        "fitContrast": False
     }
 
     return ops
@@ -364,46 +364,52 @@ def directories_to_register():
 def directories_to_fit():
     # boutons
     dirDefs = [
-        {
-            "Name": "Io",
-            "Date": "2023-02-13",
-            "SpecificNeurons": [32],
-        },
-        {"Name": "Io", "Date": "2023-02-15", "SpecificNeurons": []},
-        {"Name": "Io", "Date": "2023-02-20", "SpecificNeurons": []},
-        # {"Name": "Io", "Date": "2023-05-22", "SpecificNeurons": []},
-        {"Name": "Janus", "Date": "2023-02-14", "SpecificNeurons": []},
-        {"Name": "Janus", "Date": "2023-02-22", "SpecificNeurons": []},
+        # {
+        #     "Name": "Io",
+        #     "Date": "2023-02-13",
+        #     "SpecificNeurons": [32],
+        # },
+        # {"Name": "Io", "Date": "2023-02-15", "SpecificNeurons": []},
+        # {"Name": "Io", "Date": "2023-02-20", "SpecificNeurons": []},
+        # # {"Name": "Io", "Date": "2023-05-22", "SpecificNeurons": []},
+        # {"Name": "Janus", "Date": "2023-02-14", "SpecificNeurons": []},
+        # {"Name": "Janus", "Date": "2023-02-22", "SpecificNeurons": []},
         # # neurons
-        {"Name": "Giuseppina", "Date": "2023-01-24", "SpecificNeurons": []},
-        # weird updated file for both below
-        {"Name": "Ladon", "Date": "2023-04-17", "SpecificNeurons": []},
-        {"Name": "Lotho", "Date": "2023-04-18", "SpecificNeurons": []},
-        # done
-        {"Name": "Ladon", "Date": "2023-07-07", "SpecificNeurons": []},
-        {"Name": "Giuseppina", "Date": "2023-01-06", "SpecificNeurons": []},
-        {"Name": "Lotho", "Date": "2023-04-12", "SpecificNeurons": []},
-        ### to much running
-        # weird updated file for both below
-        {"Name": "Lotho", "Date": "2023-04-18", "SpecificNeurons": []},
-        {
-            "Name": "Lotho",
-            "Date": "2023-04-20",
-        },
-        # done
-        {"Name": "Giuseppina", "Date": "2023-01-06", "SpecificNeurons": []},
-        {"Name": "Lotho", "Date": "2023-04-12", "SpecificNeurons": []},
-        {"Name": "Quille", "Date": "2023-07-24", "SpecificNeurons": []},
-        {"Name": "Quille", "Date": "2023-08-24", "SpecificNeurons": []},
-        {"Name": "Quille", "Date": "2023-09-07", "SpecificNeurons": []},
+        # {"Name": "Giuseppina", "Date": "2023-01-24", "SpecificNeurons": []},
+        # # weird updated file for both below
+        # {"Name": "Ladon", "Date": "2023-04-04", "SpecificNeurons": []},
+        # {"Name": "Ladon", "Date": "2023-04-17", "SpecificNeurons": []}
+        # {"Name": "Lotho", "Date": "2023-04-18", "SpecificNeurons": []},
+        # # done
+        # {"Name": "Ladon", "Date": "2023-07-07", "SpecificNeurons": []},
+        # {"Name": "Giuseppina", "Date": "2023-01-06", "SpecificNeurons": []},
+        # {"Name": "Giuseppina", "Date": "2022-10-28", "SpecificNeurons": []},
+        # {"Name": "Giuseppina", "Date": "2022-11-03", "SpecificNeurons": []},
+        # {"Name": "Lotho", "Date": "2023-04-12", "SpecificNeurons": []},
+        # ### to much running
+        # # weird updated file for both below
+        # {"Name": "Lotho", "Date": "2023-04-18", "SpecificNeurons": []},
+        # {
+        #     "Name": "Lotho",
+        #     "Date": "2023-04-20",
+        # },
+        # # done
+        # {"Name": "Giuseppina", "Date": "2023-01-06", "SpecificNeurons": []},
+        # {"Name": "Lotho", "Date": "2023-04-12", "SpecificNeurons": []},
+        # {"Name": "Quille", "Date": "2023-07-12", "SpecificNeurons": []},
+        # {"Name": "Quille", "Date": "2023-07-24", "SpecificNeurons": []},
+        # {"Name": "Quille", "Date": "2023-08-24", "SpecificNeurons": []},
+        # {"Name": "Quille", "Date": "2023-09-07", "SpecificNeurons": []},
+        {"Name": "Quille", "Date": "2023-10-12", "SpecificNeurons": []}
+        # {"Name": "Tara", "Date": "2023-12-19", "SpecificNeurons": []}
     ]
-    dirDefs = [
-        {
-            "Name": "Io",
-            "Date": "2023-02-13",
-            "SpecificNeurons": [],
-        }
-        ]
+    # dirDefs = [
+    #     {
+    #         "Name": "Io",
+    #         "Date": "2023-02-13",
+    #         "SpecificNeurons": [],
+    #     }
+    #     ]
     return dirDefs
 
 
@@ -411,8 +417,8 @@ def get_sparsenoise_info():
     session = pd.DataFrame(
         [
             {
-                "Name": "Tara",
-                "Date": "2023-11-01",
+                "Name": "Styx",
+                "Date": "2024-01-11",
                 "Experiments": [1],
                 "Plane": 2,
             }

@@ -67,15 +67,20 @@ sessions = directories_to_fit()
 
 ops = create_fitting_ops()
 # Loads the save directory from the fitting_ops in user_defs.
-saveDir = ops["save_dir"]
+# saveDir = ops["save_dir"]
 for currSession in sessions:
 
     print(f"starting to run session: {currSession}")
     # Gets data for current session from the Preprocessed folder.
     di = get_directory_from_session("Z:\\ProcessedData\\", currSession)
+    
     # Creates a dictionary with all the output from main_preprocess. 
     data = load_grating_data(di)
 
+    saveDir = os.path.join(ops["save_dir"]
+      , 
+      currSession["Name"], currSession["Date"], "analysis"
+    )
     # Makes save dir for later.
     if not os.path.isdir(saveDir):
         os.makedirs(saveDir)
@@ -96,8 +101,8 @@ for currSession in sessions:
         data["wheelTs"],
         data["gratingsSt"],
         data["gratingsEt"],
-        activeQuantile=ops["active_quantile"],
-        quietQuantile=ops["quiet_quantile"],
+        activeVelocity=ops["active_velocity"],
+        quietVelocity=ops["quiet_velocity"],
     )
 
     respP = np.zeros(gratingRes.shape[-1])
@@ -115,7 +120,7 @@ for currSession in sessions:
 
     paramsTf = np.zeros((gratingRes.shape[-1],4))
     # paramsTfSplit = np.zeros((8, gratingRes.shape[-1]))
-    paramsTfSplit = np.zeros((gratingRes.shape[-1]4,2))
+    paramsTfSplit = np.zeros((gratingRes.shape[-1],4,2))
     # varsTf = np.zeros((3, gratingRes.shape[-1]))
     varTfConst = np.zeros(gratingRes.shape[-1])
     varTfOne = np.zeros(gratingRes.shape[-1])
@@ -185,58 +190,65 @@ for currSession in sessions:
         except:
             pass    
 
+
+
+    # for n in range(0,10):
     for n in fittingRange:
-
-        sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
-            gratingRes, data, ts, quietI, activeI, n,ops["fitOri"],ops["fitTf"],ops["fitSf"],ops["fitContrast"]
-        )
-
-        respP[n] = sig[0]
-        respDirection[n] = sig[1]
-
-        paramsOri[ n,:] = res_ori[0]        
-        paramsOriSplit[n,:,0] = res_ori[1][[0, 2, 4, 5, 6]]
-        paramsOriSplit[n,:,1] = res_ori[1][[1, 3, 4, 5, 6]]
-        # varsOri[:, n] = res_ori[2:5]
-        varOriConst[n] = res_ori[2]
-        varOriOne[n] = res_ori[3]
-        varOriSplit[n] = res_ori[4]
-        pvalOri[n] = res_ori[6]
-        TunersOri[n,:] = res_ori[7:]
-
-        paramsTf[n,:] = res_freq[0]        
-        paramsTfSplit[n,:,0] = res_freq[1][::2]
-        paramsTfSplit[n,:,1] = res_freq[1][1::2]
-        # varsTf[:, n] = res_freq[2:5]
-        varTfConst[n] = res_freq[2]
-        varTfOne[n] = res_freq[3]
-        varTfSplit[n] = res_freq[4]
-        pvalTf[n] = res_freq[6]
-        TunersTf[n,:] = res_freq[7:]
-
-        paramsSf[n,:] = res_spatial[0]        
-        paramsSfSplit[n,:,0] = res_spatial[1][::2]
-        paramsSfSplit[n,:,1] = res_spatial[1][1::2]
-        # varsSf[:, n] = res_spatial[2:5]
-        varSfConst[n] = res_spatial[2]
-        varSfOne[n] = res_spatial[3]
-        varSfSplit[n] = res_spatial[4]
-        pvalSf[n] = res_spatial[6]
-        TunersSf[n,:] = res_spatial[7:]
-
-        paramsCon[n,:] = res_con[0]        
-        paramsConSplit[n,:,0] = res_con[1][[0, 2, 4, 5]]
-        paramsConSplit[n,:,1] = res_con[1][[1, 3, 4, 5]]
-        # varsCon[:, n] = res_con[2:5]
-        varConConst[n] = res_con[2]
-        varConOne[n] = res_con[3]
-        varConSplit[n] = res_con[4]
-        pvalCon[n] = res_con[6]
-        TunersCon[n,:] = res_con[7:]
         
         
-
-
+    
+            sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
+                gratingRes, data, ts, quietI, activeI, n,ops["fitOri"],ops["fitTf"],ops["fitSf"],ops["fitContrast"]
+            )
+    
+            respP[n] = sig[0]
+            respDirection[n] = sig[1]
+    
+            paramsOri[ n,:] = res_ori[0]        
+            paramsOriSplit[n,:,0] = res_ori[1][[0, 2, 4, 5, 6]]
+            paramsOriSplit[n,:,1] = res_ori[1][[1, 3, 4, 5, 6]]
+            # varsOri[:, n] = res_ori[2:5]
+            varOriConst[n] = res_ori[2]
+            varOriOne[n] = res_ori[3]
+            varOriSplit[n] = res_ori[4]
+            pvalOri[n] = res_ori[6]
+            TunersOri[n,:] = res_ori[7:]
+    
+            paramsTf[n,:] = res_freq[0]        
+            paramsTfSplit[n,:,0] = res_freq[1][::2]
+            paramsTfSplit[n,:,1] = res_freq[1][1::2]
+            # varsTf[:, n] = res_freq[2:5]
+            varTfConst[n] = res_freq[2]
+            varTfOne[n] = res_freq[3]
+            varTfSplit[n] = res_freq[4]
+            pvalTf[n] = res_freq[6]
+            TunersTf[n,:] = res_freq[7:]
+    
+            paramsSf[n,:] = res_spatial[0]        
+            paramsSfSplit[n,:,0] = res_spatial[1][::2]
+            paramsSfSplit[n,:,1] = res_spatial[1][1::2]
+            # varsSf[:, n] = res_spatial[2:5]
+            varSfConst[n] = res_spatial[2]
+            varSfOne[n] = res_spatial[3]
+            varSfSplit[n] = res_spatial[4]
+            pvalSf[n] = res_spatial[6]
+            TunersSf[n,:] = res_spatial[7:]
+    
+            paramsCon[n,:] = res_con[0]        
+            paramsConSplit[n,:,0] = res_con[1][[0, 2, 4, 5]]
+            paramsConSplit[n,:,1] = res_con[1][[1, 3, 4, 5]]
+            # varsCon[:, n] = res_con[2:5]
+            varConConst[n] = res_con[2]
+            varConOne[n] = res_con[3]
+            varConSplit[n] = res_con[4]
+            pvalCon[n] = res_con[6]
+            TunersCon[n,:] = res_con[7:]
+       
+        
+        
+            
+    
+    
     np.save(os.path.join(saveDir, "gratingResp.pVal.npy"), respP)
     np.save(os.path.join(saveDir, "gratingResp.direction.npy"), respDirection)
     
@@ -271,19 +283,20 @@ for currSession in sessions:
         np.save(os.path.join(saveDir, "gratingContrastTunin.expVar.noSplit.npy"), varConOne)
         np.save(os.path.join(saveDir, "gratingContrastTunin.expVar.runningSplit.npy"), varConSplit)
         np.save(os.path.join(saveDir, "gratingContrastTunin.pVal.runningSplit.npy"), pvalCon)
-    
+        
 
 #%%plotting
 
     
-for n in fittingRange:
-         try:
+# for n in fittingRange:
+#          # try:
      
-             print_fitting_data(gratingRes,ts, quietI, activeI, data, paramsOri, 
-         paramsOriSplit, varsOri, pvalOri, paramsTf, paramsTfSplit, varsTf, 
-         pvalTf, paramsSf, paramsSfSplit, varsSf, pvalSf, n, respP,None, saveDir)
-             plt.close()
-         except Exception:
-             print("fail "+ str(n))
+#              print_fitting_data(gratingRes,ts, quietI, activeI, data, paramsOri, 
+#          paramsOriSplit, varOriOne, pvalOri, paramsTf, paramsTfSplit, varTfConst,
+#          varTfOne, varTfSplit, pvalTf, paramsSf, paramsSfSplit, varTfConst, varSfOne, varSfSplit,
+#          pvalSf, n, respP,None, saveDir)
+#              plt.close()
+#          # except Exception:
+#          #     print("fail "+ str(n))
     
  

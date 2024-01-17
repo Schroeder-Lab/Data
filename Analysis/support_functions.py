@@ -58,7 +58,7 @@ import inspect
 
 def get_directory_from_session(mainDir, session):
     di = os.path.join(
-        mainDir, session["Name"], session["Date"], "suite2p\\PreprocessedFiles"
+        mainDir, session["Name"], session["Date"], "PreprocessedFiles"
     )
     return di
 
@@ -69,8 +69,8 @@ def get_trial_classification_running(
     wheelTs,
     stimSt,
     stimEt,
-    quietQuantile=0.01,
-    activeQuantile=0.5,
+    quietVelocity=0.5,
+    activeVelocity=2,
     criterion=0.9,
 ):
     wheelVelocity = np.abs(wheelVelocity)
@@ -81,10 +81,9 @@ def get_trial_classification_running(
         np.hstack((stimSt, stimEt)) - stimSt,
     )
 
-    whLow = wh <= np.quantile(wheelVelocity, quietQuantile)
-    whLow = np.sum(whLow, 0) / whLow.shape[0]
-    activeThreshold = np.quantile(wheelVelocity, activeQuantile)
-    whHigh = wh > activeThreshold
+    whLow = wh <= quietVelocity
+    whLow = np.sum(whLow, 0) / whLow.shape[0]    
+    whHigh = wh >= activeVelocity
     whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
         whHigh.shape[0] / 2
     )
@@ -287,7 +286,7 @@ def run_tests(
 
         # remove from fit x vals where not enough values in either dataset
         indq = np.where(qCounts < 3)[0]
-        inda = np.where(qCounts < 3)[0]
+        inda = np.where(aCounts < 3)[0]
         removeInds = np.union1d(indq, inda)
         removeValues = dfq[x_name].value_counts().index.to_numpy()[removeInds]
         if (len(removeInds) / len(qCounts)) > 0.33:
@@ -496,15 +495,15 @@ def run_complete_analysis(
 def load_grating_data(directory):
     fileNameDic = {
         "sig": "calcium.dff.npy",
-        "planes": "calcium.planes.npy",
+        "planes": "rois.planes.npy",
         "planeDelays": "planes.delay.npy",
         "calTs": "calcium.timestamps.npy",
-        "faceTs": "eye.timestamps.npy",
+        #"faceTs": "eye.timestamps.npy",
         "gratingsContrast": "gratings.contrast.npy",
-        "gratingsOri": "gratings.ori.npy",
-        "gratingsEt": "gratings.et.npy",
-        "gratingsSt": "gratings.st.npy",
-        "gratingsReward": "gratings.reward.npy",
+        "gratingsOri": "gratings.direction.npy",
+        "gratingsEt": "gratings.endTime.npy",
+        "gratingsSt": "gratings.startTime.npy",
+        # "gratingsReward": "gratings.reward.npy",
         "gratingsSf": "gratings.spatialF.npy",
         "gratingsTf": "gratings.temporalF.npy",
         "wheelTs": "wheel.timestamps.npy",
