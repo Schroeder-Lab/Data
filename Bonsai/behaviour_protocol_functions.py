@@ -153,7 +153,7 @@ def stimulus_naturalImages(directory, frameChanges):
 
 
 def stimulus_spont(directory, frameChanges):
-    return {"Spont.intervals": [frameChanges[0], frameChanges[-1]]}
+    return {"darkScreen.intervals": [frameChanges[0], frameChanges[-1]]}
 
 
 stimulus_prcoessing_dictionary = {
