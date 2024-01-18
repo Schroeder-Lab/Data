@@ -175,8 +175,8 @@ def create_fitting_ops():
     ops = {
         "debug": False,
         "plot": True,
-        "active_quantile": 0.2,
-        "quiet_quantile": 0.01,
+        "active_velocity": 2,
+        "quiet_velocity": 0.5,
         "save_dir": r"D:\fitting_test\plots",
         "fitOri": True,
         "fitTf": True,

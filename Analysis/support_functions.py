@@ -69,8 +69,8 @@ def get_trial_classification_running(
     wheelTs,
     stimSt,
     stimEt,
-    quietQuantile=0.01,
-    activeQuantile=0.5,
+    quietVelocity=0.5,
+    activeVelocity=2,
     criterion=0.9,
 ):
     wheelVelocity = np.abs(wheelVelocity)
@@ -81,15 +81,14 @@ def get_trial_classification_running(
         np.hstack((stimSt, stimEt)) - stimSt,
     )
 
-    whLow = wh <= np.quantile(wheelVelocity, quietQuantile)
-    whLow = np.sum(whLow, 0) / whLow.shape[0]
-    activeThreshold = np.quantile(wheelVelocity, activeQuantile)
-    whHigh = wh > activeThreshold
+    whLow = wh <= quietVelocity
+    whLow = np.sum(whLow, 0) / whLow.shape[0]   
+    whHigh = wh > activeVelocity
     whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
         whHigh.shape[0] / 2
     )
     quietTrials = np.where(whLow >= criterion)[0]
-    activeTrials = np.where(whHigh > 0.9)[0]
+    activeTrials = np.where(whHigh > criterion)[0]
     return quietTrials, activeTrials
 
 

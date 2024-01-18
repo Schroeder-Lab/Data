@@ -67,7 +67,7 @@ sessions = directories_to_fit()
 
 ops = create_fitting_ops()
 # Loads the save directory from the fitting_ops in user_defs.
-saveDir = ops["save_dir"]
+saveDirBase = ops["save_dir"]
 for currSession in sessions:
 
     print(f"starting to run session: {currSession}")
@@ -75,7 +75,9 @@ for currSession in sessions:
     di = get_directory_from_session("Z:\\ProcessedData\\", currSession)
     # Creates a dictionary with all the output from main_preprocess. 
     data = load_grating_data(di)
-
+    
+    saveDir = os.path.join(saveDirBase,currSession["Name"],currSession["Date"])
+    
     # Makes save dir for later.
     if not os.path.isdir(saveDir):
         os.makedirs(saveDir)
@@ -96,8 +98,8 @@ for currSession in sessions:
         data["wheelTs"],
         data["gratingsSt"],
         data["gratingsEt"],
-        activeQuantile=ops["active_quantile"],
-        quietQuantile=ops["quiet_quantile"],
+        activeQuantile=ops["active_velocity"],
+        quietQuantile=ops["quiet_velocity"],
     )
 
     respP = np.zeros(gratingRes.shape[-1])
@@ -115,7 +117,7 @@ for currSession in sessions:
 
     paramsTf = np.zeros((gratingRes.shape[-1],4))
     # paramsTfSplit = np.zeros((8, gratingRes.shape[-1]))
-    paramsTfSplit = np.zeros((gratingRes.shape[-1]4,2))
+    paramsTfSplit = np.zeros((gratingRes.shape[-1],4,2))
     # varsTf = np.zeros((3, gratingRes.shape[-1]))
     varTfConst = np.zeros(gratingRes.shape[-1])
     varTfOne = np.zeros(gratingRes.shape[-1])
