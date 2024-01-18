@@ -43,6 +43,8 @@ for i in range(len(database)):
     # Goes through the pandas dataframe called database created above and
     # if True in the column "Process", the processing continues.
     if database.loc[i]["Process"]:
+        dias = []
+        xys = []
         entry = database.loc[i]
         baseDir = os.path.join(preprocessDir, entry["Name"], entry["Date"])
         s2pDir = os.path.join(baseDir, "suite2p")
@@ -52,3 +54,17 @@ for i in range(len(database)):
             print('No suite2p cannot continue')
             continue
         ops = np.load(opsFile[0], allow_pickle=True).item()
+        data_paths = ops['data_path']
+        includedSession = [os.path.split(s)[-1] for s in data_paths]
+        for s in includedSession:
+            sessionDir = os.path.join(pupilDir, s)
+            dia = np.load(os.path.join(sessionDir, "eye.diameter.npy"))
+            xy = np.load(os.path.join(sessionDir, "eye.xyPos.npy"))
+            dias.append(dia)
+            xys.append(xy)
+
+        dias = np.hstack(dias).reshape(-1, 1)
+        xys = np.vstack(xys)
+
+        np.save(os.path.join(baseDir, "eye.diameter.npy"), dias)
+        np.save(os.path.join(baseDir, "eye.xyPos.npy"), xys)

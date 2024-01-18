@@ -98,8 +98,8 @@ for currSession in sessions:
         data["wheelTs"],
         data["gratingsSt"],
         data["gratingsEt"],
-        activeQuantile=ops["active_velocity"],
-        quietQuantile=ops["quiet_velocity"],
+        activeVelocity=ops["active_velocity"],
+        quietVelocity=ops["quiet_velocity"],
     )
 
     respP = np.zeros(gratingRes.shape[-1])
