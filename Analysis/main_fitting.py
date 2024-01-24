@@ -202,9 +202,9 @@ for currSession in sessions:
         paramsOri[n, :] = res_ori[0]
 
         paramsOriSplit[n, :, 0] = res_ori[1][[0, 2, 4, 5, 6]] if (
-            not np.isnan(res_ori[1])) else np.nan
+            not np.any(np.isnan(res_ori[1]))) else np.nan
         paramsOriSplit[n, :, 1] = res_ori[1][[1, 3, 4, 5, 6]] if (
-            not np.isnan(res_ori[1])) else np.nan
+            not np.any(np.isnan(res_ori[1]))) else np.nan
         # varsOri[:, n] = res_ori[2:5]
         varOriConst[n] = res_ori[2]
         varOriOne[n] = res_ori[3]
@@ -214,9 +214,9 @@ for currSession in sessions:
 
         paramsTf[n, :] = res_freq[0]
         paramsTfSplit[n, :, 0] = res_freq[1][::2] if (
-            not np.isnan(res_freq[1])) else np.nan
+            not np.any(np.isnan(res_freq[1]))) else np.nan
         paramsTfSplit[n, :, 1] = res_freq[1][1::2] if (
-            not np.isnan(res_freq[1])) else np.nan
+            not np.any(np.isnan(res_freq[1]))) else np.nan
         # varsTf[:, n] = res_freq[2:5]
         varTfConst[n] = res_freq[2]
         varTfOne[n] = res_freq[3]
@@ -226,9 +226,9 @@ for currSession in sessions:
 
         paramsSf[n, :] = res_spatial[0]
         paramsSfSplit[n, :, 0] = res_spatial[1][::2] if (
-            not np.isnan(res_spatial[1])) else np.nan
+            not np.any(np.isnan(res_spatial[1]))) else np.nan
         paramsSfSplit[n, :, 1] = res_spatial[1][1::2] if (
-            not np.isnan(res_spatial[1])) else np.nan
+            not np.any(np.isnan(res_spatial[1]))) else np.nan
         # varsSf[:, n] = res_spatial[2:5]
         varSfConst[n] = res_spatial[2]
         varSfOne[n] = res_spatial[3]
@@ -238,9 +238,9 @@ for currSession in sessions:
 
         paramsCon[n, :] = res_con[0]
         paramsConSplit[n, :, 0] = res_con[1][[0, 2, 4, 5]] if (
-            not np.isnan(res_con[1])) else np.nan
+            not np.any(np.isnan(res_con[1]))) else np.nan
         paramsConSplit[n, :, 1] = res_con[1][[1, 3, 4, 5]] if (
-            not np.isnan(res_con[1])) else np.nan
+            not np.any(np.isnan(res_con[1]))) else np.nan
         # varsCon[:, n] = res_con[2:5]
         varConConst[n] = res_con[2]
         varConOne[n] = res_con[3]
