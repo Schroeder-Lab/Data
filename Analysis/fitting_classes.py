@@ -317,7 +317,9 @@ class BaseTuner(ABC):
         valRange = np.arange(np.min(x), np.max(x), 0.01)
         pred1 = self.predict_split(valRange, 0)
         pred2 = self.predict_split(valRange, 1)
-        return np.trapz(np.abs(pred2 - pred1))
+        # pred1 -= np.min(pred1)
+        # pred2 -= np.min(pred2)
+        return np.trapz(abs(pred2 - pred1), x=valRange)
 
     def shuffle_split(self, x, y, nshuff=500):
         """
@@ -343,17 +345,21 @@ class BaseTuner(ABC):
         vrn = len(valRange)
         vals = np.append(valRange, valRange)
         sep_save = self.sep
-        self.sep = vrn
+
         for i in range(nshuff):
             ind_surr = np.random.permutation(len(x))
             x_surr = x.copy()[ind_surr]
             y_surr = y.copy()[ind_surr]
+            self.sep = sep_save
             props = self.fit(x_surr, y_surr, save=False)
             if not (np.any(np.isnan(props))):
+                self.sep = vrn
                 preds = self.func(vals, *props)
                 pred1 = preds[:vrn]
                 pred2 = preds[vrn:]
-                diff_auc = np.trapz(np.abs(pred2 - pred1))
+                # pred1 -= np.nanmin(pred1)
+                # pred2 -= np.nanmin(pred2)
+                diff_auc = np.trapz(np.abs(pred2 - pred1), x=valRange)
                 dist[i] = diff_auc
             else:
                 dist[i] = 0
@@ -920,8 +926,8 @@ class ContrastTuner(BaseTuner):
             return np.nan
 
 
-class GammaTuner(BaseTuner):        
-    def __init__(self, funcName, prelim = None,sep=None):
+class GammaTuner(BaseTuner):
+    def __init__(self, funcName, prelim=None, sep=None):
         BaseTuner.__init__(self, sep)
         self.set_function(funcName)
         self.prelim = prelim
@@ -940,11 +946,11 @@ class GammaTuner(BaseTuner):
             avgy[xi] = np.nanmean(y[x == xuu])
         if (not (self.prelim is None)):
             return self.prelim
-        
+
         return (
             np.nanmin(avgy),
             np.nanmax(avgy),
-            1,    
+            1,
             # 0,
             2,
         )
@@ -955,14 +961,14 @@ class GammaTuner(BaseTuner):
             (
                 -np.inf,
                 0,
-                0.01,   
+                0.01,
                 # -10,
                 1,
             ),
             (
                 np.max(y),
                 np.max(y),
-                100,  
+                100,
                 # 0,
                 100,
             ),  # np.nanmax(y),  # np.nanmax(y),
@@ -1017,7 +1023,7 @@ class GammaTuner(BaseTuner):
                     p0_[3],
                     # p0_[4],
                     # p0_[4],
-                    
+
                 )
 
                 bounds = (
@@ -1032,7 +1038,7 @@ class GammaTuner(BaseTuner):
                         bounds[0][3],
                         # bounds[0][4],
                         # bounds[0][4],
-                        
+
                     ),
                     (
                         bounds[1][0],
@@ -1045,7 +1051,7 @@ class GammaTuner(BaseTuner):
                         bounds[1][3],
                         # bounds[1][4],
                         # bounds[1][4],
-                        
+
                     ),
                 )
             except:
@@ -1060,7 +1066,7 @@ class GammaTuner(BaseTuner):
                     p0[3],
                     # p0[4],
                     # p0[4],
-                    
+
                 )
 
                 bounds = (
@@ -1075,7 +1081,7 @@ class GammaTuner(BaseTuner):
                         bounds[0][3],
                         # bounds[0][4],
                         # bounds[0][4],
-                        
+
                     ),
                     (
                         bounds[1][0],
@@ -1088,7 +1094,7 @@ class GammaTuner(BaseTuner):
                         bounds[1][3],
                         # bounds[1][4],
                         # bounds[1][4],
-                        
+
                     ),
                 )
             return p0, bounds
@@ -1173,7 +1179,7 @@ class GammaTuner(BaseTuner):
 
 
 class Gauss2DTuner(BaseTuner):
-    def __init__(self, funcName, bestSpot, minR = None, sep=None):
+    def __init__(self, funcName, bestSpot, minR=None, sep=None):
         BaseTuner.__init__(self, sep)
         self.set_function(funcName)
         self.maxSpot = bestSpot
@@ -1194,17 +1200,18 @@ class Gauss2DTuner(BaseTuner):
         means = df.groupby(["x", "y"]).mean().reset_index()
         maxValInd = np.argmax(means["resp"])
         maxVal = means.iloc[maxValInd]["resp"]
-    
+
         maxX = self.maxSpot[1]  # means.iloc[maxValInd]["x"]
         maxY = self.maxSpot[0]  # means.iloc[maxValInd]["y"]
-        maxVal = means[(means.x==maxX) & (means.y==maxY)].resp.to_numpy()[0]
-        
+        maxVal = means[(means.x == maxX) & (
+            means.y == maxY)].resp.to_numpy()[0]
+
         p0 = (
             maxVal,
             maxX,
             maxY,
-            0.5/2  if self.minR is None else self.minR,#xdiff,
-            0.5/2  if self.minR is None else self.minR,#ydiff,
+            0.5/2 if self.minR is None else self.minR,  # xdiff,
+            0.5/2 if self.minR is None else self.minR,  # ydiff,
             0,
             0,
         )
@@ -1230,13 +1237,13 @@ class Gauss2DTuner(BaseTuner):
 
         possibleMaxX = np.nanmax(x[:, 0]) - np.nanmin(x[:, 0])
         possibleMaxY = np.nanmax(x[:, 1]) - np.nanmin(x[:, 1])
-        
+
         bounds = (
             (
                 -np.inf,
                 self.maxSpot[1] - 5,  # ,np.nanmin(x[:, 0])
                 self.maxSpot[0] - 5,  # np.nanmin(x[:, 1])
-                0.5/2  if self.minR is None else self.minR,
+                0.5/2 if self.minR is None else self.minR,
                 0.5/2 if self.minR is None else self.minR,
                 0,
                 -np.inf,

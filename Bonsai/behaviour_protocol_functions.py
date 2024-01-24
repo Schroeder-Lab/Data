@@ -71,7 +71,7 @@ def stimulus_classification(directory, frameChanges):
     return {'fullField.startTime.npy': retinal_st.reshape(-1, 1).copy(),
             "fullField.endTime.npy": retinal_et.reshape(-1, 1).copy(),
             "fullField.stim.npy": retinal_stimType.copy(),
-            "fullFieldExp.intervals": [retinal_st[0], retinal_et[-1]]
+            "fullFieldExp.intervals.npy": [retinal_st[0], retinal_et[-1]]
             }
 
 
@@ -134,7 +134,7 @@ def stimulus_gratings(directory, frameChanges):
             "gratings.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
-            "gratingsExp.intervals": [st[0], et[-1]]
+            "gratingsExp.intervals.npy": [st[0], et[-1]]
             }
 
 
@@ -148,7 +148,7 @@ def stimulus_naturalImages(directory, frameChanges):
     return {"natural.startTime.npy": st,
             "natural.endTime.npy": et,
             "natural.fileNames.npy": stimProps.FileName.to_numpy().reshape(-1, 1).astype(str).copy(),
-            "naturalExp.intervals": [st[0, 0], et[-1, 0]]
+            "naturalExp.intervals.npy": [st[0, 0], et[-1, 0]]
             }
 
 

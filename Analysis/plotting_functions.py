@@ -16,6 +16,7 @@ from support_functions import *
 from user_defs import directories_to_fit, create_fitting_ops
 from fitting_classes import *
 
+
 def plot_tf_resp(
     resp,
     ts,
@@ -153,10 +154,12 @@ def print_fitting_data(
 
     save = not (saveDir is None)
     if (save) & (not (sessionData is None)):
+        saveDir = os.path.join(saveDir, "plots")
         saveDir = os.path.join(
             saveDir, sessionData["Name"], sessionData["Date"]
         )
     if save:
+        saveDir = os.path.join(saveDir, "plots")
         if not os.path.isdir(saveDir):
             os.makedirs(saveDir)
 
@@ -168,26 +171,26 @@ def print_fitting_data(
         data,
         n,
     )
-    ### ORI
+    # ORI
 
     tunerBase = OriTuner("gauss")
-    tunerBase.props = paramsOri[:, n]
+    tunerBase.props = paramsOri[n, :]
     tunerSplit = OriTuner("gauss_split")
-    tunerSplit.props = paramsOriSplit[:, n]
+    tunerSplit.props = paramsOriSplit[n, :]
 
     df = dfAll[(dfAll.sf == 0.08) & (dfAll.tf == 2) & (dfAll.contrast == 1)]
     f, ax = plt.subplots(2)
     f.suptitle(f"Ori Tuning, Resp p: {np.round(respP[n],3)}")
     f.subplots_adjust(hspace=2)
     ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsOri[0,n],3)}, VE model: {np.round(varsOri[1,n],3)}"
+        f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}"
     )
     ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsOri[2,n],3)}, pVal dAUC: {np.round(pvalOri[n],3)}"
+        f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, pVal dAUC: {np.round(pvalOri[n],3)}"
     )
     sns.lineplot(
         x=np.arange(0, 360, 0.01),
-        y=tunerBase.func(np.arange(0, 360, 0.01), *paramsOri[:, n]),
+        y=tunerBase.func(np.arange(0, 360, 0.01), *paramsOri[n, :]),
         ax=ax[0],
         color="black",
     )
@@ -231,11 +234,11 @@ def print_fitting_data(
         plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.pdf"))
         plt.close(f)
 
-    #### temporal
+    # temporal
     tunerBase = FrequencyTuner("gauss")
-    tunerBase.props = paramsTf[:, n]
+    tunerBase.props = paramsTf[n, :]
     tunerSplit = FrequencyTuner("gauss_split")
-    tunerSplit.props = paramsTfSplit[:, n]
+    tunerSplit.props = paramsTfSplit[n, :]
 
     df = dfAll[
         (dfAll.sf == 0.08)
@@ -251,10 +254,10 @@ def print_fitting_data(
     f.suptitle(f"Temporal frequency Tuning, Resp p: {np.round(respP[n],3)}")
     f.subplots_adjust(hspace=2)
     ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsTf[0,n],3)}, VE model: {np.round(varsTf[1,n],3)}"
+        f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}"
     )
     ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsTf[2,n],3)}, pVal dAUC: {np.round(pvalTf[n],3)}"
+        f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, pVal dAUC: {np.round(pvalTf[n],3)}"
     )
     sns.lineplot(
         x=fittingRange,
@@ -299,11 +302,11 @@ def print_fitting_data(
         plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.pdf"))
         plt.close(f)
 
-    ### spatial
+    # spatial
     tunerBase = FrequencyTuner("gauss")
-    tunerBase.props = paramsSf[:, n]
+    tunerBase.props = paramsSf[n, :]
     tunerSplit = FrequencyTuner("gauss_split")
-    tunerSplit.props = paramsSfSplit[:, n]
+    tunerSplit.props = paramsSfSplit[n, :]
 
     df = dfAll[
         (dfAll.tf == 2)
@@ -316,10 +319,10 @@ def print_fitting_data(
     f.suptitle(f"Spatial frequency Tuning, Resp p: {np.round(respP[n],3)}")
     f.subplots_adjust(hspace=2)
     ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsSf[0,n],3)}, VE model: {np.round(varsSf[1,n],3)}"
+        f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)}"
     )
     ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsSf[2,n],3)}, pVal dAUC: {np.round(pvalSf[n],3)}"
+        f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, pVal dAUC: {np.round(pvalSf[n],3)}"
     )
     fittingRange = np.arange(0.01, 0.34, 0.01)
     sns.lineplot(

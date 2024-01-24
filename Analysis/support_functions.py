@@ -58,7 +58,7 @@ import inspect
 
 def get_directory_from_session(mainDir, session):
     di = os.path.join(
-        mainDir, session["Name"], session["Date"], "suite2p\\PreprocessedFiles"
+        mainDir, session["Name"], session["Date"],
     )
     return di
 
@@ -82,7 +82,7 @@ def get_trial_classification_running(
     )
 
     whLow = wh <= quietVelocity
-    whLow = np.sum(whLow, 0) / whLow.shape[0]   
+    whLow = np.sum(whLow, 0) / whLow.shape[0]
     whHigh = wh > activeVelocity
     whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
         whHigh.shape[0] / 2
@@ -151,7 +151,7 @@ def is_responsive_direction(df, criterion=0.05):
     model to shuffled data. 
     The function calculates a p-value based on the actual R-squared score's 
     percentile among the shuffled scores.
-    
+
     Parameters
     ----------
     df : pandas.DataFrame
@@ -193,13 +193,13 @@ def is_responsive_direction(df, criterion=0.05):
         b_ = np.random.permutation(b)
         res = sp.linalg.lstsq(a, b_)
         shuffscore[s] = r2_score(b_, a @ res[0])
-        
+
     # Calculate the percentile rank of the actual score among shuffled scores.
     p = sp.stats.percentileofscore(shuffscore, score)
     # Convert the percentile rank to a p-value.
-    
+
     p = (100 - p) / 100
-    
+
     # If the p-value is below the criterion, determine the responsiveness direction.
     if p < (criterion):
         direction = np.sign(np.nanmean(df["avg_corrected"]))
@@ -441,7 +441,7 @@ def run_complete_analysis(
 
     else:
         res_ori = make_empty_results("Ori")
-    #### run Tf
+    # run Tf
     if runTf:
         # Temporal Frequency tests
         df = dfAll[
@@ -495,14 +495,14 @@ def run_complete_analysis(
 def load_grating_data(directory):
     fileNameDic = {
         "sig": "calcium.dff.npy",
-        "planes": "calcium.planes.npy",
+        "planes": "rois.planes.npy",
         "planeDelays": "planes.delay.npy",
         "calTs": "calcium.timestamps.npy",
         "faceTs": "eye.timestamps.npy",
         "gratingsContrast": "gratings.contrast.npy",
-        "gratingsOri": "gratings.ori.npy",
-        "gratingsEt": "gratings.et.npy",
-        "gratingsSt": "gratings.st.npy",
+        "gratingsOri": "gratings.direction.npy",
+        "gratingsEt": "gratings.endTime.npy",
+        "gratingsSt": "gratings.startTime.npy",
         "gratingsReward": "gratings.reward.npy",
         "gratingsSf": "gratings.spatialF.npy",
         "gratingsTf": "gratings.temporalF.npy",
