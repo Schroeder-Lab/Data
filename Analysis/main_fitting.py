@@ -200,8 +200,11 @@ for currSession in sessions:
         respDirection[n] = sig[1]
 
         paramsOri[n, :] = res_ori[0]
-        paramsOriSplit[n, :, 0] = res_ori[1][[0, 2, 4, 5, 6]]
-        paramsOriSplit[n, :, 1] = res_ori[1][[1, 3, 4, 5, 6]]
+
+        paramsOriSplit[n, :, 0] = res_ori[1][[0, 2, 4, 5, 6]] if (
+            not np.isnan(res_ori[1])) else np.nan
+        paramsOriSplit[n, :, 1] = res_ori[1][[1, 3, 4, 5, 6]] if (
+            not np.isnan(res_ori[1])) else np.nan
         # varsOri[:, n] = res_ori[2:5]
         varOriConst[n] = res_ori[2]
         varOriOne[n] = res_ori[3]
@@ -210,8 +213,10 @@ for currSession in sessions:
         TunersOri[n, :] = res_ori[7:]
 
         paramsTf[n, :] = res_freq[0]
-        paramsTfSplit[n, :, 0] = res_freq[1][::2]
-        paramsTfSplit[n, :, 1] = res_freq[1][1::2]
+        paramsTfSplit[n, :, 0] = res_freq[1][::2] if (
+            not np.isnan(res_freq[1])) else np.nan
+        paramsTfSplit[n, :, 1] = res_freq[1][1::2] if (
+            not np.isnan(res_freq[1])) else np.nan
         # varsTf[:, n] = res_freq[2:5]
         varTfConst[n] = res_freq[2]
         varTfOne[n] = res_freq[3]
@@ -220,8 +225,10 @@ for currSession in sessions:
         TunersTf[n, :] = res_freq[7:]
 
         paramsSf[n, :] = res_spatial[0]
-        paramsSfSplit[n, :, 0] = res_spatial[1][::2]
-        paramsSfSplit[n, :, 1] = res_spatial[1][1::2]
+        paramsSfSplit[n, :, 0] = res_spatial[1][::2] if (
+            not np.isnan(res_spatial[1])) else np.nan
+        paramsSfSplit[n, :, 1] = res_spatial[1][1::2] if (
+            not np.isnan(res_spatial[1])) else np.nan
         # varsSf[:, n] = res_spatial[2:5]
         varSfConst[n] = res_spatial[2]
         varSfOne[n] = res_spatial[3]
@@ -230,8 +237,10 @@ for currSession in sessions:
         TunersSf[n, :] = res_spatial[7:]
 
         paramsCon[n, :] = res_con[0]
-        paramsConSplit[n, :, 0] = res_con[1][[0, 2, 4, 5]]
-        paramsConSplit[n, :, 1] = res_con[1][[1, 3, 4, 5]]
+        paramsConSplit[n, :, 0] = res_con[1][[0, 2, 4, 5]] if (
+            not np.isnan(res_con[1])) else np.nan
+        paramsConSplit[n, :, 1] = res_con[1][[1, 3, 4, 5]] if (
+            not np.isnan(res_con[1])) else np.nan
         # varsCon[:, n] = res_con[2:5]
         varConConst[n] = res_con[2]
         varConOne[n] = res_con[3]
@@ -303,13 +312,26 @@ varsTf = np.vstack((varTfConst, varTfOne, varTfSplit)).T
 varsSf = np.vstack((varSfConst, varSfOne, varSfSplit)).T
 varsCon = np.vstack((varConConst, varConOne, varConSplit)).T
 
+paramsOriSplit_ = np.zeros((paramsOri.shape[0], 7))
+paramsTfSplit_ = np.zeros((paramsOri.shape[0], 8))
+paramsSfSplit_ = np.zeros((paramsOri.shape[0], 8))
+paramsConSplit_ = np.zeros((paramsOri.shape[0], 8))
+
+paramsOriSplit_[:, [0, 2, 4, 5, 6]] = paramsOriSplit[:, :, 0]
+paramsOriSplit_[:, [1, 3, 4, 5, 6]] = paramsOriSplit[:, :, 1]
+
+paramsTfSplit_[:, ::2] = paramsTfSplit[:, :, 0]
+paramsTfSplit_[:, 1::2] = paramsTfSplit[:, :, 1]
+
+paramsSfSplit_[:, ::2] = paramsTfSplit[:, :, 0]
+paramsSfSplit_[:, 1::2] = paramsTfSplit[:, :, 1]
 
 for n in fittingRange:
     try:
 
-        print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri[],
-                           paramsOriSplit, varsOri, pvalOri, paramsTf, paramsTfSplit, varsTf,
-                           pvalTf, paramsSf, paramsSfSplit, varsSf, pvalSf, n, respP, None, saveDir)
+        print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
+                           paramsOriSplit_, varsOri, pvalOri, paramsTf, paramsTfSplit_, varsTf,
+                           pvalTf, paramsSf, paramsSfSplit_, varsSf, pvalSf, n, respP, None, saveDir)
         plt.close()
     except Exception:
         print("fail " + str(n))
