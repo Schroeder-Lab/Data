@@ -326,8 +326,8 @@ paramsOriSplit_[:, [1, 3, 4, 5, 6]] = paramsOriSplit[:, :, 1]
 paramsTfSplit_[:, ::2] = paramsTfSplit[:, :, 0]
 paramsTfSplit_[:, 1::2] = paramsTfSplit[:, :, 1]
 
-paramsSfSplit_[:, ::2] = paramsTfSplit[:, :, 0]
-paramsSfSplit_[:, 1::2] = paramsTfSplit[:, :, 1]
+paramsSfSplit_[:, ::2] = paramsSfSplit[:, :, 0]
+paramsSfSplit_[:, 1::2] = paramsSfSplit[:, :, 1]
 
 for n in fittingRange:
     try:
