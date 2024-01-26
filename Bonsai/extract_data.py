@@ -301,7 +301,7 @@ def detect_wheel_move(
     instDist = counterA * dist_per_move
     distance = np.cumsum(instDist)
     # Prepares the windows used for converting the distance and counting the time.
-    averagingTime = int(np.round(1 / np.median(np.diff(timestamps))))
+    averagingTime = int(np.round(1 / np.nanmedian(np.diff(timestamps))))
     sumKernel = np.ones(averagingTime)
     tsKernel = np.zeros(averagingTime)
     tsKernel[0] = 1
