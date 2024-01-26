@@ -151,7 +151,28 @@ def print_fitting_data(
     sessionData=None,
     saveDir=None,
 ):
+    # change structure to fit new data structure
 
+    varsOri = np.vstack((varOriConst, varOriOne, varOriSplit)).T
+    varsTf = np.vstack((varTfConst, varTfOne, varTfSplit)).T
+    varsSf = np.vstack((varSfConst, varSfOne, varSfSplit)).T
+    varsCon = np.vstack((varConConst, varConOne, varConSplit)).T
+
+    paramsOriSplit_ = np.zeros((paramsOri.shape[0], 7))
+    paramsTfSplit_ = np.zeros((paramsOri.shape[0], 8))
+    paramsSfSplit_ = np.zeros((paramsOri.shape[0], 8))
+    paramsConSplit_ = np.zeros((paramsOri.shape[0], 8))
+
+    paramsOriSplit_[:, [0, 2, 4, 5, 6]] = paramsOriSplit[:, :, 0]
+    paramsOriSplit_[:, [1, 3, 4, 5, 6]] = paramsOriSplit[:, :, 1]
+
+    paramsTfSplit_[:, ::2] = paramsTfSplit[:, :, 0]
+    paramsTfSplit_[:, 1::2] = paramsTfSplit[:, :, 1]
+
+    paramsSfSplit_[:, ::2] = paramsSfSplit[:, :, 0]
+    paramsSfSplit_[:, 1::2] = paramsSfSplit[:, :, 1]
+
+    #################################################################
     save = not (saveDir is None)
     if (save) & (not (sessionData is None)):
         saveDir = os.path.join(saveDir, "plots")

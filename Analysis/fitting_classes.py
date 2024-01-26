@@ -470,13 +470,18 @@ class FrequencyTuner(BaseTuner):
 
     def set_bounds_p0(self, x, y, func=None):
 
+        xu = np.unique(x)
+        avgy = np.zeros_like(xu, dtype=float)
+        for xi, xuu in enumerate(xu):
+            avgy[xi] = np.nanmedian(y[x == xuu])
+
         p0 = self._make_prelim_guess(x, y)
         xu = np.unique(x)
         minDiff = np.min(np.diff(xu, axis=0))
         maxRange = x[-1] - x[0]
         bounds = (
-            (np.nanmin(y), np.nanmin(y), np.min(xu), 1),
-            (np.nanmax(y), np.nanmax(y), np.max(xu), 10),
+            (0.8*np.nanmin(avgy), 0.8*np.nanmin(avgy), np.min(xu), 1),
+            (1.2*np.nanmax(avgy), 1.2*np.nanmax(avgy), np.max(xu), 10),
         )
         if ((func is None) & (self.func == self.gauss)) | (
             (not (func is None)) & (func == self.gauss)
@@ -629,10 +634,15 @@ class OriTuner(BaseTuner):
 
     def set_bounds_p0(self, x, y, func=None):
 
+        xu = np.unique(x)
+        avgy = np.zeros_like(xu, dtype=float)
+        for xi, xuu in enumerate(xu):
+            avgy[xi] = np.nanmedian(y[x == xuu])
+
         p0 = self._make_prelim_guess(x, y)
         bounds = (
-            (np.nanmin(y), np.nanmin(y), 0, 0, 0.5),
-            (np.nanmax(y), np.nanmax(y), 1, 360, 360),
+            (0.8*np.nanmin(avgy), 0.8*np.nanmin(avgy), 0, 0, 0.5),
+            (1.2*np.nanmax(avgy), 1.2*np.nanmax(avgy), 1, 360, 360),
         )
         if ((func is None) & (self.func == self.wrapped_gauss)) | (
             (not (func is None)) & (func == self.wrapped_gauss)
@@ -808,10 +818,15 @@ class ContrastTuner(BaseTuner):
 
     def set_bounds_p0(self, x, y, func=None):
 
+        xu = np.unique(x)
+        avgy = np.zeros_like(xu, dtype=float)
+        for xi, xuu in enumerate(xu):
+            avgy[xi] = np.nanmedian(y[x == xuu])
+
         p0 = self._make_prelim_guess(x, y)
         bounds = (
-            (np.nanmin(y), np.nanmin(y), 0.01, 0),
-            (np.nanmax(y), np.nanmax(y), 1, 10),
+            (0.8*np.nanmin(avgy), 0.8*np.nanmin(avgy), 0.01, 0),
+            (1.2*np.nanmax(avgy), 1.2*np.nanmax(avgy), 1, 10),
         )
         if ((func is None) & (self.func == self.hyperbolic)) | (
             (not (func is None)) & (func == self.hyperbolic)

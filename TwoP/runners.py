@@ -436,11 +436,14 @@ def process_s2p_directory(
         os.makedirs(saveDirectory)
     # Creates a list which contains the directories to the subfolders for each
     # plane.
-    planeDirs = glob.glob(os.path.join(suite2pDirectory, "plane*"))
+    planeDirs = list(set(glob.glob(os.path.join(
+        suite2pDirectory, "plane[0-9]*"))) - set(glob.glob(os.path.join(suite2pDirectory, "*backup"))))
     # Loads the ops dictionary from the combined directory.
     ops = np.load(
         os.path.join(planeDirs[0], "ops.npy"), allow_pickle=True
     ).item()
+
+    isBoutons = ('selected_plane' in ops.keys())
     # Loads the number of planes into a variable.
     numPlanes = ops["nplanes"]
     # Creates an array with the plane range.
@@ -459,17 +462,31 @@ def process_s2p_directory(
         jobnum = 4
     else:
         jobnum = 1
-    # Processes the 2P data for the planes specified in the plane range.
-    # This gives a list of dictionaries with all the planes.
-    # Refer to the function for a more thorough description.
-    results = Parallel(n_jobs=jobnum, verbose=5)(
-        delayed(_process_s2p_singlePlane)(
-            pops, planeDirs, zstackPath, saveDirectory, piezoTraces[:, p], p
+
+    # not a bouton recording proceed normally
+    if not (isBoutons):
+        # Processes the 2P data for the planes specified in the plane range.
+        # This gives a list of dictionaries with all the planes.
+        # Refer to the function for a more thorough description.
+        results = Parallel(n_jobs=jobnum, verbose=5)(
+            delayed(_process_s2p_singlePlane)(
+                pops, planeDirs, zstackPath, saveDirectory, piezoTraces[:, p], p
+            )
+            for p in planeRange
         )
-        for p in planeRange
-    )
-    # signalList = _process_s2p_singlePlane(planeDirs,zstackPath,saveDirectory,piezoTraces[:,0],1)
-    # Determines the absolute time after processing.
+        # signalList = _process_s2p_singlePlane(planeDirs,zstackPath,saveDirectory,piezoTraces[:,0],1)
+        # Determines the absolute time after processing.
+    # bouton recording
+    else:
+        p = ops['selected_plane']
+        results = Parallel(n_jobs=jobnum, verbose=5)(
+            delayed(_process_s2p_singlePlane)(
+                pops, list([planeDirs[0]]), zstackPath, saveDirectory, piezoTraces[:,
+                                                                                   p].reshape(-1, 1), p
+            )
+            for p in [0]
+        )
+
     postTime = time.time()
     print("Processing took: " + str(postTime - preTime) + " ms")
 
@@ -520,7 +537,7 @@ def process_s2p_directory(
     locs = np.vstack(signalLocs)
     zProfile = np.hstack(zProfiles)
     zTrace = np.vstack(zTraces)
-    zCorrs = np.swapaxes(np.dstack([a, a, a]).T, 1, 2)
+    zCorrs = np.swapaxes(np.dstack(zCorrs).T, 1, 2)
     cellIds = np.hstack(cellIds)
     isZcorrected = np.hstack(isZcorrectedList)
 

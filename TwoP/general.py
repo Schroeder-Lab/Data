@@ -61,10 +61,13 @@ def get_ops_file(suite2pDir):
         The suite2p ops dictionary.
 
     """
-    combinedDir = glob.glob(os.path.join(suite2pDir, "plane*"))
+    # get non backup planes
+    combinedDir = list(set(glob.glob(os.path.join(
+        suite2pDir, "plane[0-9]*"))) - set(glob.glob(os.path.join(suite2pDir, "*backup"))))
     ops = np.load(
         os.path.join(combinedDir[0], "ops.npy"), allow_pickle=True
     ).item()
+
     return ops
 
 
