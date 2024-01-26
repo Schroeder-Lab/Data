@@ -263,7 +263,7 @@ def _process_s2p_singlePlane(
         "isZcorrected": isZcorrected,
         "cellId": np.where(isCell[0, :].astype(bool))[0],
     }
-
+    
     if pops["plot"]:
         for i in range(dF.shape[-1]):
             # Print full
@@ -309,6 +309,9 @@ def _process_s2p_singlePlane(
                 )
                 ax["profile"].set_xlabel("fluorescence")
                 ax["profile"].set_xlabel("depth")
+                ax["profile"].axhline(np.nanmedian(zTrace), c = "green")
+                ax["profile"].axhline(np.nanmmax(zTrace), c = "red")
+                ax["profile"].axhline(np.nanmin(zTrace), c = "blue")
 
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
