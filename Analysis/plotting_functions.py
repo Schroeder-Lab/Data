@@ -424,7 +424,8 @@ def print_fitting_data(
         ax=ax[0],
         color="black",
     )
-    plot_summary_plot(df, x="ori", y="avg", line=True, ax=ax[0], color="black")
+    plot_summary_plot(df, x="contrast", y="avg",
+                      line=True, ax=ax[0], color="black")
 
     # divided
     sns.lineplot(
@@ -435,7 +436,7 @@ def print_fitting_data(
     )
     plot_summary_plot(
         df[df.movement == 0],
-        x="sf",
+        x="contrast",
         y="avg",
         line=True,
         ax=ax[1],
@@ -449,7 +450,7 @@ def print_fitting_data(
         color="red",
     )
     plot_summary_plot(
-        df[df.movement == 1], x="ori", y="avg", line=True, ax=ax[1], color="red"
+        df[df.movement == 1], x="contrast", y="avg", line=True, ax=ax[1], color="red"
     )
 
     mng = plt.get_current_fig_manager()

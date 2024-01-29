@@ -65,11 +65,7 @@ import inspect
 # Note: go to user_defs and change the inputs to directories_to_fit() and create_fitting_ops().
 sessions = directories_to_fit()
 
-sessions = pd.read_csv("D:\\preprocessBoutons.csv")
-sessions.insert(2, column='SpecificNeurons', value=[
-                [] for _ in range(len(sessions))])
-sessions = sessions[['Name', 'Date', 'SpecificNeurons']].to_dict('records')
-sessions = [sessions[1]]
+
 ops = create_fitting_ops()
 # Loads the save directory from the fitting_ops in user_defs.
 saveDirBase = ops["save_dir"]
@@ -329,7 +325,6 @@ for currSession in sessions:
                 print(traceback.format_exc())
 
     # %%plotting
-
     for n in fittingRange:
         try:
 
