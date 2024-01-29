@@ -277,6 +277,10 @@ def detect_wheel_move(
     counterA = np.zeros(len(moveA))
     counterB = np.zeros(len(moveB))
 
+    # for older recordings
+    # check if signals are the same or delayed
+    similarity = np.sum(moveA == ~moveB)/len(moveB)
+
     # Detects A move.
     risingEdgeA = np.where(np.diff(moveA > 0, prepend=True))[0]
     risingEdgeA = risingEdgeA[moveA[risingEdgeA] == 1]
@@ -284,15 +288,16 @@ def detect_wheel_move(
     counterA[risingEdgeA[risingEdgeA_B == 0]] = 1
     counterA[risingEdgeA[risingEdgeA_B == 1]] = -1
 
-    # Detects B move.
-    risingEdgeB = np.where(np.diff(moveB > 0, prepend=True))[
-        0
-    ]  # np.diff(moveB)
+    if (not (similarity > 0.9)):
+        # Detects B move.
+        risingEdgeB = np.where(np.diff(moveB > 0, prepend=True))[
+            0
+        ]  # np.diff(moveB)
 
-    risingEdgeB = risingEdgeB[moveB[risingEdgeB] == 1]
-    risingEdgeB_A = moveB[risingEdgeB]
-    counterA[risingEdgeB[risingEdgeB_A == 0]] = -1
-    counterA[risingEdgeB[risingEdgeB_A == 1]] = 1
+        risingEdgeB = risingEdgeB[moveB[risingEdgeB] == 1]
+        risingEdgeB_A = moveB[risingEdgeB]
+        counterA[risingEdgeB[risingEdgeB_A == 0]] = -1
+        counterA[risingEdgeB[risingEdgeB_A == 1]] = 1
 
     # Gets how much one move means in distance travelled.
 
@@ -656,8 +661,10 @@ def get_piezo_trace_for_plane(
         # because the location of the first frame is when the piezo starts moving so it is inaccurate.
         piezoStarts = frameTimes[imagingPlanes + plane:: imagingPlanes]
         piezoEnds = frameTimes[imagingPlanes + plane + 1:: imagingPlanes]
+
         # Determines the range over which to sample over the piezo trace given the batchFactor specified.
-        piezoBatchRange = range(0, len(piezoStarts), batchFactor)
+        piezoBatchRange = range(
+            0, min(len(piezoStarts), len(piezoEnds)), batchFactor)
         # Creates the array for the piezo location for each milisecond in each batch.
         avgTrace = np.zeros((traceDuration, len(piezoBatchRange)))
         for avgInd, pi in enumerate(piezoBatchRange):

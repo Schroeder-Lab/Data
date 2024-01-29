@@ -147,16 +147,15 @@ def print_fitting_data(
     paramsSfSplit,
     varsSf,
     pvalSf,
+    paramsCon,
+    paramsConSplit,
+    varsCon,
+    pvalCon,
     n, respP,
     sessionData=None,
     saveDir=None,
 ):
     # change structure to fit new data structure
-
-    varsOri = np.vstack((varOriConst, varOriOne, varOriSplit)).T
-    varsTf = np.vstack((varTfConst, varTfOne, varTfSplit)).T
-    varsSf = np.vstack((varSfConst, varSfOne, varSfSplit)).T
-    varsCon = np.vstack((varConConst, varConOne, varConSplit)).T
 
     paramsOriSplit_ = np.zeros((paramsOri.shape[0], 7))
     paramsTfSplit_ = np.zeros((paramsOri.shape[0], 8))
@@ -171,6 +170,14 @@ def print_fitting_data(
 
     paramsSfSplit_[:, ::2] = paramsSfSplit[:, :, 0]
     paramsSfSplit_[:, 1::2] = paramsSfSplit[:, :, 1]
+
+    paramsConSplit_[:, [0, 2, 4, 5]] = paramsConSplit[:, :, 0]
+    paramsConSplit_[:, [1, 3, 4, 5]] = paramsConSplit[:, :, 1]
+
+    paramsOriSplit = paramsOriSplit_
+    paramsTfSplit = paramsTfSplit_
+    paramsSfSplit = paramsSfSplit_
+    paramsConSplit = paramsConSplit_
 
     #################################################################
     save = not (saveDir is None)
@@ -387,4 +394,69 @@ def print_fitting_data(
     if save:
         plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.png"))
         plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.pdf"))
+        plt.close(f)
+
+    # contrast
+    tunerBase = ContrastTuner("contrast")
+    tunerBase.props = paramsSf[n, :]
+    tunerSplit = ContrastTuner("contrast_split")
+    tunerSplit.props = paramsConSplit[n, :]
+
+    df = dfAll[
+        (dfAll.tf == 2)
+        & (dfAll.sf == 0.08)
+    ]
+
+    df = filter_nonsig_orientations(df, criterion=0.05)
+    f, ax = plt.subplots(2)
+    f.suptitle(f"Contrast Tuning, Resp p: {np.round(respP[n],3)}")
+    f.subplots_adjust(hspace=2)
+    ax[0].set_title(
+        f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)}"
+    )
+    ax[1].set_title(
+        f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, pVal dAUC: {np.round(pvalCon[n],3)}"
+    )
+    fittingRange = np.arange(0, 1, 0.01)
+    sns.lineplot(
+        x=fittingRange,
+        y=tunerBase.predict(fittingRange),
+        ax=ax[0],
+        color="black",
+    )
+    plot_summary_plot(df, x="ori", y="avg", line=True, ax=ax[0], color="black")
+
+    # divided
+    sns.lineplot(
+        x=fittingRange,
+        y=tunerSplit.predict_split(fittingRange, 0),
+        ax=ax[1],
+        color="blue",
+    )
+    plot_summary_plot(
+        df[df.movement == 0],
+        x="sf",
+        y="avg",
+        line=True,
+        ax=ax[1],
+        color="blue",
+    )
+
+    sns.lineplot(
+        x=fittingRange,
+        y=tunerSplit.predict_split(fittingRange, 1),
+        ax=ax[1],
+        color="red",
+    )
+    plot_summary_plot(
+        df[df.movement == 1], x="ori", y="avg", line=True, ax=ax[1], color="red"
+    )
+
+    mng = plt.get_current_fig_manager()
+    mng.window.showMaximized()
+    # ax[0].set_xscale("log", base=2)
+    # ax[1].set_xscale("log", base=2)
+    if save:
+        plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.png"))
+        plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.pdf"))
         plt.close(f)

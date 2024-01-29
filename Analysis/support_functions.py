@@ -140,7 +140,7 @@ def make_neuron_db(
             "avg_corrected": avg_corrected,
         }
     )
-
+    df = df.dropna()
     return df
 
 

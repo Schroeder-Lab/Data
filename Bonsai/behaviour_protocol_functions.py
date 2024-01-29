@@ -118,6 +118,12 @@ def stimulus_gratings(directory, frameChanges):
         #     "Number of frames and stimuli do not match. Skpping"
         # )
         warnings.warn("Number of frames and stimuli do not match")
+        if (len(et) == len(stimProps)):
+            warnings.warn(
+                "Assuming there was a false photodiode rise in the beginning, but check!")
+            st = frameChanges[1::2].reshape(-1, 1).copy()
+            # Gets the end times  of each stimulus.
+            et = frameChanges[2::2].reshape(-1, 1).copy()
     # Adds the start and end times from above to the respective
     # lists.
 

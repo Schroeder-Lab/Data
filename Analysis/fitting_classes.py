@@ -462,7 +462,7 @@ class FrequencyTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmedian(y[x == xuu])
         return (
-            np.nanmin(y),
+            np.nanmin(avgy),
             np.nanmax(avgy),
             xu[np.nanargmax(avgy)],
             1,
@@ -480,8 +480,10 @@ class FrequencyTuner(BaseTuner):
         minDiff = np.min(np.diff(xu, axis=0))
         maxRange = x[-1] - x[0]
         bounds = (
-            (0.8*np.nanmin(avgy), 0.8*np.nanmin(avgy), np.min(xu), 1),
-            (1.2*np.nanmax(avgy), 1.2*np.nanmax(avgy), np.max(xu), 10),
+            (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
+             np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)), np.min(xu), 1),
+            (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
+             np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)), np.max(xu), 10),
         )
         if ((func is None) & (self.func == self.gauss)) | (
             (not (func is None)) & (func == self.gauss)
@@ -522,24 +524,24 @@ class FrequencyTuner(BaseTuner):
 
                 bounds = (
                     (
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.min(xu),
-                        np.min(xu),
-                        1,
-                        1,
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][2],
+                        bounds[0][3],
+                        bounds[0][3],
                     ),
                     (
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.max(xu),
-                        np.max(xu),
-                        10,
-                        10,
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][2],
+                        bounds[1][3],
+                        bounds[1][3],
                     ),
                 )
             except:
@@ -547,24 +549,24 @@ class FrequencyTuner(BaseTuner):
 
                 bounds = (
                     (
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        -np.inf,
-                        np.min(xu),
-                        np.min(xu),
-                        minDiff,
-                        minDiff,
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][2],
+                        bounds[0][3],
+                        bounds[0][3],
                     ),
                     (
-                        np.inf,
-                        np.inf,
-                        np.inf,
-                        np.inf,
-                        np.max(xu),
-                        np.max(xu),
-                        10,
-                        10,
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][2],
+                        bounds[1][3],
+                        bounds[1][3],
                     ),
                 )
             return p0, bounds
@@ -625,7 +627,7 @@ class OriTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmedian(y[x == xuu])
         return (
-            np.nanmin(y),
+            np.nanmin(avgy),
             np.nanmax(avgy),
             0.5,
             xu[np.nanargmax(avgy)],
@@ -641,8 +643,10 @@ class OriTuner(BaseTuner):
 
         p0 = self._make_prelim_guess(x, y)
         bounds = (
-            (0.8*np.nanmin(avgy), 0.8*np.nanmin(avgy), 0, 0, 0.5),
-            (1.2*np.nanmax(avgy), 1.2*np.nanmax(avgy), 1, 360, 360),
+            (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
+             np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)), 0, 0, 0.5),
+            (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
+             np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)), 1, 360, 360),
         )
         if ((func is None) & (self.func == self.wrapped_gauss)) | (
             (not (func is None)) & (func == self.wrapped_gauss)
@@ -687,22 +691,22 @@ class OriTuner(BaseTuner):
 
                 bounds = (
                     (
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        0,
-                        0,
-                        0.5,
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][3],
+                        bounds[0][4],
                     ),
                     (
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        1,
-                        360,
-                        360,
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][3],
+                        bounds[1][4],
                     ),
                 )
             except:
@@ -710,22 +714,22 @@ class OriTuner(BaseTuner):
 
                 bounds = (
                     (
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        0,
-                        0,
-                        0.5,
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][3],
+                        bounds[0][4],
                     ),
                     (
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        1,
-                        360,
-                        360,
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][3],
+                        bounds[1][4],
                     ),
                 )
             return p0, bounds
@@ -810,7 +814,7 @@ class ContrastTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmedian(y[x == xuu])
         return (
-            np.nanmin(y),
+            np.nanmin(avgy),
             np.nanmax(avgy),
             0.5,
             2,
@@ -825,8 +829,10 @@ class ContrastTuner(BaseTuner):
 
         p0 = self._make_prelim_guess(x, y)
         bounds = (
-            (0.8*np.nanmin(avgy), 0.8*np.nanmin(avgy), 0.01, 0),
-            (1.2*np.nanmax(avgy), 1.2*np.nanmax(avgy), 1, 10),
+            (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
+             np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)), 0.01, 0),
+            (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
+             np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)), 1, 10),
         )
         if ((func is None) & (self.func == self.hyperbolic)) | (
             (not (func is None)) & (func == self.hyperbolic)
@@ -871,20 +877,20 @@ class ContrastTuner(BaseTuner):
 
                 bounds = (
                     (
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        0.01,
-                        0,
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][3],
                     ),
                     (
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        1,
-                        10,
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][3],
                     ),
                 )
             except:
@@ -892,20 +898,20 @@ class ContrastTuner(BaseTuner):
 
                 bounds = (
                     (
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        np.nanmin(y),
-                        0.01,
-                        0,
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][3],
                     ),
                     (
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        np.nanmax(y),
-                        1,
-                        10,
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][3],
                     ),
                 )
             return p0, bounds
@@ -972,17 +978,21 @@ class GammaTuner(BaseTuner):
 
     def set_bounds_p0(self, x, y, func=None):
         p0 = self._make_prelim_guess(x, y)
+        xu = np.unique(x)
+        avgy = np.zeros_like(xu, dtype=float)
+        for xi, xuu in enumerate(xu):
+            avgy[xi] = np.nanmean(y[x == xuu])
         bounds = (
             (
-                -np.inf,
-                0,
+                np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
+                np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
                 0.01,
                 # -10,
                 1,
             ),
             (
-                np.max(y),
-                np.max(y),
+                np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
+                np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
                 100,
                 # 0,
                 100,
