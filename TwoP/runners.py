@@ -310,7 +310,7 @@ def _process_s2p_singlePlane(
                 ax["profile"].set_xlabel("fluorescence")
                 ax["profile"].set_xlabel("depth")
                 ax["profile"].axhline(np.nanmedian(zTrace), c = "green")
-                ax["profile"].axhline(np.nanmmax(zTrace), c = "red")
+                ax["profile"].axhline(np.nanmax(zTrace), c = "red")
                 ax["profile"].axhline(np.nanmin(zTrace), c = "blue")
 
             manager = plt.get_current_fig_manager()
