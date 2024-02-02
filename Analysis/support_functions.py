@@ -140,7 +140,6 @@ def make_neuron_db(
             "avg_corrected": avg_corrected,
         }
     )
-    df = df.dropna()
     return df
 
 
@@ -177,15 +176,16 @@ def is_responsive_direction(df, criterion=0.05):
     b = b[goodInds]
 
     # Split the dataset into training and testing sets.
-    X_train, X_test, y_train, y_test = train_test_split(a, b, test_size=0.10)
+    X_train, X_test, y_train, y_test = train_test_split(
+        a, b, test_size=0.10, stratify=np.unique(a, axis=1))
 
     # Fit a linear model to the training data.
     res = sp.linalg.lstsq(X_train, y_train)
-
+    # res = sp.linalg.lstsq(a, b)
     # Calculate the R-squared score for the test data.
-    sklearn.metrics.r2_score
 
     score = r2_score(y_test, X_test @ res[0])
+    # score = r2_score(b, a @ res[0])
 
     shuffscore = np.zeros(500)
     for s in range(500):
@@ -197,7 +197,6 @@ def is_responsive_direction(df, criterion=0.05):
     # Calculate the percentile rank of the actual score among shuffled scores.
     p = sp.stats.percentileofscore(shuffscore, score)
     # Convert the percentile rank to a p-value.
-
     p = (100 - p) / 100
 
     # If the p-value is below the criterion, determine the responsiveness direction.
@@ -241,6 +240,13 @@ def run_tests(
 
     tunerBase = tunerClass(base_name)
 
+    # Remove all Nans and Inf
+    goodInds = np.where(np.isfinite(df[y_name]))[0]
+    df = df.iloc[goodInds]
+
+    # enough test cases
+    if (len(np.unique(df[x_name]))) <= 2:
+        return make_empty_results(x_name)
     # count number of cases
     valCounts = df[x_name].value_counts().to_numpy()
     if np.any(valCounts < 3):
@@ -286,10 +292,13 @@ def run_tests(
 
         # remove from fit x vals where not enough values in either dataset
         indq = np.where(qCounts < 3)[0]
-        inda = np.where(qCounts < 3)[0]
-        removeInds = np.union1d(indq, inda)
-        removeValues = dfq[x_name].value_counts().index.to_numpy()[removeInds]
-        if (len(removeInds) / len(qCounts)) > 0.33:
+        inda = np.where(aCounts < 3)[0]
+        # removeInds = np.union1d(indq, inda)
+        removeValuesQ = dfq[x_name].value_counts().index.to_numpy()[indq]
+        removeValuesA = dfq[x_name].value_counts().index.to_numpy()[inda]
+        removeValues = np.union1d(removeValuesQ, removeValuesA)
+
+        if (len(indq) > 1) | (len(inda) > 1):
             res = make_empty_results(x_name)
             res = list(res)
             res[0] = props_reg
@@ -297,10 +306,46 @@ def run_tests(
             res[3] = score_reg
             res[7] = tunerBase
             return tuple(res)
-        else:
-            # remove only those data points that are missing
-            dfq = dfq.drop(dfq[dfq[x_name].isin(removeValues)].index)
-            dfa = dfa.drop(dfa[dfa[x_name].isin(removeValues)].index)
+
+        # # check for each split whether there are still enough values left to fit
+        # if ((len(removeValuesQ) / len(qCounts)) > 0.33) | (((len(removeValuesA) / len(aCounts)) > 0.33)):
+        #     res = make_empty_results(x_name)
+        #     res = list(res)
+        #     res[0] = props_reg
+        #     res[2] = score_constant
+        #     res[3] = score_reg
+        #     res[7] = tunerBase
+        #     return tuple(res)
+        # else:
+        #     # remove only those data points that are missing
+        #     dfq = dfq.drop(dfq[dfq[x_name].isin(removeValues)].index)
+        #     dfa = dfa.drop(dfa[dfa[x_name].isin(removeValues)].index)
+
+        # # now check that there are still enough X values to fit
+        # if ((len(np.unique(dfq[x_name]))) <= 2) | ((len(np.unique(dfa[x_name]))) <= 2):
+        #     res = make_empty_results(x_name)
+        #     res = list(res)
+        #     res[0] = props_reg
+        #     res[2] = score_constant
+        #     res[3] = score_reg
+        #     res[7] = tunerBase
+        #     return tuple(res)
+        # else:
+        #     # now make sure that the same values are fitted
+        #     sharedVals = np.intersect1d(
+        #         np.unique(dfa[x_name]), np.unique(dfq[x_name]))
+        #     dfq = dfq[dfq[x_name].isin(sharedVals)]
+        #     dfa = dfa[dfa[x_name].isin(sharedVals)]
+        # # now make sure there are enough test cases at all
+
+        # if (len(np.unique(dfa[x_name]))) <= 2:
+        #     res = make_empty_results(x_name)
+        #     res = list(res)
+        #     res[0] = props_reg
+        #     res[2] = score_constant
+        #     res[3] = score_reg
+        #     res[7] = tunerBase
+        #     return tuple(res)
 
         # if (np.any(totCounts<3)):
         #     res = make_empty_results(x_name)
@@ -436,7 +481,7 @@ def run_complete_analysis(
             (dfAll.sf == 0.08) & (dfAll.tf == 2) & (dfAll.contrast == 1)
         ]
         res_ori = run_tests(
-            OriTuner, "gauss", "gauss_split", df, "movement", "ori", "avg"
+            OriTuner, "gauss", "gauss_split", df, "movement", "ori", "avg", resp_direction
         )
 
     else:
@@ -453,7 +498,7 @@ def run_complete_analysis(
 
         df = filter_nonsig_orientations(df, criterion=0.05)
         res_freq = run_tests(
-            FrequencyTuner, "gauss", "gauss_split", df, "movement", "tf", "avg"
+            FrequencyTuner, "gauss", "gauss_split", df, "movement", "tf", "avg", resp_direction
         )
     else:
         res_freq = make_empty_results("Tf")
@@ -466,7 +511,7 @@ def run_complete_analysis(
         ]
         df = filter_nonsig_orientations(df, criterion=0.05)
         res_spatial = run_tests(
-            FrequencyTuner, "gauss", "gauss_split", df, "movement", "sf", "avg"
+            FrequencyTuner, "gauss", "gauss_split", df, "movement", "sf", "avg", resp_direction
         )
     else:
         res_spatial = make_empty_results("Sf")
@@ -481,6 +526,7 @@ def run_complete_analysis(
             "movement",
             "contrast",
             "avg",
+            resp_direction
         )
 
     return (

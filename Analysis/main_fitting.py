@@ -65,13 +65,18 @@ import inspect
 # Note: go to user_defs and change the inputs to directories_to_fit() and create_fitting_ops().
 sessions = directories_to_fit()
 
+sessions = pd.read_csv("D:\\processing.csv")
+sessions.insert(2, column='SpecificNeurons', value=[
+                [] for _ in range(len(sessions))])
+sessions = sessions[['Name', 'Date', 'SpecificNeurons']].to_dict('records')
+
 
 ops = create_fitting_ops()
 # Loads the save directory from the fitting_ops in user_defs.
 saveDirBase = ops["save_dir"]
 processedDataDir = ops["processed files"]
 for currSession in sessions:
-
+    plt.close('all')
     print(f"starting to run session: {currSession}")
     # Gets data for current session from the Preprocessed folder.
     try:
@@ -93,7 +98,7 @@ for currSession in sessions:
             data["gratingsSt"],
             np.array([-1, 4]).reshape(-1, 1).T,
             data["planes"].reshape(-1, 1),
-            data["planeDelays"].reshape(1, -1),
+            data["planeDelays"].reshape(1, -1)
         )
 
         print("getting trial classification")
@@ -109,6 +114,8 @@ for currSession in sessions:
         print(
             f"Could not loads basic files needed for session\n {currSession}")
         print(traceback.format_exc())
+        continue
+    print(f'Working on {currSession}')
     respP = np.zeros(gratingRes.shape[-1])
     respDirection = np.zeros(gratingRes.shape[-1])
 
@@ -261,7 +268,7 @@ for currSession in sessions:
 
     if (ops["fitOri"]):
         np.save(os.path.join(
-            saveDir, "gratingOriTuning.params.params.npy"), paramsOri)
+            saveDir, "gratingOriTuning.params.npy"), paramsOri)
         np.save(os.path.join(
             saveDir, "gratingOriTuning.paramsRunning.npy"), paramsOriSplit)
         np.save(os.path.join(
@@ -274,7 +281,7 @@ for currSession in sessions:
             saveDir, "gratingOriTuning.pVal.runningSplit.npy"), pvalOri)
 
     if (ops["fitTf"]):
-        np.save(os.path.join(saveDir, "gratingTfTuning.params.params.npy"), paramsTf)
+        np.save(os.path.join(saveDir, "gratingTfTuning.params.npy"), paramsTf)
         np.save(os.path.join(
             saveDir, "gratingTfTuning.paramsRunning.npy"), paramsTfSplit)
         np.save(os.path.join(
@@ -286,7 +293,7 @@ for currSession in sessions:
             saveDir, "gratingTfTuning.pVal.runningSplit.npy"), pvalTf)
 
     if (ops["fitSf"]):
-        np.save(os.path.join(saveDir, "gratingSfTuning.params.params.npy"), paramsSf)
+        np.save(os.path.join(saveDir, "gratingSfTuning.params.npy"), paramsSf)
         np.save(os.path.join(
             saveDir, "gratingSfTuning.paramsRunning.npy"), paramsSfSplit)
         np.save(os.path.join(
@@ -299,7 +306,7 @@ for currSession in sessions:
 
     if (ops["fitContrast"]):
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.params.params.npy"), paramsCon)
+            saveDir, "gratingContrastTunin.params.npy"), paramsCon)
         np.save(os.path.join(
             saveDir, "gratingContrastTunin.paramsRunning.npy"), paramsConSplit)
         np.save(os.path.join(
@@ -318,21 +325,23 @@ for currSession in sessions:
                 print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
                                    paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, pvalOri, paramsTf, paramsTfSplit, np.vstack(
                                        (varTfConst, varTfOne, varTfSplit)).T,
-                                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, pvalCon, n, respP, None, saveDir)
-                plt.close()
+                                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, pvalCon, n, respP, respDirection[n], None, saveDir)
+
             except Exception:
                 print("fail " + str(n))
                 print(traceback.format_exc())
+        plt.close('all')
 
     # %%plotting
-    for n in fittingRange:
-        try:
+try:
 
-            print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
-                               paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, pvalOri, paramsTf, paramsTfSplit, np.vstack(
-                                   (varTfConst, varTfOne, varTfSplit)).T,
-                               pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, pvalCon, n, respP, None, saveDir)
-            plt.close()
-        except Exception:
-            print("fail " + str(n))
-            print(traceback.format_exc())
+    print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
+                       paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, pvalOri, paramsTf, paramsTfSplit, np.vstack(
+                           (varTfConst, varTfOne, varTfSplit)).T,
+                       pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, pvalCon, n, respP, respDirection[n], None, saveDir)
+
+
+except Exception:
+    print("fail " + str(n))
+    print(traceback.format_exc())
+plt.close('all')

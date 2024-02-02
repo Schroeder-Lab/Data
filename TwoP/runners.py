@@ -185,11 +185,31 @@ def _process_s2p_singlePlane(
     # Unless there is no Z stack path specified, does Z correction.
     if not (zstackPath is None):
         try:
+            channel = ops["align_by_chan"]
             refImg = ops["meanImg"]  # Gets the reference image from Suite2P.
             # Creates registered Z stack path.
             zFileName = os.path.join(
-                saveDirectory, "zstackAngle_plane" + str(plane) + ".tif"
+                saveDirectory, f"zstackAngle_plane{plane}_chan{channel}.tif"
             )
+
+            # if we are using channel 2 we want to have a stack of channel 1 for the flourescence level in each channel
+            if (channel != 1):
+                zFileName_main = os.path.join(
+                    saveDirectory, f"zstackAngle_plane{plane}_chan1.tif"
+                )
+
+                if not (os.path.exists(zFileName_main)):
+                    zstack_main = register_zstack(
+                        zstackPath,
+                        spacing=1,
+                        piezo=piezo,
+                        target_image=refImg,
+                        channel=channel,
+                    )
+                    # Saves registered Z stack in the specified or default saveDir.
+                    skimage.io.imsave(zFileName_main, zstack_main)
+                else:
+                    zstack_main = skimage.io.imread(zFileName_main)
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
                 zstack = register_zstack(
@@ -197,13 +217,14 @@ def _process_s2p_singlePlane(
                     spacing=1,
                     piezo=piezo,
                     target_image=refImg,
-                    channel=1  # ops["align_by_chan"],
+                    channel=channel,
                 )
                 # Saves registered Z stack in the specified or default saveDir.
                 skimage.io.imsave(zFileName, zstack)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                _, zcorr = compute_zpos(zstack, ops)
+                ops, zcorr = compute_zpos(zstack, ops)
+                np.save(ops["ops_path"], ops)
             # Calculates Z correlation if Z stack was already registered.
             elif not ("zcorr" in ops.keys()):
                 zstack = skimage.io.imread(zFileName)
@@ -218,6 +239,9 @@ def _process_s2p_singlePlane(
             else:
                 zstack = skimage.io.imread(zFileName)
                 zcorr = ops["zcorr"]
+            # if we used the second channel then from now on use the main (channel 1) stack to extract flouresence profile
+            if (channel != 1):
+                zstack = zstack_main
             # Gets the location of each frame in Z based on the highest
             # correlation value.
             zTrace = np.argmax(zcorr, 0)
@@ -263,7 +287,7 @@ def _process_s2p_singlePlane(
         "isZcorrected": isZcorrected,
         "cellId": np.where(isCell[0, :].astype(bool))[0],
     }
-    
+
     if pops["plot"]:
         for i in range(dF.shape[-1]):
             # Print full
@@ -309,9 +333,9 @@ def _process_s2p_singlePlane(
                 )
                 ax["profile"].set_xlabel("fluorescence")
                 ax["profile"].set_xlabel("depth")
-                ax["profile"].axhline(np.nanmedian(zTrace), c = "green")
-                ax["profile"].axhline(np.nanmax(zTrace), c = "red")
-                ax["profile"].axhline(np.nanmin(zTrace), c = "blue")
+                ax["profile"].axhline(np.nanmedian(zTrace), c="green")
+                ax["profile"].axhline(np.nanmax(zTrace), c="red")
+                ax["profile"].axhline(np.nanmin(zTrace), c="blue")
 
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
@@ -438,6 +462,7 @@ def process_s2p_directory(
     # plane.
     planeDirs = list(set(glob.glob(os.path.join(
         suite2pDirectory, "plane[0-9]*"))) - set(glob.glob(os.path.join(suite2pDirectory, "*backup"))))
+    planeDirs = np.sort(planeDirs)
     # Loads the ops dictionary from the combined directory.
     ops = np.load(
         os.path.join(planeDirs[0], "ops.npy"), allow_pickle=True
@@ -447,12 +472,18 @@ def process_s2p_directory(
     # Loads the number of planes into a variable.
     numPlanes = ops["nplanes"]
     # Creates an array with the plane range.
-    planeRange = np.arange(numPlanes)
-
+    planeRange = np.arange(len(planeDirs))
     # Removes the ignored plane (if specified) from the plane range array.
-    if not (ignorePlanes is None):
-        ignorePlanes = np.intersect1d(planeRange, ignorePlanes)
+    ignorePlanes = [i for i, s in enumerate(planeDirs) if int(
+        re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
+    # find what plane directories exist and match piezo plane number to them
+
+    if not (len(ignorePlanes) == 0):
         planeRange = np.delete(planeRange, ignorePlanes)
+
+    repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
+    piezoTraces = piezoTraces[:, repPlanes]
+
     # Determine the absolute time before processing.
     preTime = time.time()
 

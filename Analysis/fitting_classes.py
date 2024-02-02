@@ -463,7 +463,7 @@ class FrequencyTuner(BaseTuner):
             avgy[xi] = np.nanmedian(y[x == xuu])
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy),
+            np.nanmax(avgy) - np.nanmin(avgy),
             xu[np.nanargmax(avgy)],
             1,
         )
@@ -479,11 +479,14 @@ class FrequencyTuner(BaseTuner):
         xu = np.unique(x)
         minDiff = np.min(np.diff(xu, axis=0))
         maxRange = x[-1] - x[0]
+
+        minAvg = np.nanmin(avgy)
+        maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
             (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
-             np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)), np.min(xu), 1),
+             0, np.min(xu), 1),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)), np.max(xu), 10),
+             maxAvg+0.2*np.abs(maxAvg), np.max(xu), 10),
         )
         if ((func is None) & (self.func == self.gauss)) | (
             (not (func is None)) & (func == self.gauss)
@@ -628,7 +631,7 @@ class OriTuner(BaseTuner):
             avgy[xi] = np.nanmedian(y[x == xuu])
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy),
+            np.nanmax(avgy) - np.nanmin(avgy),
             0.5,
             xu[np.nanargmax(avgy)],
             np.abs(xu[np.nanargmax(avgy)] - xu[np.nanargmin(avgy)]),
@@ -642,11 +645,13 @@ class OriTuner(BaseTuner):
             avgy[xi] = np.nanmedian(y[x == xuu])
 
         p0 = self._make_prelim_guess(x, y)
+        minAvg = np.nanmin(avgy)
+        maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
-             np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)), 0, 0, 0.5),
+            (minAvg-0.2*np.abs(minAvg),
+             0, 0, 0, 0.5),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)), 1, 360, 360),
+             maxAvg+0.2*np.abs(maxAvg), 1, 360, 360),
         )
         if ((func is None) & (self.func == self.wrapped_gauss)) | (
             (not (func is None)) & (func == self.wrapped_gauss)
@@ -815,7 +820,7 @@ class ContrastTuner(BaseTuner):
             avgy[xi] = np.nanmedian(y[x == xuu])
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy),
+            np.nanmax(avgy) - np.nanmin(avgy),
             0.5,
             2,
         )
@@ -828,11 +833,13 @@ class ContrastTuner(BaseTuner):
             avgy[xi] = np.nanmedian(y[x == xuu])
 
         p0 = self._make_prelim_guess(x, y)
+        minAvg = np.nanmin(avgy)
+        maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
-             np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)), 0.01, 0),
+            (minAvg-0.2*np.abs(minAvg),
+             0, 0.01, 0),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)), 1, 10),
+             maxAvg+0.2*np.abs(maxAvg), 1, 10),
         )
         if ((func is None) & (self.func == self.hyperbolic)) | (
             (not (func is None)) & (func == self.hyperbolic)
@@ -970,7 +977,7 @@ class GammaTuner(BaseTuner):
 
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy),
+            np.nanmax(avgy) - np.nanmin(avgy),
             1,
             # 0,
             2,
@@ -982,17 +989,19 @@ class GammaTuner(BaseTuner):
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmean(y[x == xuu])
+        minAvg = np.nanmin(avgy)
+        maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
             (
-                np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
-                np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
+                minAvg-0.2*np.abs(minAvg),
+                0,
                 0.01,
                 # -10,
                 1,
             ),
             (
                 np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-                np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
+                maxAvg+0.2*np.abs(maxAvg),
                 100,
                 # 0,
                 100,

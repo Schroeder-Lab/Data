@@ -97,9 +97,11 @@ def plot_tf_resp(
 
 
 def plot_summary_plot(
-    df, x, y, hue=None, ax=None, line=False, palette=None, color=None
+    df, x, y, direction=1, hue=None, ax=None, line=False, palette=None, color=None
 ):
 
+    df_ = df.copy()
+    df_[y] = direction * df[y]
     if ax is None:
         f, ax = plt.subplots(1)
     else:
@@ -108,7 +110,7 @@ def plot_summary_plot(
         return f, ax
     if line:
         sns.lineplot(
-            data=df,
+            data=df_,
             x=x,
             y=y,
             hue=hue,
@@ -151,7 +153,7 @@ def print_fitting_data(
     paramsConSplit,
     varsCon,
     pvalCon,
-    n, respP,
+    n, respP, direction=1,
     sessionData=None,
     saveDir=None,
 ):
@@ -160,7 +162,7 @@ def print_fitting_data(
     paramsOriSplit_ = np.zeros((paramsOri.shape[0], 7))
     paramsTfSplit_ = np.zeros((paramsOri.shape[0], 8))
     paramsSfSplit_ = np.zeros((paramsOri.shape[0], 8))
-    paramsConSplit_ = np.zeros((paramsOri.shape[0], 8))
+    paramsConSplit_ = np.zeros((paramsOri.shape[0], 6))
 
     paramsOriSplit_[:, [0, 2, 4, 5, 6]] = paramsOriSplit[:, :, 0]
     paramsOriSplit_[:, [1, 3, 4, 5, 6]] = paramsOriSplit[:, :, 1]
@@ -181,6 +183,8 @@ def print_fitting_data(
 
     #################################################################
     save = not (saveDir is None)
+    canFitSplit = not np.all(np.isnan(paramsOriSplit[n, :]))
+
     if (save) & (not (sessionData is None)):
         saveDir = os.path.join(saveDir, "plots")
         saveDir = os.path.join(
@@ -222,38 +226,43 @@ def print_fitting_data(
         ax=ax[0],
         color="black",
     )
-    plot_summary_plot(df, x="ori", y="avg", line=True, ax=ax[0], color="black")
+    plot_summary_plot(df, x="ori", y="avg", direction=direction,
+                      line=True, ax=ax[0], color="black")
 
     # divided
-    sns.lineplot(
-        x=np.arange(0, 360, 0.01),
-        y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 0),
-        ax=ax[1],
-        color="blue",
-    )
-    plot_summary_plot(
-        df[df.movement == 0],
-        x="ori",
-        y="avg",
-        line=True,
-        ax=ax[1],
-        color="blue",
-    )
+    canFitSplit = not np.all(np.isnan(paramsOriSplit[n, :]))
+    if (canFitSplit):
+        sns.lineplot(
+            x=np.arange(0, 360, 0.01),
+            y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 0),
+            ax=ax[1],
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="ori",
+            y="avg",
+            direction=direction,
+            line=True,
+            ax=ax[1],
+            color="blue",
+        )
 
-    sns.lineplot(
-        x=np.arange(0, 360, 0.01),
-        y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 1),
-        ax=ax[1],
-        color="red",
-    )
-    plot_summary_plot(
-        df[df.movement == 1],
-        x="ori",
-        y="avg",
-        line=True,
-        ax=ax[1],
-        color="red",
-    )
+        sns.lineplot(
+            x=np.arange(0, 360, 0.01),
+            y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 1),
+            ax=ax[1],
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1],
+            x="ori",
+            y="avg",
+            line=True,
+            direction=direction,
+            ax=ax[1],
+            color="red",
+        )
 
     mng = plt.get_current_fig_manager()
     mng.window.showMaximized()
@@ -293,33 +302,37 @@ def print_fitting_data(
         ax=ax[0],
         color="black",
     )
-    plot_summary_plot(df, x="tf", y="avg", line=True, ax=ax[0], color="black")
+    plot_summary_plot(df, x="tf", y="avg", direction=direction,
+                      line=True, ax=ax[0], color="black")
 
     # divided
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerSplit.predict_split(fittingRange, 0),
-        ax=ax[1],
-        color="blue",
-    )
-    plot_summary_plot(
-        df[df.movement == 0],
-        x="tf",
-        y="avg",
-        line=True,
-        ax=ax[1],
-        color="blue",
-    )
+    canFitSplit = not np.all(np.isnan(paramsTfSplit[n, :]))
+    if (canFitSplit):
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 0),
+            ax=ax[1],
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="tf",
+            y="avg",
+            direction=direction,
+            line=True,
+            ax=ax[1],
+            color="blue",
+        )
 
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerSplit.predict_split(fittingRange, 1),
-        ax=ax[1],
-        color="red",
-    )
-    plot_summary_plot(
-        df[df.movement == 1], x="tf", y="avg", line=True, ax=ax[1], color="red"
-    )
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 1),
+            ax=ax[1],
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1], x="tf", y="avg", direction=direction, line=True, ax=ax[1], color="red"
+        )
 
     ax[0].set_xscale("log", base=2)
     ax[1].set_xscale("log", base=2)
@@ -359,33 +372,37 @@ def print_fitting_data(
         ax=ax[0],
         color="black",
     )
-    plot_summary_plot(df, x="sf", y="avg", line=True, ax=ax[0], color="black")
+    plot_summary_plot(df, x="sf", y="avg", direction=direction,
+                      line=True, ax=ax[0], color="black")
 
     # divided
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerSplit.predict_split(fittingRange, 0),
-        ax=ax[1],
-        color="blue",
-    )
-    plot_summary_plot(
-        df[df.movement == 0],
-        x="sf",
-        y="avg",
-        line=True,
-        ax=ax[1],
-        color="blue",
-    )
+    canFitSplit = not np.all(np.isnan(paramsSfSplit[n, :]))
+    if (canFitSplit):
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 0),
+            ax=ax[1],
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="sf",
+            y="avg",
+            direction=direction,
+            line=True,
+            ax=ax[1],
+            color="blue",
+        )
 
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerSplit.predict_split(fittingRange, 1),
-        ax=ax[1],
-        color="red",
-    )
-    plot_summary_plot(
-        df[df.movement == 1], x="sf", y="avg", line=True, ax=ax[1], color="red"
-    )
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 1),
+            ax=ax[1],
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1], x="sf", y="avg", direction=direction, line=True, ax=ax[1], color="red"
+        )
 
     mng = plt.get_current_fig_manager()
     mng.window.showMaximized()
@@ -398,7 +415,7 @@ def print_fitting_data(
 
     # contrast
     tunerBase = ContrastTuner("contrast")
-    tunerBase.props = paramsSf[n, :]
+    tunerBase.props = paramsCon[n, :]
     tunerSplit = ContrastTuner("contrast_split")
     tunerSplit.props = paramsConSplit[n, :]
 
@@ -425,33 +442,35 @@ def print_fitting_data(
         color="black",
     )
     plot_summary_plot(df, x="contrast", y="avg",
-                      line=True, ax=ax[0], color="black")
+                      line=True, direction=direction, ax=ax[0], color="black")
 
     # divided
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerSplit.predict_split(fittingRange, 0),
-        ax=ax[1],
-        color="blue",
-    )
-    plot_summary_plot(
-        df[df.movement == 0],
-        x="contrast",
-        y="avg",
-        line=True,
-        ax=ax[1],
-        color="blue",
-    )
+    canFitSplit = not np.all(np.isnan(paramsConSplit[n, :]))
+    if (canFitSplit):
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 0),
+            ax=ax[1],
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="contrast",
+            y="avg",
+            line=True,
+            ax=ax[1],
+            color="blue",
+        )
 
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerSplit.predict_split(fittingRange, 1),
-        ax=ax[1],
-        color="red",
-    )
-    plot_summary_plot(
-        df[df.movement == 1], x="contrast", y="avg", line=True, ax=ax[1], color="red"
-    )
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 1),
+            ax=ax[1],
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1], x="contrast", y="avg", direction=direction, line=True, ax=ax[1], color="red"
+        )
 
     mng = plt.get_current_fig_manager()
     mng.window.showMaximized()

@@ -30,7 +30,8 @@ import re
 def get_calcium_aligned(signal, time, eventTimes, window, planes, delays):
     aligned = []
     run = 0
-    ps = np.unique(planes).astype(int)
+    ps = np.unique(planes).astype(int)    
+        
     for p in range(len(ps)):
         aligned_tmp, t = align_stim(
             signal[:, np.where(planes == ps[p])[0]],
