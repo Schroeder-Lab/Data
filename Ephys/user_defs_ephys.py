@@ -50,6 +50,7 @@ def define_directories():
 
     directoryDb = {
         "dataDefFile": "C:\\Software\\Data\\Ephys\\preprocess.csv", 
+        "tocorrectDefFile": "C:\\Software\\Data\\Ephys\\correct.csv", 
         "preprocessedDataDir": r'D:\Cloud\Box\Florencia\Experiments\TestPreprocessingPipeline\Output', #"D:\\Cloud\\Box\\Florencia\\Experiments\\Data", #this will be Z:\ProcessedData
         "metadataDir":  "D:\\Experiments\\" #this will be Z:\RawData
         #"tempEphysDir": "e.g. E:\Temp" Not implemented yet
