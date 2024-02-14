@@ -313,12 +313,12 @@ def detect_wheel_move(
     tsKernel[-1] = -1
 
     # Taking the difference and
-    distDiff = np.diff(distance)
+    distDiff = np.diff(distance, prepend=True)
     velocity = (
         sp.ndimage.gaussian_filter1d(distDiff, averagingTime / 2)
         * averagingTime
     )
-
+    velocity[0] = np.nanmedian(velocity)
     # if (plot):
     #     f,ax = plt.subplots(3,1,sharex=True)
     #     ax[0].plot(moveA)

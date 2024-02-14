@@ -61,6 +61,7 @@ import traceback
 from abc import ABC, abstractmethod
 import inspect
 
+
 # %%
 # Note: go to user_defs and change the inputs to directories_to_fit() and create_fitting_ops().
 sessions = directories_to_fit()
@@ -116,47 +117,47 @@ for currSession in sessions:
         print(traceback.format_exc())
         continue
     print(f'Working on {currSession}')
-    respP = np.zeros(gratingRes.shape[-1])
-    respDirection = np.zeros(gratingRes.shape[-1])
+    respP = np.zeros(gratingRes.shape[-1]) * np.nan
+    respDirection = np.zeros(gratingRes.shape[-1]) * np.nan
 
-    paramsOri = np.zeros((gratingRes.shape[-1], 5))
+    paramsOri = np.zeros((gratingRes.shape[-1], 5)) * np.nan
     # paramsOriSplit = np.zeros((7, gratingRes.shape[-1]))
-    paramsOriSplit = np.zeros((gratingRes.shape[-1], 5, 2))
+    paramsOriSplit = np.zeros((gratingRes.shape[-1], 5, 2)) * np.nan
     # varsOri = np.zeros((3, gratingRes.shape[-1]))
-    varOriConst = np.zeros(gratingRes.shape[-1])
-    varOriOne = np.zeros(gratingRes.shape[-1])
-    varOriSplit = np.zeros(gratingRes.shape[-1])
-    pvalOri = np.zeros(gratingRes.shape[-1])
+    varOriConst = np.zeros(gratingRes.shape[-1]) * np.nan
+    varOriOne = np.zeros(gratingRes.shape[-1]) * np.nan
+    varOriSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    pvalOri = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersOri = np.empty((gratingRes.shape[-1], 2), dtype=object)
 
-    paramsTf = np.zeros((gratingRes.shape[-1], 4))
+    paramsTf = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     # paramsTfSplit = np.zeros((8, gratingRes.shape[-1]))
-    paramsTfSplit = np.zeros((gratingRes.shape[-1], 4, 2))
+    paramsTfSplit = np.zeros((gratingRes.shape[-1], 4, 2)) * np.nan
     # varsTf = np.zeros((3, gratingRes.shape[-1]))
-    varTfConst = np.zeros(gratingRes.shape[-1])
-    varTfOne = np.zeros(gratingRes.shape[-1])
-    varTfSplit = np.zeros(gratingRes.shape[-1])
-    pvalTf = np.zeros(gratingRes.shape[-1])
+    varTfConst = np.zeros(gratingRes.shape[-1]) * np.nan
+    varTfOne = np.zeros(gratingRes.shape[-1]) * np.nan
+    varTfSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    pvalTf = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersTf = np.empty((gratingRes.shape[-1], 2), dtype=object)
 
-    paramsSf = np.zeros((gratingRes.shape[-1], 4))
+    paramsSf = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     # paramsSfSplit = np.zeros((8, gratingRes.shape[-1]))
-    paramsSfSplit = np.zeros((gratingRes.shape[-1], 4, 2))
+    paramsSfSplit = np.zeros((gratingRes.shape[-1], 4, 2)) * np.nan
     # varsSf = np.zeros((3, gratingRes.shape[-1]))
-    varSfConst = np.zeros(gratingRes.shape[-1])
-    varSfOne = np.zeros(gratingRes.shape[-1])
-    varSfSplit = np.zeros(gratingRes.shape[-1])
-    pvalSf = np.zeros(gratingRes.shape[-1])
+    varSfConst = np.zeros(gratingRes.shape[-1]) * np.nan
+    varSfOne = np.zeros(gratingRes.shape[-1]) * np.nan
+    varSfSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    pvalSf = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersSf = np.empty((gratingRes.shape[-1], 2), dtype=object)
 
-    paramsCon = np.zeros((gratingRes.shape[-1], 4))
+    paramsCon = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     # paramsConSplit = np.zeros((6, gratingRes.shape[-1]))
-    paramsConSplit = np.zeros((gratingRes.shape[-1], 4, 2))
+    paramsConSplit = np.zeros((gratingRes.shape[-1], 4, 2)) * np.nan
     # varsCon = np.zeros((3, gratingRes.shape[-1]))
-    varConConst = np.zeros(gratingRes.shape[-1])
-    varConOne = np.zeros(gratingRes.shape[-1])
-    varConSplit = np.zeros(gratingRes.shape[-1])
-    pvalCon = np.zeros(gratingRes.shape[-1])
+    varConConst = np.zeros(gratingRes.shape[-1]) * np.nan
+    varConOne = np.zeros(gratingRes.shape[-1]) * np.nan
+    varConSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    pvalCon = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersCon = np.empty((gratingRes.shape[-1], 2), dtype=object)
 
     fittingRange = range(0, gratingRes.shape[-1])
@@ -249,9 +250,9 @@ for currSession in sessions:
             TunersSf[n, :] = res_spatial[7:]
 
             paramsCon[n, :] = res_con[0]
-            paramsConSplit[n, :, 0] = res_con[1][[0, 2, 4, 5]] if (
+            paramsConSplit[n, :, 0] = res_con[1][[0, 2, 4, 6]] if (
                 not np.any(np.isnan(res_con[1]))) else np.nan
-            paramsConSplit[n, :, 1] = res_con[1][[1, 3, 4, 5]] if (
+            paramsConSplit[n, :, 1] = res_con[1][[1, 3, 5, 7]] if (
                 not np.any(np.isnan(res_con[1]))) else np.nan
             # varsCon[:, n] = res_con[2:5]
             varConConst[n] = res_con[2]
@@ -306,17 +307,17 @@ for currSession in sessions:
 
     if (ops["fitContrast"]):
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.params.npy"), paramsCon)
+            saveDir, "gratingContrastTuning.params.npy"), paramsCon)
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.paramsRunning.npy"), paramsConSplit)
+            saveDir, "gratingContrastTuning.paramsRunning.npy"), paramsConSplit)
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.expVar.constant.npy"), varConConst)
+            saveDir, "gratingContrastTuning.expVar.constant.npy"), varConConst)
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.expVar.noSplit.npy"), varConOne)
+            saveDir, "gratingContrastTuning.expVar.noSplit.npy"), varConOne)
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.expVar.runningSplit.npy"), varConSplit)
+            saveDir, "gratingContrastTuning.expVar.runningSplit.npy"), varConSplit)
         np.save(os.path.join(
-            saveDir, "gratingContrastTunin.pVal.runningSplit.npy"), pvalCon)
+            saveDir, "gratingContrastTuning.pVal.runningSplit.npy"), pvalCon)
      # plotting
     if (ops['plot']):
         for n in fittingRange:
