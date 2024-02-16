@@ -12,7 +12,7 @@ What the code does:
 -align each frame to each reference image and choose shifts based on best correlation
 It returns the best correlation reference image index as ops['zpos_registration'].
 
-There were some changes to the main suite2p code. To use this clone the repository then 
+There were some changes to the main suite2p code. To use this clone the repository then
 
 git checkout refactor​
 pip install -e .​
@@ -20,28 +20,30 @@ pip install -e .​
 Then you'll get this version of suite2p installed. I will add it to the pip though sooner rather than later since there are some outstanding bugs. '
 """
 
-import time, os, shutil
-import numpy as np
-from suite2p.registration import register, rigid, bidiphase
-from suite2p.io import tiff_to_binary, BinaryFile#BinaryRWFile#
-from suite2p import io
-from suite2p import default_ops
-from tifffile import imread
-import matplotlib.pyplot as plt
-from natsort import natsorted
 # import imp
-from suite2p import default_ops
-from suite2p.registration import utils, rigid
-from suite2p import run_s2p
-from registration_defs import *
-import contextlib
-from runners import read_directory_dictionary
-from Data.user_defs import define_directories, create_ops_boutton_registration
-from os import path
-import glob
+
+
+
+
+from suite2p.io import tiff_to_binary, BinaryFile  # BinaryRWFile
 import traceback
-
-
+import glob
+from os import path
+from Data.user_defs import define_directories, create_ops_boutton_registration
+from runners import read_directory_dictionary
+import contextlib
+from registration_defs import *
+from suite2p import run_s2p
+from suite2p.registration import utils, rigid
+from natsort import natsorted
+import matplotlib.pyplot as plt
+from tifffile import imread
+from suite2p import default_ops
+from suite2p import io
+from suite2p.registration import register, rigid, bidiphase
+import numpy as np
+import time
+import os, shutil
 def run_single_registration(dataEntry):
     """
     This is a function meant to be used in parallel processing that runs the registration function on a single data entry
@@ -60,7 +62,7 @@ def run_single_registration(dataEntry):
         s2pDir = defs["metadataDir"]
         saveDir = defs["preprocessedDataDir"]
         filePath = read_directory_dictionary(dataEntry, s2pDir)
-        ops = create_ops_boutton_registration(filePath,saveDir = saveDir)
+        ops = create_ops_boutton_registration(filePath, saveDir=saveDir)
         if ops["run_registration"]:
             newOps = z_register_one_file(ops)
         else:
@@ -73,7 +75,7 @@ def run_single_registration(dataEntry):
         if ops["run_detection"]:
             run_s2p(ops=newOps)
     except:
-        print (f'Could not run {dataEntry}.\n')
+        print(f'Could not run {dataEntry}.\n')
         print(traceback.format_exc())
 
 
@@ -99,15 +101,16 @@ def z_register_one_file(ops):
     os.makedirs(save_folder, exist_ok=True)
 
     ops = tiff_to_binary(ops)
-    
-    #set directories  and definitions 
+
+    # set directories  and definitions
     raw = ops.get("keep_movie_raw") and "raw_file" in ops and os.path.isfile(
         ops["raw_file"])
     reg_file = ops["reg_file"]
     raw_file = ops.get("raw_file", 0) if raw else reg_file
     if ops["nchannels"] > 1:
         reg_file_chan2 = ops["reg_file_chan2"]
-        raw_file_chan2 = ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
+        raw_file_chan2 = ops.get(
+            "raw_file_chan2", 0) if raw else reg_file_chan2
     else:
         reg_file_chan2 = reg_file
         raw_file_chan2 = reg_file
@@ -115,7 +118,7 @@ def z_register_one_file(ops):
 
     null = contextlib.nullcontext()
     twoc = ops["nchannels"] > 1
-    
+
     # get plane folders
     plane_folders = natsorted(
         [
@@ -152,10 +155,10 @@ def z_register_one_file(ops):
         align_file = reg_file_chan2 if align_by_chan2 else reg_file
         align_file_raw = raw_file_chan2 if align_by_chan2 else raw_file
         Ly, Lx = ops["Ly"], ops["Lx"]
-        
+
         # M:this part of the code above just does registration etc (what is done with the GUI usually)
         # grab frames
-        with BinaryFile(Ly=Ly, Lx=Lx, filename=align_file_raw,n_frames=n_frames) as f_align_in:
+        with BinaryFile(Ly=Ly, Lx=Lx, filename=align_file_raw, n_frames=n_frames) as f_align_in:
             # n_frames = f_align_in.shape[0]
             frames = f_align_in[
                 np.linspace(
@@ -165,8 +168,7 @@ def z_register_one_file(ops):
                     dtype=int,
                 )[:-1]
             ]
-        
-        
+
         # M: this is done to adjust bidirectional shift occuring due to line scanning
         # compute bidiphase shift
         if (
@@ -225,8 +227,7 @@ def z_register_one_file(ops):
             dys[i] = dy
             dxs[i] = dx
 
-    print("shifts of reference images: (y,x) = ", dys, dxs)    
-
+    print("shifts of reference images: (y,x) = ", dys, dxs)
 
     # frames = smooth_reference_stack(frames, ops)
 
@@ -242,11 +243,9 @@ def z_register_one_file(ops):
     ops["refImg"] = refImgs
     ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
     # Get the correlation between the reference images
-    corrs_all = get_reference_correlation(frames, ops)    
+    corrs_all = get_reference_correlation(frames, ops)
     cmaxRegistrations = []
-    
-    
-    
+
     for ipl, ops_path in enumerate(ops_paths):
         if ipl in ops["ignore_flyback"]:
             print(">>>> skipping flyback PLANE", ipl)
@@ -256,21 +255,22 @@ def z_register_one_file(ops):
         ops = np.load(ops_path, allow_pickle=True).item()
         with io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file, n_frames=n_frames) \
             if raw else null as f_raw, \
-         io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file, n_frames=n_frames) as f_reg, \
-         io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file_chan2, n_frames=n_frames) \
+            io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file, n_frames=n_frames) as f_reg, \
+            io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file_chan2, n_frames=n_frames) \
             if raw and twoc else null as f_raw_chan2,\
-         io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file_chan2, n_frames=n_frames) \
-            if twoc else null as f_reg_chan2:
-                registration_outputs = register.registration_wrapper(
-                    f_reg, f_raw=f_raw, f_reg_chan2=f_reg_chan2, f_raw_chan2=f_raw_chan2,
-                    refImg=refImgs, align_by_chan2=align_by_chan2, ops=ops)
+            io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file_chan2, n_frames=n_frames) \
+                if twoc else null as f_reg_chan2:
+            registration_outputs = register.registration_wrapper(
+                f_reg, f_raw=f_raw, f_reg_chan2=f_reg_chan2, f_raw_chan2=f_raw_chan2,
+                refImg=refImgs, align_by_chan2=align_by_chan2, ops=ops)
 
-                ops = register.save_registration_outputs_to_ops(registration_outputs, ops)
-                
-                meanImgE = register.compute_enhanced_mean_image(
+            ops = register.save_registration_outputs_to_ops(
+                registration_outputs, ops)
+
+            meanImgE = register.compute_enhanced_mean_image(
                 ops["meanImg"].astype(np.float32), ops)
-                ops["meanImgE"] = meanImgE
-        #ops = register.register_binary(ops, refImg=refImgs)
+            ops["meanImgE"] = meanImgE
+        # ops = register.register_binary(ops, refImg=refImgs)
         cmaxRegistrations.append(ops["cmax_registration"])
         np.save(ops["ops_path"], ops)
     cmaxs = np.dstack(cmaxRegistrations)
@@ -284,7 +284,7 @@ def z_register_one_file(ops):
     ops = np.load(ops_paths_clean[bestCorrRefPlane], allow_pickle=True).item()
     maxCorrId = ops["zpos_registration"]
     smooth_images_by_correlation(ops_paths_clean, corrs_all)
-    
+
     # At this point the files are registered properly according to where they are
     # now we need to go over each zposition and replace the frame on the channel with a weighted
     # frame on the plane it actually is
@@ -301,8 +301,8 @@ def z_register_one_file(ops):
 def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra):
     ops0 = np.load(ops_paths[selected_plane - 1], allow_pickle=True).item()
     newSavePath = os.path.join(
-        ops0["save_path0"], "suite2p", "plane" + str(len(ops_paths) + 1)
-    )
+        ops0["save_path0"], "suite2p", "plane")
+
     if not os.path.exists(newSavePath):
         os.mkdir(newSavePath)
     newBinFilePath = os.path.join(newSavePath, "data.bin")
@@ -312,33 +312,39 @@ def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra):
     newOps["raw_file"] = []
     newOps["reg_file"] = newBinFilePath
     newOps["selected_plane"] = selected_plane
-    
+
     # remove frames with low maximal correlation value
     cmax = newOps["cmax_registration"]
-    maxCorr = np.nanmax(cmax,1)
-    newOps["badframes"] = maxCorr<0.01
-    
+    maxCorr = np.nanmax(cmax, 1)
+    newOps["badframes"] = maxCorr < 0.01
+
     n_frames = len(planeList)
-    
+
     np.save(newOps["ops_path"], newOps)
     with BinaryFile(
-        Ly=ops0["Ly"], Lx=ops0["Lx"], filename=newBinFilePath, n_frames = n_frames
+        Ly=ops0["Ly"], Lx=ops0["Lx"], filename=newBinFilePath, n_frames=n_frames
     ) as newFile:
         for pi, p in enumerate(planeList):
             ops = np.load(ops_paths[p], allow_pickle=True).item()
             with BinaryFile(
-                Ly=ops0["Ly"], Lx=ops0["Lx"], filename=ops["reg_file"], n_frames = n_frames
+                Ly=ops0["Ly"], Lx=ops0["Lx"], filename=ops["reg_file"], n_frames=n_frames
             ) as planeFile:
-                newFile[pi : pi + 1] = planeFile[pi : pi + 1]
+                newFile[pi: pi + 1] = planeFile[pi: pi + 1]
     # rename/delete all the other directories names so they will not be treated
-    for op in ops_paths:
-        ops = np.load(op, allow_pickle=True).item()
-        del_path = ops["save_path"]
+    plane_folders = np.array(natsorted([
+        f.path
+        for f in os.scandir(os.path.join(ops0["save_path0"], "suite2p"))
+        if f.is_dir() and f.name[:5] == "plane"
+    ]))
+
+    plane_folders = plane_folders[plane_folders != newSavePath]
+
+    for op in plane_folders:
         if delete_extra:
-            shutil.rmtree(del_path)
+            shutil.rmtree(op)
         else:
-            os.rename(del_path, del_path + "_backup")
-            newOps["ignore_flyback"] = np.arange(len(ops_paths) + 1)
+            os.rename(op, op.replace('plane', 'backup'))
+            newOps["ignore_flyback"] = [-1]
     return newOps
 
 
@@ -355,8 +361,8 @@ def replace_frames_by_zpos(ops, ops_paths, plane):
         n_frames = f_align_in.shape[0]
         # go through frames and replace places where a jump occurred from the weighted frame from the right plane
         for b in range(0, n_frames, batch_size):
-            zpos_t = zpos[b : min(b + batch_size, n_frames)]
-            frames = f_align_in[b : min(b + batch_size, n_frames)]
+            zpos_t = zpos[b: min(b + batch_size, n_frames)]
+            frames = f_align_in[b: min(b + batch_size, n_frames)]
             changeInds = np.where(zpos_t != plane)[0]
             if len(changeInds) > 0:
                 uniqueZ = np.unique(zpos_t[changeInds])
@@ -368,9 +374,9 @@ def replace_frames_by_zpos(ops, ops_paths, plane):
                     with BinaryFile(
                         Ly=ops["Ly"], Lx=ops["Lx"], filename=reg_file_alt
                     ) as f_alt:
-                        frames_alt = f_alt[b : min(b + batch_size, n_frames)]
+                        frames_alt = f_alt[b: min(b + batch_size, n_frames)]
                         frames[changeInds] = frames_alt[changeInds]
-            f_align_in[b : min(b + batch_size, n_frames)] = frames
+            f_align_in[b: min(b + batch_size, n_frames)] = frames
 
 
 def get_reference_correlation(refImgs, ops):
@@ -409,7 +415,7 @@ def get_reference_correlation(refImgs, ops):
             smooth_sigma_time=ops["smooth_sigma_time"],
         )
 
-        corrs = cmax[np.max([0, z - 1]) : np.min([nZ, z + 2])]
+        corrs = cmax[np.max([0, z - 1]): np.min([nZ, z + 2])]
         corrs /= np.sum(corrs)
         corrs_all.append(corrs)
     return corrs_all
@@ -440,10 +446,10 @@ def smooth_images_by_correlation(ops_paths, corrs_all):
                     n_frames=n_frames
                 ) as f_plus:
                     for b in range(0, n_frames, batch_size):
-                        f_main[b : min(b + batch_size, n_frames)] = (
-                            f_main[b : min(b + batch_size, n_frames)]
+                        f_main[b: min(b + batch_size, n_frames)] = (
+                            f_main[b: min(b + batch_size, n_frames)]
                             * corrs[0]
-                            + f_plus[b : min(b + batch_size, n_frames)]
+                            + f_plus[b: min(b + batch_size, n_frames)]
                             * corrs[1]
                         )
             elif ipl == (len(ops_paths) - 1):
@@ -457,10 +463,10 @@ def smooth_images_by_correlation(ops_paths, corrs_all):
                     n_frames=n_frames
                 ) as f_minus:
                     for b in range(0, n_frames, batch_size):
-                        f_main[b : min(b + batch_size, n_frames)] = (
-                            f_main[b : min(b + batch_size, n_frames)]
+                        f_main[b: min(b + batch_size, n_frames)] = (
+                            f_main[b: min(b + batch_size, n_frames)]
                             * corrs[1]
-                            + f_minus[b : min(b + batch_size, n_frames)]
+                            + f_minus[b: min(b + batch_size, n_frames)]
                             * corrs[0]
                         )
             else:
@@ -483,11 +489,11 @@ def smooth_images_by_correlation(ops_paths, corrs_all):
                         n_frames=n_frames
                     ) as f_plus:
                         for b in range(0, n_frames, batch_size):
-                            f_main[b : min(b + batch_size, n_frames)] = (
-                                f_main[b : min(b + batch_size, n_frames)]
+                            f_main[b: min(b + batch_size, n_frames)] = (
+                                f_main[b: min(b + batch_size, n_frames)]
                                 * corrs[1]
-                                + f_minus[b : min(b + batch_size, n_frames)]
+                                + f_minus[b: min(b + batch_size, n_frames)]
                                 * corrs[0]
-                                + f_plus[b : min(b + batch_size, n_frames)]
+                                + f_plus[b: min(b + batch_size, n_frames)]
                                 * corrs[2]
                             )

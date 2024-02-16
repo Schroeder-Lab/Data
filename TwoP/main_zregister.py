@@ -15,16 +15,19 @@ from joblib import Parallel, delayed
 from zregister_function import *
 from Data.user_defs import *
 import pandas as pd
+import traceback
 
+# %%
 dataEntries = directories_to_register()
 
-# for i in range(len(dataEntries)):
-#     try:
-#         run_single_registration(dataEntries.iloc[i])
-#     except:
-        
-    
-Parallel(n_jobs=4, verbose=5, backend='threading')(
-    delayed(run_single_registration)(dataEntries.iloc[i])
-    for i in range(len(dataEntries))
-)
+for i in range(len(dataEntries)):
+    try:
+        run_single_registration(dataEntries.iloc[i])
+    except:
+        print(traceback.format_exc())
+
+
+# Parallel(n_jobs=8, verbose=5, backend='threading')(
+#     delayed(run_single_registration)(dataEntries.iloc[i])
+#     for i in range(len(dataEntries))
+# )

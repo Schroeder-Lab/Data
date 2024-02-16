@@ -186,7 +186,15 @@ def _process_s2p_singlePlane(
     if not (zstackPath is None):
         try:
             channel = ops["align_by_chan"]
-            refImg = ops["meanImg"]  # Gets the reference image from Suite2P.
+            if (channel == 1):
+                reg_file = None
+                # Gets the reference image from Suite2P.
+                refImg = ops["meanImg"]
+            else:
+                reg_file = ops["reg_file_chan2"]
+                # Gets the reference image from Suite2P.
+                refImg = ops["meanImg_chan2"]
+
             # Creates registered Z stack path.
             zFileName = os.path.join(
                 saveDirectory, f"zstackAngle_plane{plane}_chan{channel}.tif"
@@ -203,8 +211,8 @@ def _process_s2p_singlePlane(
                         zstackPath,
                         spacing=1,
                         piezo=piezo,
-                        target_image=refImg,
-                        channel=channel,
+                        target_image=ops['meanImg'],
+                        channel=1,
                     )
                     # Saves registered Z stack in the specified or default saveDir.
                     skimage.io.imsave(zFileName_main, zstack_main)
@@ -212,6 +220,7 @@ def _process_s2p_singlePlane(
                     zstack_main = skimage.io.imread(zFileName_main)
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
+
                 zstack = register_zstack(
                     zstackPath,
                     spacing=1,
@@ -223,14 +232,15 @@ def _process_s2p_singlePlane(
                 skimage.io.imsave(zFileName, zstack)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                ops, zcorr = compute_zpos(zstack, ops)
+
+                ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 np.save(ops["ops_path"], ops)
             # Calculates Z correlation if Z stack was already registered.
             elif not ("zcorr" in ops.keys()):
                 zstack = skimage.io.imread(zFileName)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                ops, zcorr = compute_zpos(zstack, ops)
+                ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 # Saves the current ops path to the ops file.
                 np.save(ops["ops_path"], ops)
             # If the Z stack has been registered and Z correlation has been

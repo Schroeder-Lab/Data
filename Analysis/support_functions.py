@@ -70,10 +70,11 @@ def get_trial_classification_running(
     stimSt,
     stimEt,
     quietVelocity=0.5,
-    activeVelocity=2,
+    activeVelocity=1,
     criterion=0.9,
 ):
     wheelVelocity = np.abs(wheelVelocity)
+
     wh, ts = align_stim(
         wheelVelocity,
         wheelTs,
@@ -82,7 +83,8 @@ def get_trial_classification_running(
     )
 
     whLow = wh <= quietVelocity
-    whLow = np.sum(whLow, 0) / whLow.shape[0]
+    whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
+        whLow.shape[0] / 2)
     whHigh = wh > activeVelocity
     whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
         whHigh.shape[0] / 2
@@ -146,9 +148,9 @@ def make_neuron_db(
 def is_responsive_direction(df, criterion=0.05):
     """
     Determines the responsiveness and direction of response by fitting a linear model
-    and performs permutation testing by shuffling the target variable and fitting the 
-    model to shuffled data. 
-    The function calculates a p-value based on the actual R-squared score's 
+    and performs permutation testing by shuffling the target variable and fitting the
+    model to shuffled data.
+    The function calculates a p-value based on the actual R-squared score's
     percentile among the shuffled scores.
 
     Parameters
@@ -175,9 +177,23 @@ def is_responsive_direction(df, criterion=0.05):
     a = a[goodInds, :]
     b = b[goodInds]
 
+    # make sure you can split by rempving single combinations of variables
+    uniqueCombos, comboCount = np.unique(a, axis=0, return_counts=True)
+    uniqueCombos = uniqueCombos[comboCount < 2, :]
+
+    badInds = []
+    for combo in uniqueCombos:
+        badInds_ = np.where((a == combo).all(axis=1))[0]
+        if (len(badInds_) > 0):
+            badInds.append(badInds_)
+    if len(badInds) > 0:
+        badInds = np.vstack(badInds)
+        a = np.delete(a, badInds, axis=0)
+        b = np.delete(b, badInds, axis=0)
+
     # Split the dataset into training and testing sets.
     X_train, X_test, y_train, y_test = train_test_split(
-        a, b, test_size=0.10, stratify=np.unique(a, axis=1))
+        a, b, test_size=0.20, stratify=a)
 
     # Fit a linear model to the training data.
     res = sp.linalg.lstsq(X_train, y_train)
@@ -205,7 +221,7 @@ def is_responsive_direction(df, criterion=0.05):
     return p, direction
 
 
-def filter_nonsig_orientations(df, criterion=0.05):
+def filter_nonsig_orientations(df, direction=1, criterion=0.05):
     dfOri = df.groupby("ori")
     pVals = np.zeros(len(dfOri))
     meanOri = np.zeros(len(dfOri))
@@ -214,8 +230,14 @@ def filter_nonsig_orientations(df, criterion=0.05):
         dfMini = dfMini[1]  # get the actual db
         s, p = sp.stats.ttest_rel(dfMini["bl"], dfMini["avg"])
         pVals[i] = p * len(pVals)
-        meanOri[i] = dfMini["avg_corrected"].mean()
+        meanOri[i] = direction*dfMini["avg_corrected"].mean()
     # df = df[df["ori"].isin(keys[pVals < criterion])]
+    # df = df[df["ori"] == keys[np.argmax(meanOri)]]
+    pks = sp.signal.find_peaks(meanOri)[0]
+
+    if len(pks) == 0:
+        pks = []
+
     df = df[df["ori"] == keys[np.argmax(meanOri)]]
     return df
 
@@ -229,6 +251,8 @@ def run_tests(
     x_name,
     y_name,
     direction=1,
+
+
 ):
     props_reg = np.nan
     props_split = np.nan
@@ -294,11 +318,11 @@ def run_tests(
         indq = np.where(qCounts < 3)[0]
         inda = np.where(aCounts < 3)[0]
         # removeInds = np.union1d(indq, inda)
-        removeValuesQ = dfq[x_name].value_counts().index.to_numpy()[indq]
-        removeValuesA = dfq[x_name].value_counts().index.to_numpy()[inda]
-        removeValues = np.union1d(removeValuesQ, removeValuesA)
+        valsQ = dfq[x_name].value_counts().index.to_numpy()
+        valsA = dfa[x_name].value_counts().index.to_numpy()
+        # removeValues = np.union1d(removeValuesQ, removeValuesA)
 
-        if (len(indq) > 1) | (len(inda) > 1):
+        if (len(indq) > 0) | (len(inda) > 0) | (len(valsQ) < len(np.unique(df[x_name]))) | (len(valsA) < len(np.unique(df[x_name]))):
             res = make_empty_results(x_name)
             res = list(res)
             res[0] = props_reg
@@ -427,7 +451,7 @@ def make_empty_results(resType, *args):
     if str.lower(resType) == "contrast":
         return (
             np.ones(4) * np.nan,
-            np.ones(6) * np.nan,
+            np.ones(8) * np.nan,
             np.nan,
             np.nan,
             np.nan,
@@ -463,7 +487,7 @@ def run_complete_analysis(
     res_ori = make_empty_results("Ori")
     res_freq = make_empty_results("Tf")
     res_spatial = make_empty_results("Sf")
-    res_contrast = make_empty_results("Contrast")
+    res_contrast = make_empty_results("contrast")
     # test responsiveness
     p_resp, resp_direction = is_responsive_direction(dfAll, criterion=0.05)
     if p_resp > 0.05:
@@ -496,7 +520,7 @@ def run_complete_analysis(
             & (np.isin(dfAll.ori, [0, 90, 180, 270]))
         ]
 
-        df = filter_nonsig_orientations(df, criterion=0.05)
+        df = filter_nonsig_orientations(df, resp_direction, criterion=0.05)
         res_freq = run_tests(
             FrequencyTuner, "gauss", "gauss_split", df, "movement", "tf", "avg", resp_direction
         )
@@ -509,7 +533,7 @@ def run_complete_analysis(
             & (dfAll.contrast == 1)
             & (np.isin(dfAll.ori, [0, 90, 180, 270]))
         ]
-        df = filter_nonsig_orientations(df, criterion=0.05)
+        df = filter_nonsig_orientations(df, resp_direction, criterion=0.05)
         res_spatial = run_tests(
             FrequencyTuner, "gauss", "gauss_split", df, "movement", "sf", "avg", resp_direction
         )
@@ -517,17 +541,19 @@ def run_complete_analysis(
         res_spatial = make_empty_results("Sf")
     if runContrast:
         df = dfAll[(dfAll.tf == 2) & (dfAll.sf == 0.08)]
-        df = filter_nonsig_orientations(df, criterion=0.05)
+        df = filter_nonsig_orientations(df, resp_direction, criterion=0.05)
         res_contrast = run_tests(
             ContrastTuner,
             "contrast",
-            "contrast_split",
+            "contrast_split_full",
             df,
             "movement",
             "contrast",
             "avg",
             resp_direction
         )
+    else:
+        res_contrast = make_empty_results("contrast")
 
     return (
         (p_resp, resp_direction),
