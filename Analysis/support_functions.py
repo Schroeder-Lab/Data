@@ -83,11 +83,16 @@ def get_trial_classification_running(
     )
 
     whLow = wh <= quietVelocity
-    whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
-        whLow.shape[0] / 2)
+    # whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
+    #     whLow.shape[0] / 2)
+    whLow = np.sum(whLow[: int(whLow.shape[0]), :, 0], 0) / int(
+        whLow.shape[0])
     whHigh = wh > activeVelocity
-    whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
-        whHigh.shape[0] / 2
+    # whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
+    #     whHigh.shape[0]
+    # )
+    whHigh = np.sum(whHigh[: int(whHigh.shape[0]), :, 0], 0) / int(
+        whHigh.shape[0]
     )
     quietTrials = np.where(whLow >= criterion)[0]
     activeTrials = np.where(whHigh > criterion)[0]
@@ -590,6 +595,12 @@ def load_grating_data(directory):
         fileNameDic["gratingsEt"] = "gratings.et.updated.npy"
     data = {}
     for key in fileNameDic.keys():
+        if (key == "planes"):
+            if not (os.path.exists(os.path.join(directory, fileNameDic[key]))):
+                if(os.path.exists(os.path.join(directory, "calcium.planes.npy"))):
+                    os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
+                        os.path.join(directory, fileNameDic[key])))
+
         data[key] = np.load(os.path.join(directory, fileNameDic[key]))
     return data
 
@@ -597,16 +608,16 @@ def load_grating_data(directory):
 def load_circle_data(directory):
     fileNameDic = {
         "sig": "calcium.dff.npy",
-        "planes": "calcium.planes.npy",
+        "planes": "rois.planes.npy",
         "planeDelays": "planes.delay.npy",
         "calTs": "calcium.timestamps.npy",
         "faceTs": "eye.timestamps.npy",
         "wheelTs": "wheel.timestamps.npy",
         "wheelVelocity": "wheel.velocity.npy",
-        "circlesSt": "circles.st.npy",
-        "circlesEt": "circles.et.npy",
-        "circlesX": "circles.x.npy",
+        "circlesSt": "circles.startTime.npy",
+        "circlesEt": "circles.endTime.npy",
         "circlesY": "circles.y.npy",
+        "circlesX": "circles.x.npy",
         "circlesDiameter": "circles.diameter.npy",
         "circlesIsWhite": "circles.isWhite.npy",
     }
@@ -618,5 +629,12 @@ def load_circle_data(directory):
         fileNameDic["gratingsEt"] = "gratings.et.updated.npy"
     data = {}
     for key in fileNameDic.keys():
+
+        if (key == "planes"):
+            if not (os.path.exists(os.path.join(directory, fileNameDic[key]))):
+                if(os.path.exists(os.path.join(directory, "calcium.planes.npy"))):
+                    os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
+                        os.path.join(directory, fileNameDic[key])))
+
         data[key] = np.load(os.path.join(directory, fileNameDic[key]))
     return data

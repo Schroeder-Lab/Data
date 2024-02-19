@@ -141,7 +141,7 @@ def correct_neuropil(
         # an array.
         regPars[:, iROI] = (a, b)
 
-        ## avoid over correction
+        # avoid over correction
 
         # Calculates the corrected signal by multiplying the neuropil values by
         # the slope of the linear fit and subtracting this from F.
@@ -153,7 +153,7 @@ def correct_neuropil(
 
 
 # TODO
-def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold = 0.2, metadata={}):
+def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold=0.2, metadata={}):
     """
     Corrects changes in fluorescence due to brain movement along z-axis
     (depth). Method is based on algorithm described in Ryan, ..., Lagnado
@@ -173,7 +173,7 @@ def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold = 0.2
     ignore_faults: bool, optional
         Whether to remove the timepoints where imaging took place in a plane
         that is meaningless to a cell's activity. Default is True.
-    
+
     ampThreshold: float, optional
         The cutoff for amplification that is deemed too high (thus amplifying noise).
         Default is 0.2 (amplification X5).
@@ -200,9 +200,9 @@ def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold = 0.2
     # Assigns the correction factor for each frame based on its location in the
     # Z trace.
     correctionMatrix = correctionFactor[ztrace, :]
-    
+
     # remove parts that are too amplified
-    correctionMatrix[correctionMatrix<ampThreshold] = np.nan
+    correctionMatrix[correctionMatrix < ampThreshold] = np.nan
     # Applies the Z correction by dividing the frames in the fluorescence
     # traces by the correction factor.
     signal = F / correctionMatrix
@@ -256,14 +256,14 @@ def get_F0(
         lastFrame = 0
         for lf in framesPerFolder:
             F0t = get_F0(
-                Fc[lastFrame : lastFrame + lf, :],
+                Fc[lastFrame: lastFrame + lf, :],
                 fs,
                 prctl_F,
                 window_size,
                 [],
                 verbose,
             )
-            F0[lastFrame : lastFrame + lf, :] = F0t
+            F0[lastFrame: lastFrame + lf, :] = F0t
 
     # Translates the window size from seconds into frames.
     window_size = int(round(fs * window_size))
@@ -327,7 +327,7 @@ def remove_zcorrected_faults(ztrace, zprofiles, signals, metadata={}):
 
     """
     # Gets the zprofiles which are only in the imaged planes.
-    zp_focused = zprofiles[min(ztrace) : max(ztrace), :]
+    zp_focused = zprofiles[min(ztrace): max(ztrace), :]
     # Normalises the zTrace so that the top imaged plane is the first plane.
     ztrace -= min(ztrace)
     # Calculates the difference between the z profiles for one plane and the
@@ -346,59 +346,97 @@ def remove_zcorrected_faults(ztrace, zprofiles, signals, metadata={}):
     metadata["removedIndex"] = []
     # For each cell,
     for i in range(signals.shape[1]):
+
+        # new logic
+        removePoint = []
+        # check where the higher fluorescnces are (normalised to plane)
+        upInds = np.where(zp_focused[:, i] > 1)[0]
+        if (len(upInds) > 0):
+            closestHighPoint = upInds[np.argmin(np.abs(upInds-imagingPlane))]
+
+            # cannot go high in fluorescence in more than one place
+            if (closestHighPoint > imagingPlane):
+                signals[np.isin(
+                    ztrace, upInds[upInds < closestHighPoint]), i] = np.nan
+            else:
+                signals[np.isin(
+                    ztrace, upInds[upInds > closestHighPoint]), i] = np.nan
+
+        downInds = np.where(zp_focused[:, i] < 1)[0]
+        zpDowns = zp_focused[downInds, i]
+        downDif = np.diff(zpDowns, 1, axis=0)
+        zero_crossings_inds = np.where(np.diff(np.signbit(downDif), axis=0))[0]
+        if (len(zero_crossings_inds)):
+            downLimits = downInds[zero_crossings_inds]
+            # find out the points that are above the imaging plane
+            dlAbove = downLimits[downLimits < imagingPlane]
+            if (len(dlAbove) > 0):
+                closestLowPoint = dlAbove[np.argmin(
+                    np.abs(dlAbove-imagingPlane))]
+                signals[ztrace < closestLowPoint, i] = np.nan
+
+            # same for below
+            dlBelow = downLimits[downLimits > imagingPlane]
+            if (len(dlBelow) > 0):
+                closestLowPoint = dlBelow[np.argmin(
+                    np.abs(dlBelow-imagingPlane))]
+                signals[ztrace > closestLowPoint, i] = np.nan
+
+            # it is not in a trough, make sure it doesn't go beyond one
+
         # Gets the indices where there are crossings for the specified cell.
-        cellInds = np.where(cells == i)[0]
-        # No zero crossings of the derivative means imaging is on a
-        # monotonous slope.
+        # cellInds = np.where(cells == i)[0]
+        # # No zero crossings of the derivative means imaging is on a
+        # # monotonous slope.
 
-        if len(cellInds) == 0:
-            continue
-        # Gets the planes where most fluorescence comes from.
-        zc = zero_crossing[cellInds]
-        # Calculates the distance of the crossing plane from the median
-        # imaging plane.
-        distFromPlane = imagingPlane - zc
-        # If there are many crossings, finds out what is the closest one to
-        # the imaging plane.
-        planeCrossingInd = np.argmin(abs(distFromPlane))
-        planeCrossing = zc[planeCrossingInd]
+        # if len(cellInds) == 0:
+        #     continue
+        # # Gets the planes where most fluorescence comes from.
+        # zc = zero_crossing[cellInds]
+        # # Calculates the distance of the crossing plane from the median
+        # # imaging plane.
+        # distFromPlane = imagingPlane - zc
+        # # If there are many crossings, finds out what is the closest one to
+        # # the imaging plane.
+        # planeCrossingInd = np.argmin(abs(distFromPlane))
+        # planeCrossing = zc[planeCrossingInd]
 
-        # Removes the signals where there is more than one crossing.
-        if len(zc) > 1:
-            # The imaging plane has the first crossing. Discards anything
-            # that comes after the rest.
-            # If the first crossing is closest to the imaging plane:
-            if planeCrossingInd == 0:
-                # Replaces the datapoints with NaNs if the location in z is
-                # after the first crossing.
-                signals[np.where(ztrace > zc[1]), i] = np.nan
-            # For all the cases where the crossing closest to the imaging plane
-            # is not the first, all values are discarded where the plane is
-            # before the crossing.
-            else:
-                signals[
-                    np.where(ztrace < zc[planeCrossingInd - 1]), i
-                ] = np.nan
+        # # Removes the signals where there is more than one crossing.
+        # if len(zc) > 1:
+        #     # The imaging plane has the first crossing. Discards anything
+        #     # that comes after the rest.
+        #     # If the first crossing is closest to the imaging plane:
+        #     if planeCrossingInd == 0:
+        #         # Replaces the datapoints with NaNs if the location in z is
+        #         # after the first crossing.
+        #         signals[np.where(ztrace > zc[1]), i] = np.nan
+        #     # For all the cases where the crossing closest to the imaging plane
+        #     # is not the first, all values are discarded where the plane is
+        #     # before the crossing.
+        #     else:
+        #         signals[
+        #             np.where(ztrace < zc[planeCrossingInd - 1]), i
+        #         ] = np.nan
 
-        # Checks if differential is positive before crossing.
-        # If that's the case we're golden, the problem is if it is negative.
-        # Then it's a trough and it depends on what side of the trough we are
-        # imaging.
+        # # Checks if differential is positive before crossing.
+        # # If that's the case we're golden, the problem is if it is negative.
+        # # Then it's a trough and it depends on what side of the trough we are
+        # # imaging.
 
-        # If the first crossing is below the imaging plane, removes the
-        # timepoints after the crossing.
-        if dif[planeCrossing - 1, i] < 0:
-            if distFromPlane[planeCrossingInd] < 0:
+        # # If the first crossing is below the imaging plane, removes the
+        # # timepoints after the crossing.
+        # if dif[planeCrossing - 1, i] < 0:
+        #     if distFromPlane[planeCrossingInd] < 0:
 
-                removeInd = np.where(ztrace > planeCrossing + 1)[0]
-            else:
-                # In the opposite case, it removes the points from before the
-                # crossing.
-                removeInd = np.where(ztrace < planeCrossing + 1)[0]
+        #         removeInd = np.where(ztrace > planeCrossing + 1)[0]
+        #     else:
+        #         # In the opposite case, it removes the points from before the
+        #         # crossing.
+        #         removeInd = np.where(ztrace < planeCrossing + 1)[0]
 
-            signals[removeInd, i] = np.nan
-        # Adds the indices of the removed points to a dictionary.
-        metadata["removedIndex"].append(np.where(np.isnan(signals))[0])
+        #     signals[removeInd, i] = np.nan
+        # # Adds the indices of the removed points to a dictionary.
+        # metadata["removedIndex"].append(np.where(np.isnan(signals))[0])
     return signals
 
 

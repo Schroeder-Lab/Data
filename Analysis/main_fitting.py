@@ -55,6 +55,8 @@ from support_functions import (
     run_complete_analysis,
     get_directory_from_session,
 )
+
+from Data.user_defs import define_directories
 from plotting_functions import print_fitting_data
 from user_defs import directories_to_fit, create_fitting_ops
 import traceback
@@ -64,11 +66,12 @@ import inspect
 
 # %%
 # Note: go to user_defs and change the inputs to directories_to_fit() and create_fitting_ops().
-sessions = directories_to_fit()
+dirs = define_directories()
+csvDir = dirs["dataDefFile"]
 
-sessions = pd.read_csv("D:\\processing.csv")
-sessions.insert(2, column='SpecificNeurons', value=[
-                [] for _ in range(len(sessions))])
+sessions = pd.read_csv(csvDir)
+# sessions.insert(2, column='SpecificNeurons', value=[
+#                 [] for _ in range(len(sessions))])
 sessions = sessions[['Name', 'Date', 'SpecificNeurons']].to_dict('records')
 
 
@@ -163,7 +166,7 @@ for currSession in sessions:
     fittingRange = range(0, gratingRes.shape[-1])
     # check if want to run only some neurons
 
-    if len(currSession["SpecificNeurons"]) > 0:
+    if not np.all(np.isnan(sessions[0]['SpecificNeurons'])):
         fittingRange = currSession["SpecificNeurons"]
         # assume to wants to redo only those, so try reloading existing data first
         try:
