@@ -140,7 +140,8 @@ def stimulus_gratings(directory, frameChanges):
             "gratings.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
-            "gratingsExp.intervals.npy": [st[0], et[-1]]
+            "gratingsExp.intervals.npy": [st[0], et[-1]],
+            "gratingsExp.description.npy": 'Gratings' #TODO: check if this is usefull; should add same line to gratings
             }
 
 
@@ -162,6 +163,88 @@ def stimulus_spont(directory, frameChanges):
     return {"darkScreen.intervals": [frameChanges[0], frameChanges[-1]]}
 
 
+def stimulus_flicker(directory, frameChanges):
+    # Gets the identity of the stimuli (see function for
+    # further details).
+    # stimProps = get_stimulus_info(directory)
+    flicker_stimType = np.zeros(21) #Asuming 10 reps per each contrast block
+    
+    flicker_stimType[0::2] = 0.05 #SD from Low contrast
+    flicker_stimType[1::2] = 0.175 #SD from High contrast
+    
+    # Checks if number of frames and stimuli match (if not, there
+    # could have been an issue with the photodiode, check if there
+    # are irregular frames in the photodiode trace).
+    
+    if len(flicker_stimType) == len(frameChanges):
+
+        # Gets the start times of each stimulus.
+        st = frameChanges[:-1].reshape(-1, 1).copy()
+        # Gets the end times  of each stimulus.
+        et = frameChanges[1:].reshape(-1, 1).copy()
+    else:
+        warnings.warn(f'''Number of frames and stimuli do not match.
+                      Assuming there was a false photodiode rise at the end, but check!''')
+                      
+        st = frameChanges[0:-2].reshape(-1, 1).copy()
+        et = frameChanges[1:-1].reshape(-1, 1).copy()
+
+    return {"flicker.startTime.npy": st,
+            "flicker.endTime.npy": et,
+            "flicker.contrast.npy": '',
+            "flickerExp.intervals.npy": [st[0], et[-1]],
+             }
+
+
+def stimulus_oddball(directory, frameChanges):
+    # Gets the identity of the stimuli (see function for
+    # further details).
+    stimProps = get_stimulus_info(directory)
+    # Gets the start times of each stimulus.
+    st = frameChanges[::2].reshape(-1, 1).copy()
+    # Gets the end times  of each stimulus.
+    et = frameChanges[1::2].reshape(-1, 1).copy()
+
+    # Checks if number of frames and stimuli match (if not, there
+    # could have been an issue with the photodiode, check if there
+    # are irregular frames in the photodiode trace).
+    if len(stimProps) != len(st):
+        # raise ValueError(
+        #     "Number of frames and stimuli do not match. Skpping"
+        # )
+        warnings.warn("Number of frames and stimuli do not match")
+        if (len(et) == len(stimProps)):
+            warnings.warn(
+                "Assuming there was a false photodiode rise in the beginning, but check!")
+            st = frameChanges[1::2].reshape(-1, 1).copy()
+            # Gets the end times  of each stimulus.
+            et = frameChanges[2::2].reshape(-1, 1).copy()
+    # Adds the start and end times from above to the respective
+    # lists.
+
+    if "Reward" in stimProps.columns:
+        reward = np.array(
+            [x in "True" for x in np.array(stimProps.Reward)]).reshape(-1, 1).astype(bool).copy()
+    else:
+        reward = np.ones_like(st) * np.nan
+
+    return {"gratings.startTime.npy": st,
+            "gratings.endTime.npy": et,
+            "gratings.direction.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+            "gratings.spatialF.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.reward.npy": reward,
+            "gratingsExp.intervals.npy": [st[0], et[-1]],
+            "gratingsExp.description.npy": 'Oddball' #TODO: check if this is usefull; should add same line to gratings
+            }
+    
+
+
+def stimulus_gratingsStep(directory, frameChanges):
+    pass
+
+
 stimulus_prcoessing_dictionary = {
     "Gratings": stimulus_gratings,
     "Circles": stimulus_circles,
@@ -169,4 +252,7 @@ stimulus_prcoessing_dictionary = {
     "NaturalImages": stimulus_naturalImages,
     "Sparse": stimulus_sparse,
     "Spont": stimulus_spont,
+    "Flicker":stimulus_flicker,
+    "Oddball":stimulus_oddball,
+    "GratingsStep":stimulus_gratingsStep,
 }
