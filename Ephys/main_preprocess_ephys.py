@@ -28,6 +28,7 @@ dirs = define_directories()
 csvDir = dirs["dataDefFile"]
 preprocessedDataDir = dirs["preprocessedDataDir"]
 metadataDir = dirs["metadataDir"]
+tempEphysDir = dirs["tempEphysDir"]
 
 pops = create_ephys_processing_ops()
 
@@ -60,7 +61,7 @@ for i in range(len(database)):
         metadataDirectory,
         saveDirectory,
     ) = read_csv_produce_directories_ephys(
-        database.loc[i], metadataDir,preprocessedDataDir 
+        database.loc[i], metadataDir,preprocessedDataDir
     )
     
     if database.loc[i]["Sync"]:
@@ -72,7 +73,7 @@ for i in range(len(database)):
             print(f"Synchronising directories:\n{database.loc[i]}\n")
             
             synchronise_streams_with_ephys(database.loc[i], pops, ephysDirectory,
-                                          metadataDirectory, saveDirectory)       
+                                          metadataDirectory, saveDirectory, tempEphysDir)       
     
         except Exception:
             print('Error in syncronization' + str(database.loc[i]))

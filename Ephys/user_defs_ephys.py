@@ -42,18 +42,17 @@ def define_directories():
           and Contrast
           Note: These files should be generated automatically when using the Bonsai scripts within this repository.
 
-    tempEphysDir: str ["YourLocalTemporaryDirectoryPath"] NOT IMPLEMENTED YET
-        The local folder where ephys data exclusively should be downloaded from the NAS for processing.
-        Data should be deleated locally afterwards. 
+    tempEphysDir: str ["YourLocalTemporaryDirectoryPath"]
+        The local folder where ephys data (lfp) exclusively should be downloaded from the NAS for processing.  
            
     """
 
     directoryDb = {
         "dataDefFile": "C:\\Software\\Data\\Ephys\\preprocess.csv", 
         "tocorrectDefFile": "C:\\Software\\Data\\Ephys\\correct.csv", 
-        "preprocessedDataDir": r'D:\Cloud\Box\Florencia\Experiments\TestPreprocessingPipeline\Output', #"D:\\Cloud\\Box\\Florencia\\Experiments\\Data", #this will be Z:\ProcessedData
-        "metadataDir":  "D:\\Experiments\\" #this will be Z:\RawData
-        #"tempEphysDir": "e.g. E:\Temp" Not implemented yet
+        "preprocessedDataDir": "D:\\Cloud\\Box\\Florencia\\Experiments\\Data", #this will be Z:\ProcessedData
+        "metadataDir":  "D:\\Experiments", #this will be Z:\RawData
+        "tempEphysDir": None #"E:\\tempEphys" 
     }
     return (
         directoryDb  # dataDefFile, preprocessedDataDir, zstackDir, metadataDir
