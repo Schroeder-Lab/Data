@@ -242,7 +242,35 @@ def stimulus_oddball(directory, frameChanges):
 
 
 def stimulus_gratingsStep(directory, frameChanges):
-    pass
+   
+    stimProps = get_stimulus_info(directory)
+    # Gets the start times of each stimulus.
+    st = frameChanges[::2].reshape(-1, 1).copy()
+    # Gets the end times  of each stimulus.
+    et = frameChanges[1::2].reshape(-1, 1).copy()
+
+    # Checks if number of frames and stimuli match (if not, there
+    # could have been an issue with the photodiode, check if there
+    # are irregular frames in the photodiode trace).
+    if len(stimProps) != len(st):
+
+        warnings.warn("Number of frames and stimuli do not match")
+   
+    #TODO: add here corrections for general issues
+   
+   
+    # Adds the start and end times from above to the respective
+    # lists.
+
+    return {"gratingsStep.startTime.npy": st,
+            "gratingsStep.endTime.npy": et,
+            "gratingsStep.direction.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+            "gratingsStep.spatialF.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsStep.startTemporalF.npy": stimProps.TFreqStart.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsStep.endTemporalF.npy": stimProps.TFreqEnd.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsStep.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsStepExp.intervals.npy": [st[0], et[-1]],
+            }
 
 
 stimulus_prcoessing_dictionary = {
