@@ -70,7 +70,7 @@ for i in range(len(database)):
                 np.array(database.loc[i]["IgnorePlanes"]).astype(int)
             )
             # make save directory the main root
-            saveDirectory = os.path.split(s2pDirectory)[0]            
+            saveDirectory = os.path.split(s2pDirectory)[0]
             # Returns the ops dictionary.
             ops = get_ops_file(s2pDirectory)
             if pops["process_suite2p"]:
@@ -80,15 +80,19 @@ for i in range(len(database)):
                 # z-axis for all planes.
                 planePiezo = get_piezo_data(ops)
                 print("processing suite2p data")
-                fc = process_s2p_directory(
-                    s2pDirectory,
-                    pops,
-                    planePiezo,
-                    zstackPath,
-                    saveDirectory=saveDirectory,
-                    ignorePlanes=ignorePlanes,
-                    debug=pops["debug"],
-                )
+                try:
+                    fc = process_s2p_directory(
+                        s2pDirectory,
+                        pops,
+                        planePiezo,
+                        zstackPath,
+                        saveDirectory=saveDirectory,
+                        ignorePlanes=ignorePlanes,
+                        debug=pops["debug"],
+                    )
+                except Exception:
+                    print("Could not process due to errors, moving to next batch.")
+                    print(traceback.format_exc())
             if pops["process_bonsai"]:
                 print("reading bonsai data")
                 process_metadata_directory(

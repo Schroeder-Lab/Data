@@ -13,6 +13,7 @@ from sklearn.metrics import r2_score
 import os
 import glob
 from Data.Bonsai.extract_data import *
+import shutil
 
 
 def read_ephys_meta_data(md_file):
@@ -222,9 +223,9 @@ def synchronise (syncTimes, ardSync, at, plot = False):
 
 
 def synchronise_streams_with_ephys(dataEntry, pops, ephysDirectory,
-                                  metadataDirectory, saveDirectory):
+                                  metadataDirectory, saveDirectory, tempEphysDir):
     '''
-    This fucntion should 
+    This function should 
     1) take the ephys path and extract sync signal from lfp
     2) take the sync signals from arduino and nidaq from experiments asigned 
     3) align times, and give the parameters for correction for each experiment/
@@ -234,6 +235,15 @@ def synchronise_streams_with_ephys(dataEntry, pops, ephysDirectory,
     
     lfpMetaDir = glob.glob(os.path.join(ephysDirectory,'*.lf.meta' ))[0] #ALWAYS LOAD THESE FILES IF SYNC IS TRUE   
     lfpRawDir = glob.glob(os.path.join(ephysDirectory,'*.lf.bin' ))[0]
+    
+    if tempEphysDir is not None:   
+        
+        #Copy files to temp directory and use this as local
+        shutil.copy(lfpMetaDir, tempEphysDir)
+        shutil.copy(lfpRawDir, tempEphysDir)
+        
+        lfpMetaDir = os.path.join(tempEphysDir, os.path.basename(lfpMetaDir))
+        lfpRawDir = os.path.join(tempEphysDir, os.path.basename(lfpRawDir))
 
     lfpMeta = read_ephys_meta_data(lfpMetaDir)
     lfpSync  = obtain_sync_ephys(lfpRawDir, lfpMeta)  

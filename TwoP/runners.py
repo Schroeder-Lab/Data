@@ -186,7 +186,15 @@ def _process_s2p_singlePlane(
     if not (zstackPath is None):
         try:
             channel = ops["align_by_chan"]
-            refImg = ops["meanImg"]  # Gets the reference image from Suite2P.
+            if (channel == 1):
+                reg_file = None
+                # Gets the reference image from Suite2P.
+                refImg = ops["meanImg"]
+            else:
+                reg_file = ops["reg_file_chan2"]
+                # Gets the reference image from Suite2P.
+                refImg = ops["meanImg_chan2"]
+
             # Creates registered Z stack path.
             zFileName = os.path.join(
                 saveDirectory, f"zstackAngle_plane{plane}_chan{channel}.tif"
@@ -203,8 +211,8 @@ def _process_s2p_singlePlane(
                         zstackPath,
                         spacing=1,
                         piezo=piezo,
-                        target_image=refImg,
-                        channel=channel,
+                        target_image=ops['meanImg'],
+                        channel=1,
                     )
                     # Saves registered Z stack in the specified or default saveDir.
                     skimage.io.imsave(zFileName_main, zstack_main)
@@ -212,6 +220,7 @@ def _process_s2p_singlePlane(
                     zstack_main = skimage.io.imread(zFileName_main)
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
+
                 zstack = register_zstack(
                     zstackPath,
                     spacing=1,
@@ -223,14 +232,15 @@ def _process_s2p_singlePlane(
                 skimage.io.imsave(zFileName, zstack)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                ops, zcorr = compute_zpos(zstack, ops)
+
+                ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 np.save(ops["ops_path"], ops)
             # Calculates Z correlation if Z stack was already registered.
             elif not ("zcorr" in ops.keys()):
                 zstack = skimage.io.imread(zFileName)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                ops, zcorr = compute_zpos(zstack, ops)
+                ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 # Saves the current ops path to the ops file.
                 np.save(ops["ops_path"], ops)
             # If the Z stack has been registered and Z correlation has been
@@ -291,52 +301,97 @@ def _process_s2p_singlePlane(
     if pops["plot"]:
         for i in range(dF.shape[-1]):
             # Print full
-            plotArrangement = [
-                ["profile", "f"],
-                ["profile", "corr"],
-                ["profile", "zcorr"],
-                ["profile", "trace"],
-            ]
-            f, ax = plt.subplot_mosaic(plotArrangement)
-            ax["f"].plot(F[:, i], "b")
-            ax["f"].plot(N[:, i], "r")
-            ax["f"].legend(
-                ["Fluorescence", "Neuropil"],
-                bbox_to_anchor=(1.01, 1),
-                loc="upper left",
-            )
-            ax["corr"].plot(Fc[:, i], "k")
-            ax["corr"].plot(F0[:, i], "b", linewidth=4, zorder=10)
-            ax["corr"].legend(
-                ["Corrected F", "F0"],
-                bbox_to_anchor=(1.01, 1),
-                loc="upper left",
-            )
-
-            ax["zcorr"].plot(dF[:, i], "b", linewidth=3)
-            ax["zcorr"].plot(Fcz[:, i], "k", alpha=0.5)
-            ax["zcorr"].legend(
-                ["dF/F", "dF/F z-zcorrected"],
-                bbox_to_anchor=(1.01, 1),
-                loc="upper left",
-            )
-            ax["zcorr"].set_xlabel("time (frames)")
-            if not zTrace is None:
-                ax["trace"].plot(zTrace)
-                ax["trace"].legend(
-                    ["Z trace"], bbox_to_anchor=(1.01, 1), loc="upper left"
-                )
+            fig = plt.figure(1, figsize = (12,6))
+            gs = gridspec.GridSpec(10,10)
+            gs.update (wspace = 0.2, hspace = 0.2)
+            # plotting Z profile
+            xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
+            
             if not zprofiles is None:
-                ax["profile"].plot(zprofiles[:, i], range(zprofiles.shape[0]))
-                ax["profile"].legend(
-                    ["Z profile"], bbox_to_anchor=(1.01, 1), loc="upper left"
+                plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
+                plt.legend(
+                    ["Z profile"], 
+                    # bbox_to_anchor=(1.01, 1), 
+                    loc="upper left"
                 )
-                ax["profile"].set_xlabel("fluorescence")
-                ax["profile"].set_xlabel("depth")
-                ax["profile"].axhline(np.nanmedian(zTrace), c="green")
-                ax["profile"].axhline(np.nanmax(zTrace), c="red")
-                ax["profile"].axhline(np.nanmin(zTrace), c="blue")
-
+                plt.xlabel("fluorescence")
+                plt.ylabel("depth")
+                plt.gca().invert_yaxis()
+                plt.axhline(np.nanmedian(zTrace), c="green")
+                plt.axhline(np.nanmax(zTrace), c="red")
+                plt.axhline(np.nanmin(zTrace), c="blue")
+                # Adding text labels
+                plt.text(0, np.nanmedian(zTrace), 'Median', color='green', fontsize=10, va='bottom')
+                plt.text(0, np.nanmax(zTrace), 'Maximum', color='red', fontsize=10, va='bottom')
+                plt.text(0, np.nanmin(zTrace), 'Minimum', color='blue', fontsize=10, va='bottom')
+                plt.xlim(0, max(zprofiles[:,i]))
+            
+            xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
+    
+            
+            plt.plot(F[:, i], "b")
+            plt.plot(N[:, i], "r")
+            plt.legend(
+                ["Fluorescence", "Neuropil"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.xlim(0, zTrace.shape[0])
+            
+            xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
+            
+            plt.plot(Fc[:, i], "k")
+            plt.plot(F0[:, i], "b", linewidth=4, zorder=10)
+            plt.legend(
+                ["Corrected F", "F0"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.xlim(0, zTrace.shape[0])
+            
+            xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
+    
+            plt.plot(dF[:, i], "b", linewidth=3)
+            plt.legend(
+                ["dF/F"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.xlim(0, zTrace.shape[0])
+            
+            xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey = xtr_subplot_df)
+    
+            plt.plot(Fcz[:, i], c = "purple")
+            plt.legend(
+                ["dF/F z-zcorrected"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.xlim(0, zTrace.shape[0])
+            
+            xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
+    
+            if not zTrace is None:
+                
+                    plt.plot(zTrace)
+                    plt.gca().invert_yaxis()
+                    plt.axhline(np.nanmedian(zTrace), c="green")
+                    plt.legend(
+                        ["Z trace"], 
+                        # bbox_to_anchor=(1.01, 1),
+                        loc="upper right"
+                    )
+                    plt.xlabel("time (frames)")
+                    plt.tick_params(axis='y', labelright=True, labelleft = False)
+                    plt.xlim(0, zTrace.shape[0])
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
             plt.savefig(
@@ -346,7 +401,7 @@ def _process_s2p_singlePlane(
                 ),
                 format="png",
             )
-
+    
             with open(
                 os.path.join(
                     saveDirectoryPlot,
@@ -354,44 +409,129 @@ def _process_s2p_singlePlane(
                 ),
                 "wb",
             ) as file:
-                pickle.dump(f, file)
+                pickle.dump(fig, file)
             # Print Part
-            f, ax = plt.subplot_mosaic(plotArrangement)
-            ax["f"].plot(F[1:500, i], "b")
-            ax["f"].plot(N[1:500, i], "r")
-            ax["f"].legend(
+            # f, ax = plt.subplot_mosaic(plotArrangement)
+            # ax["f"].plot(F[1:500, i], "b")
+            # ax["f"].plot(N[1:500, i], "r")
+            # ax["f"].legend(
+            #     ["Fluorescence", "Neuropil"],
+            #     bbox_to_anchor=(1.01, 1),
+            #     loc="upper left",
+            # )
+            # ax["corr"].plot(Fc[1:500, i], "k")
+            # ax["corr"].plot(F0[1:500, i], "b", linewidth=4)
+            # ax["corr"].legend(
+            #     ["Corrected F", "F0"],
+            #     bbox_to_anchor=(1.01, 1),
+            #     loc="upper left",
+            # )
+            # ax["zcorr"].plot(dF[1:500, i], "b", linewidth=3)
+            # ax["zcorr"].plot(Fcz[1:500, i], "k", alpha=0.3)
+            # ax["zcorr"].legend(
+            #     ["dF/F", "dF/F z-zcorrected"],
+            #     bbox_to_anchor=(1.01, 1),
+            #     loc="upper left",
+            # )
+            # ax["zcorr"].set_xlabel("time (frames)")
+            # if not zTrace is None:
+            #     ax["trace"].plot(zTrace[1:500])
+            #     ax["trace"].legend(
+            #         ["Z trace"], bbox_to_anchor=(1.01, 1), loc="upper left"
+            #     )
+            # if not zprofiles is None:
+            #     ax["profile"].plot(zprofiles[:, i], range(zprofiles.shape[0]))
+            #     ax["profile"].legend(
+            #         ["Z profile"], bbox_to_anchor=(1.01, 1), loc="upper left"
+            #     )
+            #     ax["profile"].set_xlabel("fluorescence")
+            #     ax["profile"].set_xlabel("depth")
+            
+            
+            # Print full
+            
+    
+            fig = plt.figure(1, figsize=(12, 6))
+            gs = gridspec.GridSpec(10, 10)
+            gs.update(wspace=0.2, hspace=0.2)
+            
+            # plotting Z profile
+            xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
+            
+            if not zprofiles is not None:
+                plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
+                plt.legend(
+                    ["Z profile"],
+                    loc="upper left"
+                )
+                plt.xlabel("fluorescence")
+                plt.ylabel("depth")
+                plt.gca().invert_yaxis()
+                plt.axhline(np.nanmedian(zTrace), c="green")
+                plt.axhline(np.nanmax(zTrace), c="red")
+                plt.axhline(np.nanmin(zTrace), c="blue")
+                # Adding text labels
+                plt.text(0, np.nanmedian(zTrace), 'Median', color='green', fontsize=10, va='bottom')
+                plt.text(0, np.nanmax(zTrace), 'Maximum', color='red', fontsize=10, va='bottom')
+                plt.text(0, np.nanmin(zTrace), 'Minimum', color='blue', fontsize=10, va='bottom')
+                plt.xlim(0, max(zprofiles[:, i]))
+            
+            xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
+            plt.plot(F[:500, i], "b")
+            plt.plot(N[:500, i], "r")
+            plt.legend(
                 ["Fluorescence", "Neuropil"],
-                bbox_to_anchor=(1.01, 1),
-                loc="upper left",
+                loc="upper right",
             )
-            ax["corr"].plot(Fc[1:500, i], "k")
-            ax["corr"].plot(F0[1:500, i], "b", linewidth=4)
-            ax["corr"].legend(
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, zTrace[:500].shape[0])
+            
+            xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
+            plt.plot(Fc[:500, i], "k")
+            plt.plot(F0[:500, i], "b", linewidth=4, zorder=10)
+            plt.legend(
                 ["Corrected F", "F0"],
-                bbox_to_anchor=(1.01, 1),
-                loc="upper left",
+                loc="upper right",
             )
-            ax["zcorr"].plot(dF[1:500, i], "b", linewidth=3)
-            ax["zcorr"].plot(Fcz[1:500, i], "k", alpha=0.3)
-            ax["zcorr"].legend(
-                ["dF/F", "dF/F z-zcorrected"],
-                bbox_to_anchor=(1.01, 1),
-                loc="upper left",
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, zTrace[:500].shape[0])
+            
+            xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
+            plt.plot(dF[:500, i], "b", linewidth=3)
+            plt.legend(
+                ["dF/F"],
+                loc="upper right",
             )
-            ax["zcorr"].set_xlabel("time (frames)")
-            if not zTrace is None:
-                ax["trace"].plot(zTrace[1:500])
-                ax["trace"].legend(
-                    ["Z trace"], bbox_to_anchor=(1.01, 1), loc="upper left"
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, zTrace[:500].shape[0])
+            
+            xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
+            plt.plot(Fcz[:500, i], c="purple")
+            plt.legend(
+                ["dF/F z-zcorrected"],
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, zTrace[:500].shape[0])
+            
+            xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
+            
+            if not zTrace is not None:
+                plt.plot(zTrace[:500])
+                plt.gca().invert_yaxis()
+                plt.axhline(np.nanmedian(zTrace), c="green")
+                plt.legend(
+                    ["Z trace"],
+                    loc="upper right"
                 )
-            if not zprofiles is None:
-                ax["profile"].plot(zprofiles[:, i], range(zprofiles.shape[0]))
-                ax["profile"].legend(
-                    ["Z profile"], bbox_to_anchor=(1.01, 1), loc="upper left"
-                )
-                ax["profile"].set_xlabel("fluorescence")
-                ax["profile"].set_xlabel("depth")
-
+                plt.xlabel("time (frames)")
+                plt.tick_params(axis='y', labelright=True, labelleft=False)
+                plt.xlim(0, zTrace[:500].shape[0])
+            
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
 
