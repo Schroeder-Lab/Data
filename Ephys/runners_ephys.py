@@ -272,8 +272,9 @@ def process_metadata_directory_ephys(
                               camera from {di}. Check data.''')
                 
                 if len(cam2times) < nframes2:
-                    if (nframes2 - len(cam2times)) == 1:
-                        cam2times = np.append(cam2times, np.nan)
+                    if (nframes2 - len(cam2times)) <= 2:
+                        added = np.full((nframes2 - len(cam2times)), np.nan)
+                        cam2times = np.append(cam2times, added)
                         bodyTimes.append(cam2times)
                     else:                    
                         print(f'''More frames than TTL pulses in body camera from {di}. 
