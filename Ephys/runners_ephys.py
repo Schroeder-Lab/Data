@@ -97,6 +97,7 @@ def process_metadata_directory_ephys(
 
     for dInd, di in enumerate(metadataDirectory_dirList):
         sparseNoise = False
+        
         print(f"Directory: {di}")
         if len(os.listdir(di)) == 0:
             continue
@@ -150,8 +151,6 @@ def process_metadata_directory_ephys(
                             photodiode, 
                             plot=pops["plot"],
                             fs=1)
-            
-            #TODO: check if stimulus extraction is correct here?
 
             changesPhotodiode = nt[indexPhotodiode.astype(int)]
         except:
@@ -160,7 +159,10 @@ def process_metadata_directory_ephys(
 
         try:
             # process stimuli
-            stimulusResults = process_stimulus(propTitles, di, changesPhotodiode)
+            if propTitles[0][0] == 'Spont':
+                stimulusResults = {"darkScreen.intervals": [nt[0], nt[-1]]}
+            else:
+                stimulusResults = process_stimulus(propTitles, di, changesPhotodiode)
             stimulusProps.append(stimulusResults)
             stimulusTypes.append(propTitles[0][0])
         except:
