@@ -1133,7 +1133,7 @@ class GammaTuner(BaseTuner):
                 0,
                 0.01,
                 # -10,
-                1,
+                0,
             ),
             (
                 np.nanmedian(avgy),

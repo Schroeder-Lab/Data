@@ -196,6 +196,8 @@ def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold=0.2, 
     # zprofiles = zprofiles - np.min(zprofiles, 0)
     # Calculates the correction factor by dividing the z profiles with the
     # z profile at the reference depth.
+    zprofiles = zprofiles.copy()
+    zprofiles -= np.nanmin(zprofiles)
     correctionFactor = np.abs(zprofiles / zprofiles[referenceDepth, :])
     # Assigns the correction factor for each frame based on its location in the
     # Z trace.
