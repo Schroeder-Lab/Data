@@ -162,7 +162,7 @@ def print_fitting_data(
     paramsOriSplit_ = np.zeros((paramsOri.shape[0], 7))
     paramsTfSplit_ = np.zeros((paramsOri.shape[0], 8))
     paramsSfSplit_ = np.zeros((paramsOri.shape[0], 8))
-    paramsConSplit_ = np.zeros((paramsOri.shape[0], 6))
+    paramsConSplit_ = np.zeros((paramsOri.shape[0], 8))
 
     paramsOriSplit_[:, [0, 2, 4, 5, 6]] = paramsOriSplit[:, :, 0]
     paramsOriSplit_[:, [1, 3, 4, 5, 6]] = paramsOriSplit[:, :, 1]
@@ -173,8 +173,8 @@ def print_fitting_data(
     paramsSfSplit_[:, ::2] = paramsSfSplit[:, :, 0]
     paramsSfSplit_[:, 1::2] = paramsSfSplit[:, :, 1]
 
-    paramsConSplit_[:, [0, 2, 4, 5]] = paramsConSplit[:, :, 0]
-    paramsConSplit_[:, [1, 3, 4, 5]] = paramsConSplit[:, :, 1]
+    paramsConSplit_[:, ::2] = paramsConSplit[:, :, 0]
+    paramsConSplit_[:, 1::2] = paramsConSplit[:, :, 1]
 
     paramsOriSplit = paramsOriSplit_
     paramsTfSplit = paramsTfSplit_
@@ -209,274 +209,282 @@ def print_fitting_data(
     tunerBase.props = paramsOri[n, :]
     tunerSplit = OriTuner("gauss_split")
     tunerSplit.props = paramsOriSplit[n, :]
-
-    df = dfAll[(dfAll.sf == 0.08) & (dfAll.tf == 2) & (dfAll.contrast == 1)]
-    f, ax = plt.subplots(2)
-    f.suptitle(f"Ori Tuning, Resp p: {np.round(respP[n],3)}")
-    f.subplots_adjust(hspace=2)
-    ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}"
-    )
-    ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, pVal dAUC: {np.round(pvalOri[n],3)}"
-    )
-    sns.lineplot(
-        x=np.arange(0, 360, 0.01),
-        y=tunerBase.func(np.arange(0, 360, 0.01), *paramsOri[n, :]),
-        ax=ax[0],
-        color="black",
-    )
-    plot_summary_plot(df, x="ori", y="avg", direction=direction,
-                      line=True, ax=ax[0], color="black")
-
-    # divided
-    canFitSplit = not np.all(np.isnan(paramsOriSplit[n, :]))
-    if (canFitSplit):
+    canPrint = not np.all(np.isnan(paramsOri[n, :]))
+    if (canPrint):
+        df = dfAll[(dfAll.sf == 0.08) & (
+            dfAll.tf == 2) & (dfAll.contrast == 1)]
+        f, ax = plt.subplots(2)
+        f.suptitle(f"Ori Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        ax[0].set_title(
+            f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}"
+        )
+        ax[1].set_title(
+            f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, pVal dAUC: {np.round(pvalOri[n],3)}"
+        )
         sns.lineplot(
             x=np.arange(0, 360, 0.01),
-            y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 0),
-            ax=ax[1],
-            color="blue",
+            y=tunerBase.func(np.arange(0, 360, 0.01), *paramsOri[n, :]),
+            ax=ax[0],
+            color="black",
         )
-        plot_summary_plot(
-            df[df.movement == 0],
-            x="ori",
-            y="avg",
-            direction=direction,
-            line=True,
-            ax=ax[1],
-            color="blue",
-        )
+        plot_summary_plot(df, x="ori", y="avg", direction=direction,
+                          line=True, ax=ax[0], color="black")
 
-        sns.lineplot(
-            x=np.arange(0, 360, 0.01),
-            y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 1),
-            ax=ax[1],
-            color="red",
-        )
-        plot_summary_plot(
-            df[df.movement == 1],
-            x="ori",
-            y="avg",
-            line=True,
-            direction=direction,
-            ax=ax[1],
-            color="red",
-        )
+        # divided
+        canFitSplit = not np.all(np.isnan(paramsOriSplit[n, :]))
+        if (canFitSplit):
+            sns.lineplot(
+                x=np.arange(0, 360, 0.01),
+                y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 0),
+                ax=ax[1],
+                color="blue",
+            )
+            plot_summary_plot(
+                df[df.movement == 0],
+                x="ori",
+                y="avg",
+                direction=direction,
+                line=True,
+                ax=ax[1],
+                color="blue",
+            )
 
-    mng = plt.get_current_fig_manager()
-    mng.window.showMaximized()
-    if save:
-        plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.png"))
-        plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.pdf"))
-        plt.close(f)
+            sns.lineplot(
+                x=np.arange(0, 360, 0.01),
+                y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 1),
+                ax=ax[1],
+                color="red",
+            )
+            plot_summary_plot(
+                df[df.movement == 1],
+                x="ori",
+                y="avg",
+                line=True,
+                direction=direction,
+                ax=ax[1],
+                color="red",
+            )
+
+        mng = plt.get_current_fig_manager()
+        mng.window.showMaximized()
+        if save:
+            plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.pdf"))
+            plt.close(f)
 
     # temporal
     tunerBase = FrequencyTuner("gauss")
     tunerBase.props = paramsTf[n, :]
     tunerSplit = FrequencyTuner("gauss_split")
     tunerSplit.props = paramsTfSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsTf[n, :]))
+    if (canPrint):
+        df = dfAll[
+            (dfAll.sf == 0.08)
+            & (dfAll.contrast == 1)
+            & (np.isin(dfAll.ori, [0, 90, 180, 270]))
+        ]
 
-    df = dfAll[
-        (dfAll.sf == 0.08)
-        & (dfAll.contrast == 1)
-        & (np.isin(dfAll.ori, [0, 90, 180, 270]))
-    ]
+        df = filter_nonsig_orientations(df, direction, criterion=0.05)
 
-    df = filter_nonsig_orientations(df, criterion=0.05)
+        fittingRange = np.arange(df[df.tf > 0].tf.min(), df.tf.max(), 0.01)
 
-    fittingRange = np.arange(0.5, 16, 0.01)
-
-    f, ax = plt.subplots(2)
-    f.suptitle(f"Temporal frequency Tuning, Resp p: {np.round(respP[n],3)}")
-    f.subplots_adjust(hspace=2)
-    ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}"
-    )
-    ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, pVal dAUC: {np.round(pvalTf[n],3)}"
-    )
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerBase.predict(fittingRange),
-        ax=ax[0],
-        color="black",
-    )
-    plot_summary_plot(df, x="tf", y="avg", direction=direction,
-                      line=True, ax=ax[0], color="black")
-
-    # divided
-    canFitSplit = not np.all(np.isnan(paramsTfSplit[n, :]))
-    if (canFitSplit):
+        f, ax = plt.subplots(2)
+        f.suptitle(
+            f"Temporal frequency Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        ax[0].set_title(
+            f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}"
+        )
+        ax[1].set_title(
+            f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, pVal dAUC: {np.round(pvalTf[n],3)}"
+        )
         sns.lineplot(
             x=fittingRange,
-            y=tunerSplit.predict_split(fittingRange, 0),
-            ax=ax[1],
-            color="blue",
+            y=tunerBase.predict(fittingRange),
+            ax=ax[0],
+            color="black",
         )
-        plot_summary_plot(
-            df[df.movement == 0],
-            x="tf",
-            y="avg",
-            direction=direction,
-            line=True,
-            ax=ax[1],
-            color="blue",
-        )
+        plot_summary_plot(df, x="tf", y="avg", direction=direction,
+                          line=True, ax=ax[0], color="black")
 
-        sns.lineplot(
-            x=fittingRange,
-            y=tunerSplit.predict_split(fittingRange, 1),
-            ax=ax[1],
-            color="red",
-        )
-        plot_summary_plot(
-            df[df.movement == 1], x="tf", y="avg", direction=direction, line=True, ax=ax[1], color="red"
-        )
+        # divided
+        canFitSplit = not np.all(np.isnan(paramsTfSplit[n, :]))
+        if (canFitSplit):
+            sns.lineplot(
+                x=fittingRange,
+                y=tunerSplit.predict_split(fittingRange, 0),
+                ax=ax[1],
+                color="blue",
+            )
+            plot_summary_plot(
+                df[df.movement == 0],
+                x="tf",
+                y="avg",
+                direction=direction,
+                line=True,
+                ax=ax[1],
+                color="blue",
+            )
 
-    ax[0].set_xscale("log", base=2)
-    ax[1].set_xscale("log", base=2)
-    mng = plt.get_current_fig_manager()
-    mng.window.showMaximized()
-    if save:
-        plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.png"))
-        plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.pdf"))
-        plt.close(f)
+            sns.lineplot(
+                x=fittingRange,
+                y=tunerSplit.predict_split(fittingRange, 1),
+                ax=ax[1],
+                color="red",
+            )
+            plot_summary_plot(
+                df[df.movement == 1], x="tf", y="avg", direction=direction, line=True, ax=ax[1], color="red"
+            )
+
+        ax[0].set_xscale("log", base=2)
+        ax[1].set_xscale("log", base=2)
+        mng = plt.get_current_fig_manager()
+        mng.window.showMaximized()
+        if save:
+            plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.pdf"))
+            plt.close(f)
 
     # spatial
     tunerBase = FrequencyTuner("gauss")
     tunerBase.props = paramsSf[n, :]
     tunerSplit = FrequencyTuner("gauss_split")
     tunerSplit.props = paramsSfSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsSf[n, :]))
+    if (canPrint):
+        df = dfAll[
+            (dfAll.tf == 2)
+            & (dfAll.contrast == 1)
+            & (np.isin(dfAll.ori, [0, 90, 180, 270]))
+        ]
 
-    df = dfAll[
-        (dfAll.tf == 2)
-        & (dfAll.contrast == 1)
-        & (np.isin(dfAll.ori, [0, 90, 180, 270]))
-    ]
-
-    df = filter_nonsig_orientations(df, criterion=0.05)
-    f, ax = plt.subplots(2)
-    f.suptitle(f"Spatial frequency Tuning, Resp p: {np.round(respP[n],3)}")
-    f.subplots_adjust(hspace=2)
-    ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)}"
-    )
-    ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, pVal dAUC: {np.round(pvalSf[n],3)}"
-    )
-    fittingRange = np.arange(0.01, 0.34, 0.01)
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerBase.predict(fittingRange),
-        ax=ax[0],
-        color="black",
-    )
-    plot_summary_plot(df, x="sf", y="avg", direction=direction,
-                      line=True, ax=ax[0], color="black")
-
-    # divided
-    canFitSplit = not np.all(np.isnan(paramsSfSplit[n, :]))
-    if (canFitSplit):
+        df = filter_nonsig_orientations(df, direction, criterion=0.05)
+        f, ax = plt.subplots(2)
+        f.suptitle(f"Spatial frequency Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        ax[0].set_title(
+            f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)}"
+        )
+        ax[1].set_title(
+            f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, pVal dAUC: {np.round(pvalSf[n],3)}"
+        )
+        fittingRange = np.arange(df.sf.min(), df.sf.max(), 0.01)
         sns.lineplot(
             x=fittingRange,
-            y=tunerSplit.predict_split(fittingRange, 0),
-            ax=ax[1],
-            color="blue",
+            y=tunerBase.predict(fittingRange),
+            ax=ax[0],
+            color="black",
         )
-        plot_summary_plot(
-            df[df.movement == 0],
-            x="sf",
-            y="avg",
-            direction=direction,
-            line=True,
-            ax=ax[1],
-            color="blue",
-        )
+        plot_summary_plot(df, x="sf", y="avg", direction=direction,
+                          line=True, ax=ax[0], color="black")
 
-        sns.lineplot(
-            x=fittingRange,
-            y=tunerSplit.predict_split(fittingRange, 1),
-            ax=ax[1],
-            color="red",
-        )
-        plot_summary_plot(
-            df[df.movement == 1], x="sf", y="avg", direction=direction, line=True, ax=ax[1], color="red"
-        )
+        # divided
+        canFitSplit = not np.all(np.isnan(paramsSfSplit[n, :]))
+        if (canFitSplit):
+            sns.lineplot(
+                x=fittingRange,
+                y=tunerSplit.predict_split(fittingRange, 0),
+                ax=ax[1],
+                color="blue",
+            )
+            plot_summary_plot(
+                df[df.movement == 0],
+                x="sf",
+                y="avg",
+                direction=direction,
+                line=True,
+                ax=ax[1],
+                color="blue",
+            )
 
-    mng = plt.get_current_fig_manager()
-    mng.window.showMaximized()
-    ax[0].set_xscale("log", base=2)
-    ax[1].set_xscale("log", base=2)
-    if save:
-        plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.png"))
-        plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.pdf"))
-        plt.close(f)
+            sns.lineplot(
+                x=fittingRange,
+                y=tunerSplit.predict_split(fittingRange, 1),
+                ax=ax[1],
+                color="red",
+            )
+            plot_summary_plot(
+                df[df.movement == 1], x="sf", y="avg", direction=direction, line=True, ax=ax[1], color="red"
+            )
+
+        mng = plt.get_current_fig_manager()
+        mng.window.showMaximized()
+        ax[0].set_xscale("log", base=2)
+        ax[1].set_xscale("log", base=2)
+        if save:
+            plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.pdf"))
+            plt.close(f)
 
     # contrast
     tunerBase = ContrastTuner("contrast")
     tunerBase.props = paramsCon[n, :]
-    tunerSplit = ContrastTuner("contrast_split")
+    tunerSplit = ContrastTuner("contrast_split_full")
     tunerSplit.props = paramsConSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsCon[n, :]))
+    if (canPrint):
 
-    df = dfAll[
-        (dfAll.tf == 2)
-        & (dfAll.sf == 0.08)
-    ]
+        df = dfAll[
+            (dfAll.tf == 2)
+            & (dfAll.sf == 0.08)
+        ]
 
-    df = filter_nonsig_orientations(df, criterion=0.05)
-    f, ax = plt.subplots(2)
-    f.suptitle(f"Contrast Tuning, Resp p: {np.round(respP[n],3)}")
-    f.subplots_adjust(hspace=2)
-    ax[0].set_title(
-        f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)}"
-    )
-    ax[1].set_title(
-        f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, pVal dAUC: {np.round(pvalCon[n],3)}"
-    )
-    fittingRange = np.arange(0, 1, 0.01)
-    sns.lineplot(
-        x=fittingRange,
-        y=tunerBase.predict(fittingRange),
-        ax=ax[0],
-        color="black",
-    )
-    plot_summary_plot(df, x="contrast", y="avg",
-                      line=True, direction=direction, ax=ax[0], color="black")
-
-    # divided
-    canFitSplit = not np.all(np.isnan(paramsConSplit[n, :]))
-    if (canFitSplit):
+        df = filter_nonsig_orientations(df, direction, criterion=0.05)
+        f, ax = plt.subplots(2)
+        f.suptitle(f"Contrast Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        ax[0].set_title(
+            f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)}"
+        )
+        ax[1].set_title(
+            f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, pVal dAUC: {np.round(pvalCon[n],3)}"
+        )
+        fittingRange = np.arange(0, 1, 0.01)
         sns.lineplot(
             x=fittingRange,
-            y=tunerSplit.predict_split(fittingRange, 0),
-            ax=ax[1],
-            color="blue",
+            y=tunerBase.predict(fittingRange),
+            ax=ax[0],
+            color="black",
         )
-        plot_summary_plot(
-            df[df.movement == 0],
-            x="contrast",
-            y="avg",
-            line=True,
-            ax=ax[1],
-            color="blue",
-        )
+        plot_summary_plot(df, x="contrast", y="avg",
+                          line=True, direction=direction, ax=ax[0], color="black")
 
-        sns.lineplot(
-            x=fittingRange,
-            y=tunerSplit.predict_split(fittingRange, 1),
-            ax=ax[1],
-            color="red",
-        )
-        plot_summary_plot(
-            df[df.movement == 1], x="contrast", y="avg", direction=direction, line=True, ax=ax[1], color="red"
-        )
+        # divided
+        canFitSplit = not np.all(np.isnan(paramsConSplit[n, :]))
+        if (canFitSplit):
+            sns.lineplot(
+                x=fittingRange,
+                y=tunerSplit.predict_split(fittingRange, 0),
+                ax=ax[1],
+                color="blue",
+            )
+            plot_summary_plot(
+                df[df.movement == 0],
+                x="contrast",
+                y="avg",
+                line=True,
+                ax=ax[1],
+                direction=direction,
+                color="blue",
+            )
 
-    mng = plt.get_current_fig_manager()
-    mng.window.showMaximized()
-    # ax[0].set_xscale("log", base=2)
-    # ax[1].set_xscale("log", base=2)
-    if save:
-        plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.png"))
-        plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.pdf"))
-        plt.close(f)
+            sns.lineplot(
+                x=fittingRange,
+                y=tunerSplit.predict_split(fittingRange, 1),
+                ax=ax[1],
+                color="red",
+            )
+            plot_summary_plot(
+                df[df.movement == 1], x="contrast", y="avg", direction=direction, line=True, ax=ax[1], color="red"
+            )
+
+        mng = plt.get_current_fig_manager()
+        mng.window.showMaximized()
+        # ax[0].set_xscale("log", base=2)
+        # ax[1].set_xscale("log", base=2)
+        if save:
+            plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.pdf"))
+            plt.close(f)

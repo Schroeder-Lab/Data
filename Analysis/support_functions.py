@@ -87,15 +87,18 @@ def get_trial_classification_running(
     #     whLow.shape[0] / 2)
     whLow = np.sum(whLow[: int(whLow.shape[0]), :, 0], 0) / int(
         whLow.shape[0])
-    whHigh = wh > activeVelocity
-    # whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
+
+    quietTrials = np.where(whLow >= criterion)[0]
+    activeTrials = np.setdiff1d(np.arange(wh.shape[1]), quietTrials)
+    # whHigh = wh > activeVelocity
+    # # whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
+    # #     whHigh.shape[0]
+    # # )
+    # whHigh = np.sum(whHigh[: int(whHigh.shape[0]), :, 0], 0) / int(
     #     whHigh.shape[0]
     # )
-    whHigh = np.sum(whHigh[: int(whHigh.shape[0]), :, 0], 0) / int(
-        whHigh.shape[0]
-    )
-    quietTrials = np.where(whLow >= criterion)[0]
-    activeTrials = np.where(whHigh > criterion)[0]
+    # quietTrials = np.where(whLow >= criterion)[0]
+    # activeTrials = np.where(whHigh > criterion)[0]
     return quietTrials, activeTrials
 
 
@@ -633,8 +636,8 @@ def load_circle_data(directory):
         if (key == "planes"):
             if not (os.path.exists(os.path.join(directory, fileNameDic[key]))):
                 if(os.path.exists(os.path.join(directory, "calcium.planes.npy"))):
-                    os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
-                        os.path.join(directory, fileNameDic[key])))
+                    os.rename(os.path.join(directory, "calcium.planes.npy"),
+                              os.path.join(directory, fileNameDic[key]))
 
         data[key] = np.load(os.path.join(directory, fileNameDic[key]))
     return data

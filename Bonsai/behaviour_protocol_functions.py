@@ -22,6 +22,12 @@ def stimulus_circles(directory, frameChanges):
 
     circle_st = frameChanges
 
+    # make sure no spurious signal is caught
+    durs = np.diff(circle_st)
+    if (durs[-1] > np.max(stimProps.Dur.astype(np.float64))*10):
+        circle_st = circle_st[:-1]
+        circle_et = circle_et[:-1]
+
     return {'circles.startTime.npy': circle_st.reshape(-1, 1).copy(),
             'circles.endTime.npy': circle_et.reshape(-1, 1).copy(),
             'circles.x.npy': stimProps.X.to_numpy().reshape(-1, 1).astype(float).copy(),
@@ -141,7 +147,8 @@ def stimulus_gratings(directory, frameChanges):
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
             "gratingsExp.intervals.npy": [st[0], et[-1]],
-            "gratingsExp.description.npy": 'Gratings' #TODO: check if this is usefull; should add same line to gratings
+            # TODO: check if this is usefull; should add same line to gratings
+            "gratingsExp.description.npy": 'Gratings'
             }
 
 
@@ -167,15 +174,15 @@ def stimulus_flicker(directory, frameChanges):
     # Gets the identity of the stimuli (see function for
     # further details).
     # stimProps = get_stimulus_info(directory)
-    flicker_stimType = np.zeros(21) #Asuming 10 reps per each contrast block
-    
-    flicker_stimType[0::2] = 0.05 #SD from Low contrast
-    flicker_stimType[1::2] = 0.175 #SD from High contrast
-    
+    flicker_stimType = np.zeros(21)  # Asuming 10 reps per each contrast block
+
+    flicker_stimType[0::2] = 0.05  # SD from Low contrast
+    flicker_stimType[1::2] = 0.175  # SD from High contrast
+
     # Checks if number of frames and stimuli match (if not, there
     # could have been an issue with the photodiode, check if there
     # are irregular frames in the photodiode trace).
-    
+
     if len(flicker_stimType) == len(frameChanges):
 
         # Gets the start times of each stimulus.
@@ -185,7 +192,7 @@ def stimulus_flicker(directory, frameChanges):
     else:
         warnings.warn(f'''Number of frames and stimuli do not match.
                       Assuming there was a false photodiode rise at the end, but check!''')
-                      
+
         st = frameChanges[0:-2].reshape(-1, 1).copy()
         et = frameChanges[1:-1].reshape(-1, 1).copy()
 
@@ -193,7 +200,7 @@ def stimulus_flicker(directory, frameChanges):
             "flicker.endTime.npy": et,
             "flicker.contrast.npy": '',
             "flickerExp.intervals.npy": [st[0], et[-1]],
-             }
+            }
 
 
 def stimulus_oddball(directory, frameChanges):
@@ -236,13 +243,13 @@ def stimulus_oddball(directory, frameChanges):
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
             "gratingsExp.intervals.npy": [st[0], et[-1]],
-            "gratingsExp.description.npy": 'Oddball' #TODO: check if this is usefull; should add same line to gratings
+            # TODO: check if this is usefull; should add same line to gratings
+            "gratingsExp.description.npy": 'Oddball'
             }
-    
 
 
 def stimulus_gratingsStep(directory, frameChanges):
-   
+
     stimProps = get_stimulus_info(directory)
     # Gets the start times of each stimulus.
     st = frameChanges[::2].reshape(-1, 1).copy()
@@ -255,10 +262,9 @@ def stimulus_gratingsStep(directory, frameChanges):
     if len(stimProps) != len(st):
 
         warnings.warn("Number of frames and stimuli do not match")
-   
-    #TODO: add here corrections for general issues
-   
-   
+
+    # TODO: add here corrections for general issues
+
     # Adds the start and end times from above to the respective
     # lists.
 
@@ -280,7 +286,7 @@ stimulus_prcoessing_dictionary = {
     "NaturalImages": stimulus_naturalImages,
     "Sparse": stimulus_sparse,
     "Spont": stimulus_spont,
-    "Flicker":stimulus_flicker,
-    "Oddball":stimulus_oddball,
-    "GratingsStep":stimulus_gratingsStep,
+    "Flicker": stimulus_flicker,
+    "Oddball": stimulus_oddball,
+    "GratingsStep": stimulus_gratingsStep,
 }

@@ -49,8 +49,8 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
 
     """
     # Normalises the piezo trace to the top depth.
-    piezoNorm -= piezoNorm[0]    
-    
+    piezoNorm -= piezoNorm[0]
+
     # Adds the value of the current Z stack plane (equivalent to 1um/plane).
     piezoNorm += i
 
@@ -58,14 +58,15 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
     planes = stack.shape[0]
     resolutionx = stack.shape[1]
     resolutiony = stack.shape[2]
-    
+
     # interpolate
     ratio = resolutiony/len(piezoNorm)
     # f = sp.interpolate.interp1d(np.arange(piezoNorm.shape[0]), piezoNorm)
     # piezoNorm = f(np.arange(0,piezoNorm.shape[0]-1,spacing/10))
-    f = sp.interpolate.interp1d(np.linspace(0,resolutiony-1,len(piezoNorm)), piezoNorm)
-    piezoNorm =  f(np.arange(0,resolutiony))
-    
+    f = sp.interpolate.interp1d(np.linspace(
+        0, resolutiony-1, len(piezoNorm)), piezoNorm)
+    piezoNorm = f(np.arange(0, resolutiony))
+
     # Creates a variable that tells the current location in Y (in pixels).
     currPixelY = 0
     # Will contain the slanted image in the current plane.
@@ -75,7 +76,8 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
     pixelsPerMoveY = np.ones(len(piezoNorm)) * resolutiony
 
     # Gets the number of pixels per piezo step.
-    numPixelsY = pixelsPerMoveY / len(piezoNorm)#np.round(pixelsPerMoveY / len(piezoNorm)).astype(int)
+    # np.round(pixelsPerMoveY / len(piezoNorm)).astype(int)
+    numPixelsY = pixelsPerMoveY / len(piezoNorm)
 
     # Corrects in case of rounding error.
     Yerr = resolutiony-1 - sum(numPixelsY)
@@ -88,30 +90,30 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
         (
             np.arange(0, planes, spacing),
             np.arange(0, resolutiony),
-            np.arange(0, resolutionx),            
+            np.arange(0, resolutionx),
         ),
         stack,
         fill_value=None,
-        method = 'nearest'
+        method='nearest'
     )
     for yt in range(len(piezoNorm)):
         depth = piezoNorm[yt]
-        
+
         # If beyond the depth, takes the final frame.
         if depth > planes - 1:
             depth = planes - 1
         # If below the topmost frame, takes the first one.
         if depth < 0:
             depth = 0
-        
+
         line = interp(
-                    (
-                        depth,
-                        yt,
-                        np.arange(0, resolutionx),
-                    )
-                )
-        
+            (
+                depth,
+                yt,
+                np.arange(0, resolutionx),
+            )
+        )
+
         slantImg[int(yt), 0:resolutionx] = line
     # for d in range(len(piezoNorm)):  # For each piezo step
     #     endPointY = pixelsY[
@@ -215,7 +217,7 @@ def register_zstack_frames(zstack):
         The locally registered Z stack.
 
     """
-    #### Start from centre take triples and align them
+    # Start from centre take triples and align them
     centreFrame = int(np.floor(zstack.shape[0] / 2))
     # Performs registration from mid to top plane.
     zstack = _register_swipe(zstack, centreFrame, 0, -1)
@@ -328,7 +330,7 @@ def register_zstack(
         # Uses the suite2p registration function to align the 10 frames taken
         # per plane to the first frame in each plane.
         res = register_frames(
-            image[i, 0, :, :], image[i, :, :, :].astype(np.int16),bidiphase=1
+            image[i, 0, :, :], image[i, :, :, :].astype(np.int16), bidiphase=1
         )
 
         # Calculates the mean of those 10 registered frames per plane.
@@ -353,13 +355,12 @@ def register_zstack(
             zstackTmp[p, :, :] = _fill_plane_piezo(zstack, piezoNorm, p)
         # apply a gaussian filter of 1 sigma on the y axis
         zstack = zstackTmp
-        
 
     if not (target_image is None):
         # Registers the z Stack to the reference image using functions from
         # suite2p. See function for details.
         zstack = register_stack_to_ref(zstack, target_image)
-    
+
     # zstack = sp.ndimage.gaussian_filter(zstack, (0, 1, 0))
     return zstack
 
@@ -375,7 +376,7 @@ def extract_zprofiles(
     neuropil_masks=None,
     smoothing_factor=None,
     metadata={},
-    abs_zero = None,    
+    abs_zero=None,
 ):
     """
     Extracts fluorescence of ROIs across depth of z-stack.
@@ -450,28 +451,34 @@ def extract_zprofiles(
         zProfile = zero_signal(zProfile)
         Fneu = zero_signal(Fneu)
     else:
-        zProfile = zero_signal(zProfile,abs_zero)
-        Fneu = zero_signal(Fneu,abs_zero)
+        zProfile = zero_signal(zProfile, abs_zero)
+        Fneu = zero_signal(Fneu, abs_zero)
 
     # Only takes the ROIs which are considered cells.
     zProfile = zProfile[isCell[:, 0], :].T
     Fneu = Fneu[isCell[:, 0], :].T
 
+    neuMin = np.nanmin(Fneu, 0)
+    ZprofMin = np.nanmin(zProfile, 0)
+
+    FneuRaw = Fneu.copy()
     zprofileRaw = zProfile.T.copy()
+
+    Fneu -= neuMin
+    zProfile -= ZprofMin
     # Performs neuropil correction of the zProfile.
     if not (neuropil_correction is None):
-        zProfile = np.fmax(zProfile - (neuropil_correction[1,:].reshape(1, -1) * Fneu + neuropil_correction[0,:].reshape(1, -1)),0)
+        zProfile = np.fmax(zProfile - (neuropil_correction[1, :].reshape(
+            1, -1) * Fneu + neuropil_correction[0, :].reshape(1, -1)), 0)
         # iF - (b * iN + a) + F0[:, iROI]
-    # 
-
+    #
+    zProfile += ZprofMin
     # Smoothes the Z profile using a gaussian filter.
     if not (smoothing_factor is None):
         zProfile = sp.ndimage.gaussian_filter1d(
             zProfile, smoothing_factor, axis=0
         )
 
-    
-    
     # Appends the raw and neuropil corrected Z profiles into a dictionary.
     metadata["zprofiles_raw"] = zprofileRaw
     metadata["zprofiles_neuropil"] = Fneu.T

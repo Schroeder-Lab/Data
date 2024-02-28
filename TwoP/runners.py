@@ -202,12 +202,12 @@ def _process_s2p_singlePlane(
 
             # if we are using channel 2 we want to have a stack of channel 1 for the flourescence level in each channel
             if (channel != 1):
-                zFileName_main = os.path.join(
+                zFileName_functional = os.path.join(
                     saveDirectory, f"zstackAngle_plane{plane}_chan1.tif"
                 )
 
-                if not (os.path.exists(zFileName_main)):
-                    zstack_main = register_zstack(
+                if not (os.path.exists(zFileName_functional)):
+                    zstack_functional = register_zstack(
                         zstackPath,
                         spacing=1,
                         piezo=piezo,
@@ -215,9 +215,9 @@ def _process_s2p_singlePlane(
                         channel=1,
                     )
                     # Saves registered Z stack in the specified or default saveDir.
-                    skimage.io.imsave(zFileName_main, zstack_main)
+                    skimage.io.imsave(zFileName_functional, zstack_functional)
                 else:
-                    zstack_main = skimage.io.imread(zFileName_main)
+                    zstack_functional = skimage.io.imread(zFileName_functional)
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
 
@@ -230,9 +230,9 @@ def _process_s2p_singlePlane(
                 )
                 # Saves registered Z stack in the specified or default saveDir.
                 skimage.io.imsave(zFileName, zstack)
+
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-
                 ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 np.save(ops["ops_path"], ops)
             # Calculates Z correlation if Z stack was already registered.
@@ -251,7 +251,7 @@ def _process_s2p_singlePlane(
                 zcorr = ops["zcorr"]
             # if we used the second channel then from now on use the main (channel 1) stack to extract flouresence profile
             if (channel != 1):
-                zstack = zstack_main
+                zstack = zstack_functional
             # Gets the location of each frame in Z based on the highest
             # correlation value.
             zTrace = np.argmax(zcorr, 0)
@@ -301,17 +301,17 @@ def _process_s2p_singlePlane(
     if pops["plot"]:
         for i in range(dF.shape[-1]):
             # Print full
-            fig = plt.figure(1, figsize = (12,6))
-            gs = gridspec.GridSpec(10,10)
-            gs.update (wspace = 0.2, hspace = 0.2)
+            fig = plt.figure(1, figsize=(12, 6))
+            gs = gridspec.GridSpec(10, 10)
+            gs.update(wspace=0.2, hspace=0.2)
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
-            
+
             if not zprofiles is None:
                 plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
                 plt.legend(
-                    ["Z profile"], 
-                    # bbox_to_anchor=(1.01, 1), 
+                    ["Z profile"],
+                    # bbox_to_anchor=(1.01, 1),
                     loc="upper left"
                 )
                 plt.xlabel("fluorescence")
@@ -321,14 +321,16 @@ def _process_s2p_singlePlane(
                 plt.axhline(np.nanmax(zTrace), c="red")
                 plt.axhline(np.nanmin(zTrace), c="blue")
                 # Adding text labels
-                plt.text(0, np.nanmedian(zTrace), 'Median', color='green', fontsize=10, va='bottom')
-                plt.text(0, np.nanmax(zTrace), 'Maximum', color='red', fontsize=10, va='bottom')
-                plt.text(0, np.nanmin(zTrace), 'Minimum', color='blue', fontsize=10, va='bottom')
-                plt.xlim(0, max(zprofiles[:,i]))
-            
+                plt.text(0, np.nanmedian(zTrace), 'Median',
+                         color='green', fontsize=10, va='bottom')
+                plt.text(0, np.nanmax(zTrace), 'Maximum',
+                         color='red', fontsize=10, va='bottom')
+                plt.text(0, np.nanmin(zTrace), 'Minimum',
+                         color='blue', fontsize=10, va='bottom')
+                plt.xlim(0, max(zprofiles[:, i]))
+
             xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
-    
-            
+
             plt.plot(F[:, i], "b")
             plt.plot(N[:, i], "r")
             plt.legend(
@@ -337,11 +339,11 @@ def _process_s2p_singlePlane(
                 loc="upper right",
             )
             plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace.shape[0])
-            
+
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
-            
+
             plt.plot(Fc[:, i], "k")
             plt.plot(F0[:, i], "b", linewidth=4, zorder=10)
             plt.legend(
@@ -350,11 +352,11 @@ def _process_s2p_singlePlane(
                 loc="upper right",
             )
             plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace.shape[0])
-            
+
             xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
-    
+
             plt.plot(dF[:, i], "b", linewidth=3)
             plt.legend(
                 ["dF/F"],
@@ -362,36 +364,36 @@ def _process_s2p_singlePlane(
                 loc="upper right",
             )
             plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace.shape[0])
-            
-            xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey = xtr_subplot_df)
-    
-            plt.plot(Fcz[:, i], c = "purple")
+
+            xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
+
+            plt.plot(Fcz[:, i], c="purple")
             plt.legend(
                 ["dF/F z-zcorrected"],
                 # bbox_to_anchor=(1.01, 1),
                 loc="upper right",
             )
             plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft = False)
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace.shape[0])
-            
+
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
-    
+
             if not zTrace is None:
-                
-                    plt.plot(zTrace)
-                    plt.gca().invert_yaxis()
-                    plt.axhline(np.nanmedian(zTrace), c="green")
-                    plt.legend(
-                        ["Z trace"], 
-                        # bbox_to_anchor=(1.01, 1),
-                        loc="upper right"
-                    )
-                    plt.xlabel("time (frames)")
-                    plt.tick_params(axis='y', labelright=True, labelleft = False)
-                    plt.xlim(0, zTrace.shape[0])
+
+                plt.plot(zTrace)
+                plt.gca().invert_yaxis()
+                plt.axhline(np.nanmedian(zTrace), c="green")
+                plt.legend(
+                    ["Z trace"],
+                    # bbox_to_anchor=(1.01, 1),
+                    loc="upper right"
+                )
+                plt.xlabel("time (frames)")
+                plt.tick_params(axis='y', labelright=True, labelleft=False)
+                plt.xlim(0, zTrace.shape[0])
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
             plt.savefig(
@@ -401,7 +403,7 @@ def _process_s2p_singlePlane(
                 ),
                 format="png",
             )
-    
+
             with open(
                 os.path.join(
                     saveDirectoryPlot,
@@ -446,18 +448,16 @@ def _process_s2p_singlePlane(
             #     )
             #     ax["profile"].set_xlabel("fluorescence")
             #     ax["profile"].set_xlabel("depth")
-            
-            
+
             # Print full
-            
-    
+
             fig = plt.figure(1, figsize=(12, 6))
             gs = gridspec.GridSpec(10, 10)
             gs.update(wspace=0.2, hspace=0.2)
-            
+
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
-            
+
             if not zprofiles is not None:
                 plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
                 plt.legend(
@@ -471,11 +471,14 @@ def _process_s2p_singlePlane(
                 plt.axhline(np.nanmax(zTrace), c="red")
                 plt.axhline(np.nanmin(zTrace), c="blue")
                 # Adding text labels
-                plt.text(0, np.nanmedian(zTrace), 'Median', color='green', fontsize=10, va='bottom')
-                plt.text(0, np.nanmax(zTrace), 'Maximum', color='red', fontsize=10, va='bottom')
-                plt.text(0, np.nanmin(zTrace), 'Minimum', color='blue', fontsize=10, va='bottom')
+                plt.text(0, np.nanmedian(zTrace), 'Median',
+                         color='green', fontsize=10, va='bottom')
+                plt.text(0, np.nanmax(zTrace), 'Maximum',
+                         color='red', fontsize=10, va='bottom')
+                plt.text(0, np.nanmin(zTrace), 'Minimum',
+                         color='blue', fontsize=10, va='bottom')
                 plt.xlim(0, max(zprofiles[:, i]))
-            
+
             xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
             plt.plot(F[:500, i], "b")
             plt.plot(N[:500, i], "r")
@@ -486,7 +489,7 @@ def _process_s2p_singlePlane(
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace[:500].shape[0])
-            
+
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
             plt.plot(Fc[:500, i], "k")
             plt.plot(F0[:500, i], "b", linewidth=4, zorder=10)
@@ -497,7 +500,7 @@ def _process_s2p_singlePlane(
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace[:500].shape[0])
-            
+
             xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
             plt.plot(dF[:500, i], "b", linewidth=3)
             plt.legend(
@@ -507,7 +510,7 @@ def _process_s2p_singlePlane(
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace[:500].shape[0])
-            
+
             xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
             plt.plot(Fcz[:500, i], c="purple")
             plt.legend(
@@ -517,9 +520,9 @@ def _process_s2p_singlePlane(
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, zTrace[:500].shape[0])
-            
+
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
-            
+
             if not zTrace is not None:
                 plt.plot(zTrace[:500])
                 plt.gca().invert_yaxis()
@@ -531,7 +534,7 @@ def _process_s2p_singlePlane(
                 plt.xlabel("time (frames)")
                 plt.tick_params(axis='y', labelright=True, labelleft=False)
                 plt.xlim(0, zTrace[:500].shape[0])
-            
+
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
 

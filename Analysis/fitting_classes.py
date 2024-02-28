@@ -441,6 +441,30 @@ class BaseTuner(ABC):
         """
         return inspect.signature(self.func)
 
+    def get_specific_boundaries(self, x, y):
+        y1 = y[:self.sep]
+        y2 = y[self.sep:]
+        x1 = x[:self.sep]
+        x2 = x[self.sep:]
+
+        xu = np.unique(x1)
+        avgy = np.zeros_like(xu, dtype=float)
+        for xi, xuu in enumerate(xu):
+            avgy[xi] = np.nanmedian(y1[x1 == xuu])
+
+        min1 = np.nanmin(avgy)
+        max1 = np.nanmax(avgy)
+
+        xu = np.unique(x2)
+        avgy = np.zeros_like(xu, dtype=float)
+        for xi, xuu in enumerate(xu):
+            avgy[xi] = np.nanmedian(y2[x2 == xuu])
+
+        min2 = np.nanmin(avgy)
+        max2 = np.nanmax(avgy)
+
+        return min1, min2, max1, max2
+
 
 # fit using log - gaussian
 class FrequencyTuner(BaseTuner):
@@ -467,6 +491,11 @@ class FrequencyTuner(BaseTuner):
             xu[np.nanargmax(avgy)],
             1,
         )
+
+    def get_specific_boundaries(self, x, y):
+        y1 = y[:self.sep]
+        y2 = y[self.sep:]
+        return np.nanmin(y1), np.nanmin(y2), np.nanmax(y1), np.nanmax(y2)
 
     def set_bounds_p0(self, x, y, func=None):
 
@@ -497,38 +526,43 @@ class FrequencyTuner(BaseTuner):
             (not (func is None)) & (func == self.gauss_split)
         ):
             try:
-                meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
-                x_mean = meanVals.index.to_numpy()
-                y_mean = meanVals["y"].to_numpy()
-                p0_, _ = sp.optimize.curve_fit(
-                    self.gauss,
-                    x_mean,
-                    y_mean,
-                    p0=p0,
-                    bounds=bounds,
-                    xtol=self.xtol,
-                    max_nfev=self.max_nfev,
-                    method="trf",
-                    loss="soft-l1",
-                    f_scale=1,
-                    x_scale="jac",
-                )
+                # meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
+                # x_mean = meanVals.index.to_numpy()
+                # y_mean = meanVals["y"].to_numpy()
+                # p0_, _ = sp.optimize.curve_fit(
+                #     self.gauss,
+                #     x_mean,
+                #     y_mean,
+                #     p0=p0,
+                #     bounds=bounds,
+                #     xtol=self.xtol,
+                #     max_nfev=self.max_nfev,
+                #     method="trf",
+                #     loss="soft-l1",
+                #     f_scale=1,
+                #     x_scale="jac",
+                # )
+
+                p01 = self._make_prelim_guess(x[:self.sep], y[:self.sep])
+                p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
 
                 p0 = (
-                    p0_[0],
-                    p0_[0],
-                    p0_[1],
-                    p0_[1],
-                    p0_[2],
-                    p0_[2],
-                    p0_[3],
-                    p0_[3],
+                    p01[0],
+                    p02[0],
+                    p01[1],
+                    p02[1],
+                    p01[2],
+                    p02[2],
+                    p01[3],
+                    p02[3],
                 )
+
+                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
 
                 bounds = (
                     (
-                        bounds[0][0],
-                        bounds[0][0],
+                        min1-0.2*np.abs(min1),
+                        min2-0.2*np.abs(min2),
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -537,16 +571,17 @@ class FrequencyTuner(BaseTuner):
                         bounds[0][3],
                     ),
                     (
-                        bounds[1][0],
-                        bounds[1][0],
-                        bounds[1][1],
-                        bounds[1][1],
+                        max1+0.2*np.abs(max1),
+                        max2+0.2*np.abs(max2),
+                        (max1-min1)+0.2*np.abs((max1-min1)),
+                        (max2-min2)+0.2*np.abs((max2-min2)),
                         bounds[1][2],
                         bounds[1][2],
                         bounds[1][3],
                         bounds[1][3],
                     ),
                 )
+
             except:
                 p0 = (p0[0], p0[0], p0[1], p0[1], p0[2], p0[2], p0[3], p0[3])
 
@@ -632,10 +667,9 @@ class OriTuner(BaseTuner):
         return (
             np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
-            0.5,
+            0,
             xu[np.nanargmax(avgy)],
-            np.abs(xu[np.nanargmax(avgy)] - xu[np.nanargmin(avgy)]),
-        )
+            0.7*np.median(np.diff(xu)))
 
     def set_bounds_p0(self, x, y, func=None):
 
@@ -649,9 +683,9 @@ class OriTuner(BaseTuner):
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
             (minAvg-0.2*np.abs(minAvg),
-             0, 0, 0, 0.5),
+             0, 0, 0, 0.7*np.median(np.diff(xu))),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             maxAvg+0.2*np.abs(maxAvg), 1, 360, 360),
+             maxAvg+0.2*np.abs(maxAvg), 1, 360, 80),
         )
         if ((func is None) & (self.func == self.wrapped_gauss)) | (
             (not (func is None)) & (func == self.wrapped_gauss)
@@ -663,26 +697,13 @@ class OriTuner(BaseTuner):
         ):
             try:
 
-                meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
-                x_mean = meanVals.index.to_numpy()
-                y_mean = meanVals["y"].to_numpy()
-                p0_, _ = sp.optimize.curve_fit(
-                    self.wrapped_gauss,
-                    x_mean,
-                    y_mean,
-                    p0=p0,
-                    bounds=bounds,
-                    xtol=self.xtol,
-                    max_nfev=self.max_nfev,
-                    method="trf",
-                    loss="soft_l1",
-                    f_scale=1,
-                )
-
+                # meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
+                # x_mean = meanVals.index.to_numpy()
+                # y_mean = meanVals["y"].to_numpy()
                 # p0_, _ = sp.optimize.curve_fit(
                 #     self.wrapped_gauss,
-                #     x,
-                #     y,
+                #     x_mean,
+                #     y_mean,
                 #     p0=p0,
                 #     bounds=bounds,
                 #     xtol=self.xtol,
@@ -692,12 +713,17 @@ class OriTuner(BaseTuner):
                 #     f_scale=1,
                 # )
 
-                p0 = (p0_[0], p0_[0], p0_[1], p0_[1], p0_[2], p0_[3], p0_[4])
+                p01 = self._make_prelim_guess(x[:self.sep], y[:self.sep])
+                p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
+
+                p0 = (p01[0], p02[0], p01[1], p02[1], p0[2], p0[3], p0[4])
+
+                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
 
                 bounds = (
                     (
-                        bounds[0][0],
-                        bounds[0][0],
+                        min1-0.2*np.abs(min1),
+                        min2-0.2*np.abs(min2),
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -705,10 +731,10 @@ class OriTuner(BaseTuner):
                         bounds[0][4],
                     ),
                     (
-                        bounds[1][0],
-                        bounds[1][0],
-                        bounds[1][1],
-                        bounds[1][1],
+                        max1+0.2*np.abs(max1),
+                        max2+0.2*np.abs(max2),
+                        (max1-min1)+0.2*np.abs((max1-min1)),
+                        (max2-min2)+0.2*np.abs((max2-min2)),
                         bounds[1][2],
                         bounds[1][3],
                         bounds[1][4],
@@ -812,16 +838,26 @@ class ContrastTuner(BaseTuner):
         if args[0] == "contrast_split":
             self.func = self.hyperbolic_split
 
+        if args[0] == "contrast_split_full":
+            self.func = self.hyperbolic_split_full
+
     def _make_prelim_guess(self, x, y):
         # get average per ori
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmedian(y[x == xuu])
+
+        avgyn = avgy-np.nanmin(avgy)
+        c50val = 0.5*(np.nanmax(avgyn))
+
+        c50u = xu[np.where((avgyn-c50val) > 0)[0][0]]
+        c50d = xu[np.where((avgyn-c50val) < 0)[0][-1]]
+        c50 = (c50u + c50d)/2
         return (
             np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
-            0.5,
+            c50,
             2,
         )
 
@@ -837,9 +873,9 @@ class ContrastTuner(BaseTuner):
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
             (minAvg-0.2*np.abs(minAvg),
-             0, 0.01, 0),
+             0, np.nanmax([0, p0[-2]-0.5*p0[-2]]), 1),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             maxAvg+0.2*np.abs(maxAvg), 1, 10),
+             maxAvg+0.2*np.abs(maxAvg), np.nanmin([1, p0[-2]+0.5*p0[-2]]), 10),
         )
         if ((func is None) & (self.func == self.hyperbolic)) | (
             (not (func is None)) & (func == self.hyperbolic)
@@ -851,26 +887,13 @@ class ContrastTuner(BaseTuner):
         ):
             try:
 
-                meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
-                x_mean = meanVals.index.to_numpy()
-                y_mean = meanVals["y"].to_numpy()
-                p0_, _ = sp.optimize.curve_fit(
-                    self.hyperbolic,
-                    x_mean,
-                    y_mean,
-                    p0=p0,
-                    bounds=bounds,
-                    xtol=self.xtol,
-                    max_nfev=self.max_nfev,
-                    method="trf",
-                    loss="soft_l1",
-                    f_scale=1,
-                )
-
+                # meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
+                # x_mean = meanVals.index.to_numpy()
+                # y_mean = meanVals["y"].to_numpy()
                 # p0_, _ = sp.optimize.curve_fit(
-                #     self.wrapped_gauss,
-                #     x,
-                #     y,
+                #     self.hyperbolic,
+                #     x_mean,
+                #     y_mean,
                 #     p0=p0,
                 #     bounds=bounds,
                 #     xtol=self.xtol,
@@ -880,22 +903,27 @@ class ContrastTuner(BaseTuner):
                 #     f_scale=1,
                 # )
 
-                p0 = (p0_[0], p0_[0], p0_[1], p0_[1], p0_[2], p0_[3])
+                p01 = self._make_prelim_guess(x[:self.sep], y[:self.sep])
+                p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
+
+                p0 = (p01[0], p02[0], p01[1], p02[1], p0[2], p0[3])
+
+                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
 
                 bounds = (
                     (
-                        bounds[0][0],
-                        bounds[0][0],
+                        min1-0.2*np.abs(min1),
+                        min2-0.2*np.abs(min2),
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
                         bounds[0][3],
                     ),
                     (
-                        bounds[1][0],
-                        bounds[1][0],
-                        bounds[1][1],
-                        bounds[1][1],
+                        max1+0.2*np.abs(max1),
+                        max2+0.2*np.abs(max2),
+                        (max1-min1)+0.2*np.abs((max1-min1)),
+                        (max2-min2)+0.2*np.abs((max2-min2)),
                         bounds[1][2],
                         bounds[1][3],
                     ),
@@ -921,13 +949,98 @@ class ContrastTuner(BaseTuner):
                         bounds[1][3],
                     ),
                 )
+
+        if ((func is None) & (self.func == self.hyperbolic_split_full)) | (
+            (not (func is None)) & (func == self.hyperbolic_split_full)
+        ):
+            try:
+
+                # meanVals = pd.DataFrame({"x": x, "y": y}).groupby("x").mean()
+                # x_mean = meanVals.index.to_numpy()
+                # y_mean = meanVals["y"].to_numpy()
+                # p0_, _ = sp.optimize.curve_fit(
+                #     self.hyperbolic,
+                #     x_mean,
+                #     y_mean,
+                #     p0=p0,
+                #     bounds=bounds,
+                #     xtol=self.xtol,
+                #     max_nfev=self.max_nfev,
+                #     method="trf",
+                #     loss="soft_l1",
+                #     f_scale=1,
+                # )
+
+                p01 = self._make_prelim_guess(x[:self.sep], y[:self.sep])
+                p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
+
+                p0 = (p01[0], p02[0], p01[1], p02[1],
+                      p01[2], p02[2], p01[3], p02[3])
+
+                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
+
+                bounds = (
+                    (
+                        min1-0.2*np.abs(min1),
+                        min2-0.2*np.abs(min2),
+                        bounds[0][1],
+                        bounds[0][1],
+                        0,  # np.nanmax([0, p01[-2]-0.2*p01[-2]]),
+                        0,  # np.nanmax([0, p02[-2]-0.2*p02[-2]]),
+                        bounds[0][3],
+                        bounds[0][3],
+                    ),
+                    (
+                        max1+0.2*np.abs(max1),
+                        max2+0.2*np.abs(max2),
+                        (max1-min1)+0.2*np.abs((max1-min1)),
+                        (max2-min2)+0.2*np.abs((max2-min2)),
+                        1,  # np.nanmin([1, p01[-2]+0.2*p01[-2]]),
+                        1,  # np.nanmin([1, p02[-2]+0.2*p02[-2]]),
+                        bounds[1][3],
+                        bounds[1][3],
+                    ),
+                )
+            except:
+                p0 = (p0[0], p0[0], p0[1], p0[1],
+                      p0[2], p0[2], p0[3], p0[3])
+
+                bounds = (
+                    (
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][2],
+                        bounds[0][3],
+                        bounds[0][3],
+                    ),
+                    (
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][2],
+                        bounds[1][3],
+                        bounds[1][3],
+                    ),
+                )
             return p0, bounds
 
     def predict_split(self, x, state):
-        if state == 0:
-            return self.hyperbolic(x, *self.props[[0, 2, 4, 5]])
+        if (self.func == self.hyperbolic_split_full):
+
+            if state == 0:
+                return self.hyperbolic(x, *self.props[[0, 2, 4, 6]])
+            else:
+                return self.hyperbolic(x, *self.props[[1, 3, 5, 7]])
         else:
-            return self.hyperbolic(x, *self.props[[1, 3, 4, 5]])
+            if state == 0:
+                return self.hyperbolic(x, *self.props[[0, 2, 4, 5]])
+            else:
+                return self.hyperbolic(x, *self.props[[1, 3, 4, 5]])
 
     def hyperbolic(self, c, R0, R, c50, n):
         return R * (c**n / (c50**n + c**n)) + R0
@@ -953,6 +1066,27 @@ class ContrastTuner(BaseTuner):
         else:
             return np.nan
 
+    def hyperbolic_split_full(self, c, R0q, R0a, Rq, Ra, c50q, c50a, nq, na):
+        sep = self.sep
+        # have one state only to predict
+        if len(np.atleast_1d(c)) == 1:
+            if self.state <= sep:
+                # quiet
+                y = self.hyperbolic(c, R0q, Rq, c50q, nq)
+            else:
+                # active
+                y = self.hyperbolic(c, R0a, Ra, c50a, na)
+            return y
+
+        if not (sep is None):
+            quiet = c[:sep]
+            active = c[sep:]
+            yq = self.hyperbolic(quiet, R0q, Rq, c50q, nq)
+            ya = self.hyperbolic(active, R0a, Ra, c50a, na)
+            return np.append(yq, ya)
+        else:
+            return np.nan
+
 
 class GammaTuner(BaseTuner):
     def __init__(self, funcName, prelim=None, sep=None):
@@ -973,11 +1107,13 @@ class GammaTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmean(y[x == xuu])
         if (not (self.prelim is None)):
+            self.prelim[0] = np.nanmin(avgy)
+            self.prelim[1] = np.nanmax(avgy) - np.nanmedian(avgy)
             return self.prelim
 
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy) - np.nanmin(avgy),
+            np.nanmax(avgy) - np.nanmedian(avgy),
             1,
             # 0,
             2,
@@ -990,7 +1126,7 @@ class GammaTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmean(y[x == xuu])
         minAvg = np.nanmin(avgy)
-        maxAvg = np.nanmax(avgy) - minAvg
+        maxAvg = np.nanmax(avgy) - np.nanmin(avgy)
         bounds = (
             (
                 minAvg-0.2*np.abs(minAvg),
@@ -1000,8 +1136,8 @@ class GammaTuner(BaseTuner):
                 1,
             ),
             (
-                np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-                maxAvg+0.2*np.abs(maxAvg),
+                np.nanmedian(avgy),
+                maxAvg,
                 100,
                 # 0,
                 100,

@@ -66,6 +66,7 @@ import inspect
 
 # %%
 # Note: go to user_defs and change the inputs to directories_to_fit() and create_fitting_ops().
+
 dirs = define_directories()
 csvDir = dirs["dataDefFile"]
 
@@ -80,6 +81,7 @@ ops = create_fitting_ops()
 saveDirBase = ops["save_dir"]
 processedDataDir = ops["processed files"]
 for currSession in sessions:
+
     plt.close('all')
     print(f"starting to run session: {currSession}")
     # Gets data for current session from the Preprocessed folder.
@@ -113,6 +115,7 @@ for currSession in sessions:
             data["gratingsEt"],
             activeVelocity=ops["active_velocity"],
             quietVelocity=ops["quiet_velocity"],
+            criterion=0.9
         )
     except:
         print(
@@ -166,7 +169,7 @@ for currSession in sessions:
     fittingRange = range(0, gratingRes.shape[-1])
     # check if want to run only some neurons
 
-    if not np.all(np.isnan(sessions[0]['SpecificNeurons'])):
+    if not np.all(np.isnan(currSession['SpecificNeurons'])):
         fittingRange = currSession["SpecificNeurons"]
         # assume to wants to redo only those, so try reloading existing data first
         try:
