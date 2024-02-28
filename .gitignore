@@ -5,6 +5,8 @@ __pycache__/
 
 # setting files to ignore
 Data/TwoP/folder_defs.py
+Data/Ephys/user_defs_ephys.py
+Data/Ephys/preprocess.csv
 
 # C extensions
 *.so
@@ -134,5 +136,4 @@ dmypy.json
 TwoP/folder_defs.py
 user_defs.py
 Ephys/preprocess.csv
-Ephys/user_defs_ephys.py
 Ephys/user_defs_ephys.py
