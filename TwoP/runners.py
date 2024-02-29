@@ -29,6 +29,7 @@ from Data.Bonsai.extract_data import *
 from Data.Bonsai.behaviour_protocol_functions import *
 from Data.TwoP.general import *
 from Data.user_defs import create_2p_processing_ops, directories_to_register
+import matplotlib.gridspec as gridspec
 def _process_s2p_singlePlane(
     pops, planeDirs, zstackPath, saveDirectory, piezo, plane
 ):
@@ -450,7 +451,7 @@ def _process_s2p_singlePlane(
             #     ax["profile"].set_xlabel("depth")
 
             # Print full
-
+            plt.close()
             fig = plt.figure(1, figsize=(12, 6))
             gs = gridspec.GridSpec(10, 10)
             gs.update(wspace=0.2, hspace=0.2)
@@ -557,7 +558,7 @@ def _process_s2p_singlePlane(
                 ),
                 "wb",
             ) as file:
-                pickle.dump(f, file)
+                pickle.dump(fig, file)
 
             plt.close("all")
     return results
