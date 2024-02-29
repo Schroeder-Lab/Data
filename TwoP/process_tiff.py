@@ -93,7 +93,7 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
             np.arange(0, resolutionx),
         ),
         stack,
-        fill_value=None,
+        fill_value=np.nan,
         method='nearest'
     )
     for yt in range(len(piezoNorm)):
