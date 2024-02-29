@@ -255,7 +255,7 @@ def _process_s2p_singlePlane(
                 zstack = zstack_functional
             # Gets the location of each frame in Z based on the highest
             # correlation value.
-            zTrace = np.argmax(zcorr, 0)
+            zTrace = (np.argmax(zcorr, 0)).astype(int)
             # Computes the Z profiles for each ROI.
             zprofiles = extract_zprofiles(
                 currDir,
@@ -645,7 +645,8 @@ def process_s2p_directory(
         # Refer to the function for a more thorough description.
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, planeDirs, zstackPath, saveDirectory, piezoTraces[:, p], p
+                pops, planeDirs, zstackPath, saveDirectory, (
+                    piezoTraces[:, p]-piezoTraces[0, max(p-1, planeRange[0])]).reshape(-1, 1), p
             )
             for p in planeRange
         )
