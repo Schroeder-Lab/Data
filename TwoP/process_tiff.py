@@ -93,15 +93,16 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
             np.arange(0, resolutionx),
         ),
         stack,
-        fill_value=np.nan
+        fill_value=np.nan,
+        bounds_error=False,
         method='nearest'
     )
     for yt in range(len(piezoNorm)):
         depth = piezoNorm[yt]
 
         # If beyond the depth, takes the final frame.
-        if depth > planes - 1:
-            depth = planes - 1
+        # if depth > planes - 1:
+        #     depth = planes - 1
         # If below the topmost frame, takes the first one.
         if depth < 0:
             depth = 0
