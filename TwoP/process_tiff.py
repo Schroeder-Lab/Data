@@ -64,7 +64,7 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
     # f = sp.interpolate.interp1d(np.arange(piezoNorm.shape[0]), piezoNorm)
     # piezoNorm = f(np.arange(0,piezoNorm.shape[0]-1,spacing/10))
     f = sp.interpolate.interp1d(np.linspace(
-        0, resolutiony-1, len(piezoNorm)), piezoNorm)
+        0, resolutiony-1, len(piezoNorm)), piezoNorm[:,0])
     piezoNorm = f(np.arange(0, resolutiony))
 
     # Creates a variable that tells the current location in Y (in pixels).
