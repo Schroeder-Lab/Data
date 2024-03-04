@@ -164,7 +164,11 @@ def process_metadata_directory_ephys(
             else:
                 stimulusResults = process_stimulus(propTitles, di, changesPhotodiode)
             stimulusProps.append(stimulusResults)
-            stimulusTypes.append(propTitles[0][0])
+            
+            if propTitles[0][0] == 'Oddball':
+                stimulusTypes.append('Gratings')
+            else:    
+                stimulusTypes.append(propTitles[0][0])
         except:
             print("Error in stimulus processing in directory: " + di)
             print(traceback.format_exc())

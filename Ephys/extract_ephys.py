@@ -238,9 +238,11 @@ def synchronise_streams_with_ephys(dataEntry, pops, ephysDirectory,
     
     if tempEphysDir is not None:   
         
-        #Copy files to temp directory and use this as local
-        shutil.copy(lfpMetaDir, tempEphysDir)
-        shutil.copy(lfpRawDir, tempEphysDir)
+        if not os.path.exists(lfpMetaDir) or not os.path.exists(lfpRawDir):
+        
+            #Copy files to temp directory and use this as local
+            shutil.copy(lfpMetaDir, tempEphysDir)
+            shutil.copy(lfpRawDir, tempEphysDir)
         
         lfpMetaDir = os.path.join(tempEphysDir, os.path.basename(lfpMetaDir))
         lfpRawDir = os.path.join(tempEphysDir, os.path.basename(lfpRawDir))
