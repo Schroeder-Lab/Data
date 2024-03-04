@@ -64,7 +64,7 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
     # f = sp.interpolate.interp1d(np.arange(piezoNorm.shape[0]), piezoNorm)
     # piezoNorm = f(np.arange(0,piezoNorm.shape[0]-1,spacing/10))
     f = sp.interpolate.interp1d(np.linspace(
-        0, resolutiony-1, len(piezoNorm)), piezoNorm[:,0])
+        0, resolutiony-1, len(piezoNorm)), piezoNorm[:, 0])
     piezoNorm = f(np.arange(0, resolutiony))
 
     # Creates a variable that tells the current location in Y (in pixels).
@@ -93,7 +93,7 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
             np.arange(0, resolutionx),
         ),
         stack,
-        fill_value=np.nan,
+        fill_value=None,
         bounds_error=False,
         method='nearest'
     )
@@ -104,8 +104,8 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
         # if depth > planes - 1:
         #     depth = planes - 1
         # If below the topmost frame, takes the first one.
-        if depth < 0:
-            depth = 0
+        # if depth < 0:
+        #     depth = 0
 
         line = interp(
             (
@@ -254,7 +254,7 @@ def register_stack_to_ref(zstack, refImg, ops=default_ops()):
     # Processes reference image for phase correlation with frames.
     ref = rigid.phasecorr_reference(refImg, ops["smooth_sigma"])
     data = rigid.apply_masks(
-        zstack.astype(np.int16),
+        zstack.astype(np.float32),
         *rigid.compute_masks(
             refImg=refImg,
             maskSlope=ops["spatial_taper"]
