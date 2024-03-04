@@ -261,12 +261,15 @@ def process_metadata_directory_ephys(
                 # 3) 
     
                 if len(cam1times) < nframes1:
-                    if (nframes1 - len(cam1times)) == 1:
-                        cam1times = np.append(cam1times, np.nan)
-                        faceTimes.append(cam1times)
-                    else:    
-                        print(f'''More frames than TTL pulses in face camera from {di}. 
-                              Check data.''')
+                    if (nframes1 - len(cam1times)) < 65:
+                        if (nframes1 - len(cam1times)) == 1:
+                            cam1times = np.append(cam1times, np.nan)
+                            faceTimes.append(cam1times)
+                        else:    
+                            added = np.full((nframes1 - len(cam1times)), np.nan)
+                            cam1times = np.append(added, cam1times)
+                            faceTimes.append(cam1times)
+                            print(f'''Extreme correction performed (FG003 cases).''')
                 else:
                     if (len(cam1times) - nframes1) == 1:
                         cam1times = cam1times[:-1]
@@ -278,13 +281,17 @@ def process_metadata_directory_ephys(
                               camera from {di}. Check data.''')
                 
                 if len(cam2times) < nframes2:
-                    if (nframes2 - len(cam2times)) <= 2:
-                        added = np.full((nframes2 - len(cam2times)), np.nan)
-                        cam2times = np.append(cam2times, added)
-                        bodyTimes.append(cam2times)
-                    else:                    
-                        print(f'''More frames than TTL pulses in body camera from {di}. 
-                          Check data.''')
+                    if (nframes2 - len(cam2times)) <65:
+                        if (nframes2 - len(cam2times)) <= 2:
+                            added = np.full((nframes2 - len(cam2times)), np.nan)
+                            cam2times = np.append(cam2times, added)
+                            bodyTimes.append(cam2times)
+                        else:         
+                            added = np.full((nframes2 - len(cam2times)-1), np.nan)
+                            cam2times = np.append(added, cam2times)
+                            cam2times = np.append(cam2times, np.nan)
+                            bodyTimes.append(cam2times)
+                            print(f'''Extreme correction performed (FG003 cases).''')
                 else:
                     if (len(cam2times) - nframes2) == 1:
                         cam2times = cam2times[:-1]
