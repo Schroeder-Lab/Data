@@ -234,14 +234,20 @@ def _process_s2p_singlePlane(
 
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
+                r = ops['reg_file']
+                ops['reg_file'] = reg_file
                 ops, zcorr = compute_zpos(zstack, ops, reg_file)
+                ops['reg_file'] = r
                 np.save(ops["ops_path"], ops)
             # Calculates Z correlation if Z stack was already registered.
             elif not ("zcorr" in ops.keys()):
                 zstack = skimage.io.imread(zFileName)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
+                r = ops['reg_file']
+                ops['reg_file'] = reg_file
                 ops, zcorr = compute_zpos(zstack, ops, reg_file)
+                ops['reg_file'] = r
                 # Saves the current ops path to the ops file.
                 np.save(ops["ops_path"], ops)
             # If the Z stack has been registered and Z correlation has been
@@ -255,7 +261,8 @@ def _process_s2p_singlePlane(
                 zstack = zstack_functional
             # Gets the location of each frame in Z based on the highest
             # correlation value.
-            zTrace = (np.argmax(zcorr, 0)).astype(int)
+            zTrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
+                zcorr3, 2, axis=0), axis=0)).astype(int)
             # Computes the Z profiles for each ROI.
             zprofiles = extract_zprofiles(
                 currDir,

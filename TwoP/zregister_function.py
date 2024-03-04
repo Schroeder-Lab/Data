@@ -158,27 +158,12 @@ def z_register_one_file(ops):
     regstate = _detect_if_planes_registered(ops)
 
     if (not regstate["isBinCreated"]):
+        print("Creating bin files out of tiff")
         ops = tiff_to_binary(ops)
     else:
         print("Skipping tiff conversion")
         ops = init_ops(ops)
     if (not regstate["isOnePlaneCreated"]):
-        # set directories  and definitions
-        raw = ops.get("keep_movie_raw") and "raw_file" in ops and os.path.isfile(
-            ops["raw_file"])
-        reg_file = ops["reg_file"]
-        raw_file = ops.get("raw_file", 0) if raw else reg_file
-        if ops["nchannels"] > 1:
-            reg_file_chan2 = ops["reg_file_chan2"]
-            raw_file_chan2 = ops.get(
-                "raw_file_chan2", 0) if raw else reg_file_chan2
-        else:
-            reg_file_chan2 = reg_file
-            raw_file_chan2 = reg_file
-        n_frames, Ly, Lx = ops["nframes"], ops["Ly"], ops["Lx"]
-
-        null = contextlib.nullcontext()
-        twoc = ops["nchannels"] > 1
 
         # get plane folders
         plane_folders = natsorted(
@@ -190,7 +175,7 @@ def z_register_one_file(ops):
         )
         ops_paths = [os.path.join(f, "ops.npy") for f in plane_folders]
         nplanes = len(ops_paths)
-
+        ops = np.load(ops_paths[0], allow_pickle=True).item()
         # compute reference image
         refImgs = []
 
@@ -198,6 +183,10 @@ def z_register_one_file(ops):
             if ipl in ops["ignore_flyback"]:
                 print(">>>> skipping flyback PLANE", ipl)
                 continue
+            n_frames, Ly, Lx = ops["nframes"], ops["Ly"], ops["Lx"]
+
+            null = contextlib.nullcontext()
+            twoc = ops["nchannels"] > 1
 
             ops = np.load(ops_path, allow_pickle=True).item()
             align_by_chan2 = ops["functional_chan"] != ops["align_by_chan"]
@@ -300,7 +289,7 @@ def z_register_one_file(ops):
         # imp.reload(utils)
         # imp.reload(rigid)
         # imp.reload(register)
-
+        print("Finding correlation in z direciton")
         ops["refImg"] = refImgs
         ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
         # Get the correlation between the reference images
@@ -321,6 +310,8 @@ def z_register_one_file(ops):
                 raw_file_chan2 = (
                     ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
                 )
+
+            null = None
             with io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file, n_frames=n_frames) \
                 if raw else null as f_raw, \
                 io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file, n_frames=n_frames) as f_reg, \
@@ -354,7 +345,7 @@ def z_register_one_file(ops):
             ops_paths_clean[bestCorrRefPlane], allow_pickle=True).item()
         maxCorrId = zposList[bestCorrRefPlane]
         smooth_images_by_correlation(ops_paths_clean, corrs_all)
-
+        print("Creating new file")
         # At this point the files are registered properly according to where they are
         # now we need to go over each zposition and replace the frame on the channel with a weighted
         # frame on the plane it actually is
@@ -379,7 +370,7 @@ def z_register_one_file(ops):
     return ops
 
 
-def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra):
+def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra=False):
     ops0 = np.load(ops_paths[selected_plane - 1], allow_pickle=True).item()
     newSavePath = os.path.join(
         ops0["save_path0"], "suite2p", "plane")
@@ -400,8 +391,8 @@ def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra):
     newOps["badframes"] = maxCorr < 0.01
 
     n_frames = len(planeList)
-
-    np.save(newOps["ops_path"], newOps)
+    n_chan = newOps["nchannels"]
+    align_chan = newOps["align_by_chan"]
     with BinaryFile(
         Ly=ops0["Ly"], Lx=ops0["Lx"], filename=newBinFilePath, n_frames=n_frames
     ) as newFile:
@@ -411,6 +402,38 @@ def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra):
                 Ly=ops0["Ly"], Lx=ops0["Lx"], filename=ops["reg_file"], n_frames=n_frames
             ) as planeFile:
                 newFile[pi: pi + 1] = planeFile[pi: pi + 1]
+
+    # if there are 2 channels, make the second file too.
+    if n_chan == 2:
+        newBinFilePath_chan2 = os.path.join(newSavePath, "data_chan2.bin")
+        newOps["raw_file"] = []
+        newOps["reg_file_chan2"] = newBinFilePath_chan2
+
+        with BinaryFile(
+            Ly=ops0["Ly"], Lx=ops0["Lx"], filename=newBinFilePath_chan2, n_frames=n_frames
+        ) as newFile:
+            for pi, p in enumerate(planeList):
+                ops = np.load(ops_paths[p], allow_pickle=True).item()
+                with BinaryFile(
+                    Ly=ops0["Ly"], Lx=ops0["Lx"], filename=ops["reg_file_chan2"], n_frames=n_frames
+                ) as planeFile:
+                    newFile[pi: pi + 1] = planeFile[pi: pi + 1]
+
+    null = None
+    twoc = (n_chan == 2)
+    align_by_chan2 = align_chan == 2
+    Lx = newOps["Lx"]
+    Ly = newOps["Ly"]
+    with io.BinaryFile(Ly=Ly, Lx=Lx, filename=newOps["reg_file"], n_frames=n_frames) as f_reg, \
+            io.BinaryFile(Ly=Ly, Lx=Lx, filename=newOps["reg_file_chan2"], n_frames=n_frames) \
+            if twoc else null as f_reg_chan2:
+        registration_outputs = register.registration_wrapper(
+            f_reg, f_raw=None, f_reg_chan2=f_reg_chan2, f_raw_chan2=None,
+            refImg=newOps['refImg'], align_by_chan2=align_by_chan2, ops=newOps)
+        newOps = register.save_registration_outputs_to_ops(
+            registration_outputs, newOps)
+
+    np.save(newOps["ops_path"], newOps)
     # rename/delete all the other directories names so they will not be treated
     plane_folders = np.array(natsorted([
         f.path
