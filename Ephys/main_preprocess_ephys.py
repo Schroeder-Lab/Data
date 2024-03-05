@@ -91,10 +91,10 @@ for i in range(len(database)):
             #Find experiment folders dirs
             if database.loc[i].Experiments == 'all':
                 #find experiment folders only, assuming that are all digits
-                experiments  = [os.path.join(metadataDirectory,x) 
-                                for x in os.listdir(metadataDirectory)
-                                if x.isdigit()]
-
+                experiments  = sorted([os.path.join(metadataDirectory,x) 
+                                       for x in os.listdir(metadataDirectory)
+                                       if x.isdigit()],
+                                       key=lambda x: int(os.path.basename(x)))
             else:    
                 experiments = [os.path.join(metadataDirectory,x) 
                                for x in database.loc[i].Experiments.split(',')] 
