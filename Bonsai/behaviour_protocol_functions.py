@@ -178,13 +178,13 @@ def stimulus_flicker(directory, frameChanges):
 
     flicker_stimType[0::2] = 0.05  # SD from Low contrast
     flicker_stimType[1::2] = 0.175  # SD from High contrast
-    flicker_stimType.reshape(-1, 1)
+    flicker_stimType = flicker_stimType.reshape(-1, 1)
     
     # Checks if number of frames and stimuli match (if not, there
     # could have been an issue with the photodiode, check if there
     # are irregular frames in the photodiode trace).
 
-    if len(flicker_stimType) == len(frameChanges):
+    if (len(flicker_stimType)+1) == len(frameChanges):
 
         # Gets the start times of each stimulus.
         st = frameChanges[:-1].reshape(-1, 1).copy()
