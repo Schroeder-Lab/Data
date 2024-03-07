@@ -199,7 +199,7 @@ def stimulus_flicker(directory, frameChanges):
 
     return {"flicker.startTime.npy": st,
             "flicker.endTime.npy": et,
-            "flicker.contrast.npy": '',
+            "flicker.contrast.npy": flicker_stimType,
             "flickerExp.intervals.npy": [st[0], et[-1]],
             }
 
