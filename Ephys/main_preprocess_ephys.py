@@ -59,6 +59,7 @@ for i in range(len(database)):
     (                   
         ephysDirectory,
         metadataDirectory,
+        preprocessedDirectory,
         saveDirectory,
     ) = read_csv_produce_directories_ephys(
         database.loc[i], metadataDir,preprocessedDataDir
@@ -103,10 +104,12 @@ for i in range(len(database)):
             ops = {
                     'Experiments':experiments,
                     }
-            
+
+
             process_metadata_directory_ephys(
-                    metadataDirectory, ops, pops, saveDirectory
+                    metadataDirectory, ops, pops, preprocessedDirectory, saveDirectory
                 )
+            
         except Exception:
             print("Could not process due to errors, moving to next batch.")
             print(traceback.format_exc())

@@ -27,7 +27,8 @@ from Data.Ephys.user_defs_ephys import create_ephys_processing_ops
 from Data.Ephys.extract_ephys import *
 
 def process_metadata_directory_ephys(
-    bonsai_dir, ops=None, pops=create_ephys_processing_ops(), saveDirectory=None 
+    bonsai_dir, ops=None, pops=create_ephys_processing_ops(), 
+    preprocessedDirectory=None, saveDirectory=None 
 ):
     """
 
@@ -53,18 +54,27 @@ def process_metadata_directory_ephys(
     ----------
     bonsai_dir : str
         The directory where the metadata is saved.
+        
     ops : dict
         For now, it only includes a list to the experiment directories to 
         analyse. But can be expanded to other params e.g. types of probes.
+        
     pops : dict [2], optional
         The dictionary with all the processing infomration needed. Refer to the
         function create_processing_ops in user_defs for a more in depth
         description.
-    saveDirectory : str, optional
-        Directory where the processed data will be saved. Is is determined in
+        
+    preprocessedDirectory : str, optional
+        Defaut directory where the processed data will be saved, determined in
         read_csv_produce_directories_ephys. If saveDir in proprocess.csv is
         empty, preprocessed data will be saved in preprocessedDataDir, defined
         in user_defs_ephys. The default is None.
+        
+    saveDirectory : str, optional
+        Directory where the processed data will be saved.If saveDir 
+        in proprocess.csv is empty, preprocessed data will be saved in 
+        preprocessedDataDir, defined in user_defs_ephys. Otherwise, every output
+        will be saved in saveDir from preprocess.csv. The default is None.
 
     Raises
     ------
@@ -122,7 +132,7 @@ def process_metadata_directory_ephys(
    
         #Load nidaq alignment and correct times
         try:
-            alignmentNidaq = np.load(os.path.join(saveDirectory,'Ephys', expDir,
+            alignmentNidaq = np.load(os.path.join(preprocessedDirectory,'Ephys', expDir,
                                                     'alignment.nidaq.npy'))
             
             nt = (nt * alignmentNidaq[1]) + alignmentNidaq[0]
@@ -191,7 +201,7 @@ def process_metadata_directory_ephys(
                 
             #Load arduino alignment and correct times
             try:
-                alignmentArduino = np.load(os.path.join(saveDirectory, 'Ephys', expDir,
+                alignmentArduino = np.load(os.path.join(preprocessedDirectory, 'Ephys', expDir,
                                                         'alignment.arduino.npy'))
                 at = (at * alignmentArduino[1]) + alignmentArduino[0]
             except:
@@ -373,9 +383,13 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
     
     metadataDirectory : string [metadataDir\Animal\Date]
         The concatenated metadata directory.
+    
+    preprocessedDirectory : string
+        Preprocessed directory in server.
+        
     saveDirectory : string [SaveDir from dataEntry or ]
         The save directory where all the processed files are saved. If not
-        specified, will be saved in the suite2p folder.
+        specified, will be saved in preprocessedDirectory.
 
     """
     # The data from each  dataEntry column is placed into variables.
@@ -408,13 +422,21 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
     if not type(saveDirectory) is str:
         
         saveDirectory = os.path.join(preprocessedDataDir, name, date)
+        preprocessedDirectory = saveDirectory
         
         if not os.path.isdir(saveDirectory):
             os.makedirs(saveDirectory)
        
     else:
+        
+        preprocessedDirectory =  os.path.join(preprocessedDataDir, name, date)
+        
         saveDirectory = os.path.join(saveDirectory, "PreprocessedFiles")
-    
-    return ephysDirectory, metadataDirectory, saveDirectory
+        
+        if not os.path.isdir(saveDirectory):
+            os.makedirs(saveDirectory)     
+
+
+    return ephysDirectory, metadataDirectory, preprocessedDirectory, saveDirectory
 
 
