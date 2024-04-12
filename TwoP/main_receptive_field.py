@@ -23,7 +23,9 @@ from Data.user_defs import (
 )
 import numpy as np
 import pandas as pd
-import time, os, shutil
+import time
+import os
+import shutil
 from suite2p.registration import register, rigid, bidiphase
 from suite2p.io import tiff_to_binary, BinaryRWFile
 from suite2p import io
@@ -37,6 +39,7 @@ from suite2p.registration import utils, rigid
 from suite2p import run_s2p
 from Data.TwoP.registration_defs import *
 from Data.TwoP.runners import *
+from suite2p.io import BinaryFile
 
 sparseSession, tmpSave = get_sparsenoise_info()
 
@@ -51,7 +54,7 @@ filePath = read_directory_dictionary(sparseSession, s2pDir)
 ops = create_ops_boutton_registration(filePath)
 ops["save_path0"] = tmpSave
 
-#%%
+# %%
 # do registration
 # convert tiffs to binaries
 if "save_folder" not in ops or len(ops["save_folder"]) == 0:
@@ -199,7 +202,7 @@ ops = tiff_to_binary(ops)
 #     np.save(ops["ops_path"], ops)
 
 
-#%% load bonsai stuff
+# %% load bonsai stuff
 
 plane = sparseSession["Plane"]
 readDir = os.path.join(ops["save_path0"], "suite2p", f"plane{plane}")
@@ -208,7 +211,7 @@ process_metadata_directory(
     ops["data_path"], ops, saveDirectory=ops["save_path0"]
 )
 
-#%%
+# %%
 ts = np.load(os.path.join(ops["save_path0"], "calcium.timestamps.npy"))
 st = np.load(os.path.join(ops["save_path0"], "sparse.st.npy"))
 smap = np.load(os.path.join(ops["save_path0"], "sparse.map.npy"))
@@ -224,19 +227,22 @@ window = [-0.3, 0.3]
 wt = (window / f).astype(int)
 t = np.arange(*wt)
 
-averageMap = np.zeros((smap.shape[1], smap.shape[2], ops["Ly"], ops["Lx"]))
+
+n_frames, Ly, Lx = ops["nframes"], ops["Ly"], ops["Lx"]
+
+averageMap = np.zeros((smap.shape[1], smap.shape[2], Ly, Lx))
 # get the locked frame per map position
 for y in range(smap.shape[1]):
     for x in range(smap.shape[2]):
         inds = np.where(smap[:, y, x] != 0.5)[0]
         sts = st[inds]
-        maps = np.zeros((len(sts), ops["Ly"], ops["Lx"]))
+        maps = np.zeros((len(sts), Ly, Lx))
         for si, s in enumerate(sts):
             # find the first instance where s is after the clock time
             firstInd = np.where(s >= ts)[0][-1]
             sw = wt + firstInd
-            with BinaryRWFile(
-                Ly=ops["Ly"], Lx=ops["Lx"], filename=binPath
+            with BinaryFile(
+                Ly=ops["Ly"], Lx=ops["Lx"], filename=binPath, n_frames=n_frames
             ) as f_bin:
                 frames = f_bin[t + firstInd]
                 corrected = np.nanmean(frames[t >= 0], 0) - np.nanmean(
@@ -246,11 +252,11 @@ for y in range(smap.shape[1]):
 
         averageMap[y, x, :, :] = np.nanmean(maps, 0)
 
-#%%
+# %%
 averageMap_ncd = sp.signal.convolve2d(
     averageMap_n[0, 0, :, :], np.ones((16, 16)), mode="same"
 )
-#%%
+# %%
 averageMap_n = averageMap - np.nanmin(averageMap)
 averageMap_n = averageMap_n / np.nanmax(averageMap_n)
 
