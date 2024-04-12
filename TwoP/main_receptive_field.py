@@ -27,7 +27,7 @@ import time
 import os
 import shutil
 from suite2p.registration import register, rigid, bidiphase
-from suite2p.io import tiff_to_binary, BinaryRWFile
+from suite2p.io import tiff_to_binary, BinaryFile
 from suite2p import io
 from suite2p import default_ops
 from tifffile import imread
@@ -39,7 +39,7 @@ from suite2p.registration import utils, rigid
 from suite2p import run_s2p
 from Data.TwoP.registration_defs import *
 from Data.TwoP.runners import *
-from suite2p.io import BinaryFile
+
 
 sparseSession, tmpSave = get_sparsenoise_info()
 
