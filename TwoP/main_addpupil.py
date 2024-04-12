@@ -39,9 +39,11 @@ database = pd.read_csv(
 )
 
 # %%
+errorList = []
 for i in range(len(database)):
     # Goes through the pandas dataframe called database created above and
     # if True in the column "Process", the processing continues.
+
     if database.loc[i]["Process"]:
         error = False
         dias = []
@@ -50,9 +52,10 @@ for i in range(len(database)):
         baseDir = os.path.join(preprocessDir, entry["Name"], entry["Date"])
         s2pDir = os.path.join(baseDir, "suite2p")
         pupilDir = os.path.join(baseDir, "pupil", "xyPos_diameter")
-        opsFile = glob.glob(os.path.join(s2pDir, "plane[0-9]", "ops.npy"))
+        opsFile = glob.glob(os.path.join(s2pDir, "plane*", "ops.npy"))
         if (len(opsFile) == 0):
-            print('No suite2p cannot continue')
+            print(f'{entry} No suite2p cannot continue')
+            errorList.append(f'{entry} No suite2p cannot continue')
             continue
         ops = np.load(opsFile[0], allow_pickle=True).item()
         data_paths = ops['data_path']
@@ -63,10 +66,15 @@ for i in range(len(database)):
             if (not os.path.exists(sessionDir)):
                 error = True
                 break
-            dia = np.load(os.path.join(sessionDir, "eye.diameter.npy"))
-            xy = np.load(os.path.join(sessionDir, "eye.xyPos.npy"))
-            dias.append(dia)
-            xys.append(xy)
+            try:
+                dia = np.load(os.path.join(sessionDir, "eye.diameter.npy"))
+                xy = np.load(os.path.join(sessionDir, "eye.xyPos.npy"))
+                dias.append(dia)
+                xys.append(xy)
+            except:
+                print(traceback.format_exc())
+                error = True
+                errorList.append(traceback.format_exc())
 
         if (not error):
             dias = np.hstack(dias).reshape(-1, 1)

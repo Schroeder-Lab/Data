@@ -54,6 +54,7 @@ from support_functions import (
     get_trial_classification_running,
     run_complete_analysis,
     get_directory_from_session,
+    remove_blinking_trials
 )
 
 from Data.user_defs import define_directories
@@ -67,21 +68,24 @@ import inspect
 # %%
 # Note: go to user_defs and change the inputs to directories_to_fit() and create_fitting_ops().
 
-dirs = define_directories()
-csvDir = dirs["dataDefFile"]
+
+ops = create_fitting_ops()
+csvDir = ops["fitting_list"]
 
 sessions = pd.read_csv(csvDir)
 # sessions.insert(2, column='SpecificNeurons', value=[
 #                 [] for _ in range(len(sessions))])
-sessions = sessions[['Name', 'Date', 'SpecificNeurons']].to_dict('records')
+sessions = sessions[['Name', 'Date',
+                     'SpecificNeurons', 'Process']].to_dict('records')
 
 
-ops = create_fitting_ops()
 # Loads the save directory from the fitting_ops in user_defs.
 saveDirBase = ops["save_dir"]
 processedDataDir = ops["processed files"]
 for currSession in sessions:
-
+    if (not currSession['Process']):
+        print(f"Process set to False in session: {currSession}")
+        continue
     plt.close('all')
     print(f"starting to run session: {currSession}")
     # Gets data for current session from the Preprocessed folder.
@@ -115,7 +119,8 @@ for currSession in sessions:
             data["gratingsEt"],
             activeVelocity=ops["active_velocity"],
             quietVelocity=ops["quiet_velocity"],
-            criterion=0.9
+            fractionToTest=ops["fraction_to_test"],
+            criterion=ops["criterion"],
         )
     except:
         print(
@@ -129,12 +134,13 @@ for currSession in sessions:
     paramsOri = np.zeros((gratingRes.shape[-1], 5)) * np.nan
     # paramsOriSplit = np.zeros((7, gratingRes.shape[-1]))
     paramsOriSplit = np.zeros((gratingRes.shape[-1], 5, 2)) * np.nan
-    # varsOri = np.zeros((3, gratingRes.shape[-1]))
+    varSpecificOri = np.zeros((gratingRes.shape[-1], 2)) * np.nan
     varOriConst = np.zeros(gratingRes.shape[-1]) * np.nan
     varOriOne = np.zeros(gratingRes.shape[-1]) * np.nan
     varOriSplit = np.zeros(gratingRes.shape[-1]) * np.nan
     pvalOri = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersOri = np.empty((gratingRes.shape[-1], 2), dtype=object)
+    paramsDistOri = np.zeros((gratingRes.shape[-1], 5, 2, 500)) * np.nan
 
     paramsTf = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     # paramsTfSplit = np.zeros((8, gratingRes.shape[-1]))
@@ -143,8 +149,10 @@ for currSession in sessions:
     varTfConst = np.zeros(gratingRes.shape[-1]) * np.nan
     varTfOne = np.zeros(gratingRes.shape[-1]) * np.nan
     varTfSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    varSpecificTf = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     pvalTf = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersTf = np.empty((gratingRes.shape[-1], 2), dtype=object)
+    paramsDistTf = np.zeros((gratingRes.shape[-1], 4, 2, 500)) * np.nan
 
     paramsSf = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     # paramsSfSplit = np.zeros((8, gratingRes.shape[-1]))
@@ -153,8 +161,10 @@ for currSession in sessions:
     varSfConst = np.zeros(gratingRes.shape[-1]) * np.nan
     varSfOne = np.zeros(gratingRes.shape[-1]) * np.nan
     varSfSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    varSpecificSf = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     pvalSf = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersSf = np.empty((gratingRes.shape[-1], 2), dtype=object)
+    paramsDistSf = np.zeros((gratingRes.shape[-1], 4, 2, 500)) * np.nan
 
     paramsCon = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     # paramsConSplit = np.zeros((6, gratingRes.shape[-1]))
@@ -163,13 +173,16 @@ for currSession in sessions:
     varConConst = np.zeros(gratingRes.shape[-1]) * np.nan
     varConOne = np.zeros(gratingRes.shape[-1]) * np.nan
     varConSplit = np.zeros(gratingRes.shape[-1]) * np.nan
+    varSpecificCon = np.zeros((gratingRes.shape[-1], 4)) * np.nan
     pvalCon = np.zeros(gratingRes.shape[-1]) * np.nan
     TunersCon = np.empty((gratingRes.shape[-1], 2), dtype=object)
+    paramsDistCon = np.zeros((gratingRes.shape[-1], 4, 2, 500)) * np.nan
 
     fittingRange = range(0, gratingRes.shape[-1])
     # check if want to run only some neurons
 
-    if not np.all(np.isnan(currSession['SpecificNeurons'])):
+    if type(currSession['SpecificNeurons']) is str:
+        currSession["SpecificNeurons"] = eval(currSession["SpecificNeurons"])
         fittingRange = currSession["SpecificNeurons"]
         # assume to wants to redo only those, so try reloading existing data first
         try:
@@ -208,10 +221,13 @@ for currSession in sessions:
         except:
             pass
 
+    blinkTrials = remove_blinking_trials(data)
+
     for n in fittingRange:
+        print(f"Neuron {n}")
         try:
             sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
-                gratingRes, data, ts, quietI, activeI, n, ops[
+                gratingRes, data, ts, quietI, activeI, blinkTrials, n, ops[
                     "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"]
             )
 
@@ -228,8 +244,13 @@ for currSession in sessions:
             varOriConst[n] = res_ori[2]
             varOriOne[n] = res_ori[3]
             varOriSplit[n] = res_ori[4]
+            varSpecificOri[n] = res_ori[-1] if (
+                not np.any(np.isnan(res_ori[-1]))) else np.ones(2) * np.nan
             pvalOri[n] = res_ori[6]
-            TunersOri[n, :] = res_ori[7:]
+            paramsDistOri[n, :, 0, :] = res_ori[7][:, [0, 2, 4, 5, 6]].T if (
+                not np.any(np.isnan(res_ori[7]))) else np.nan
+            paramsDistOri[n, :, 1, :] = res_ori[7][:, [1, 3, 4, 5, 6]].T if (
+                not np.any(np.isnan(res_ori[7]))) else np.nan
 
             paramsTf[n, :] = res_freq[0]
             paramsTfSplit[n, :, 0] = res_freq[1][::2] if (
@@ -240,8 +261,13 @@ for currSession in sessions:
             varTfConst[n] = res_freq[2]
             varTfOne[n] = res_freq[3]
             varTfSplit[n] = res_freq[4]
+            varSpecificTf[n] = res_freq[-1] if (
+                not np.any(np.isnan(res_freq[-1]))) else np.ones(4) * np.nan
             pvalTf[n] = res_freq[6]
-            TunersTf[n, :] = res_freq[7:]
+            paramsDistTf[n, :, 0, :] = res_freq[7][:, ::2].T if (
+                not np.any(np.isnan(res_freq[7]))) else np.nan
+            paramsDistTf[n, :, 1, :] = res_freq[7][:, 1::2].T if (
+                not np.any(np.isnan(res_freq[7]))) else np.nan
 
             paramsSf[n, :] = res_spatial[0]
             paramsSfSplit[n, :, 0] = res_spatial[1][::2] if (
@@ -252,8 +278,13 @@ for currSession in sessions:
             varSfConst[n] = res_spatial[2]
             varSfOne[n] = res_spatial[3]
             varSfSplit[n] = res_spatial[4]
+            varSpecificSf[n] = res_spatial[-1] if (
+                not np.all(np.isnan(res_spatial[-1]))) else np.ones(4) * np.nan
             pvalSf[n] = res_spatial[6]
-            TunersSf[n, :] = res_spatial[7:]
+            paramsDistSf[n, :, 0, :] = res_spatial[7][:, ::2].T if (
+                not np.any(np.isnan(res_spatial[7]))) else np.nan
+            paramsDistSf[n, :, 1, :] = res_spatial[7][:, 1::2].T if (
+                not np.any(np.isnan(res_spatial[7]))) else np.nan
 
             paramsCon[n, :] = res_con[0]
             paramsConSplit[n, :, 0] = res_con[1][[0, 2, 4, 6]] if (
@@ -264,8 +295,14 @@ for currSession in sessions:
             varConConst[n] = res_con[2]
             varConOne[n] = res_con[3]
             varConSplit[n] = res_con[4]
+            varSpecificCon[n] = res_con[-1] if (
+                not np.any(np.isnan(res_con[-1]))) else np.ones(4) * np.nan
             pvalCon[n] = res_con[6]
-            TunersCon[n, :] = res_con[7:]
+            paramsDistCon[n, :, 0, :] = res_con[7][:, [0, 2, 4, 6]].T if (
+                not np.any(np.isnan(res_con[7]))) else np.nan
+            paramsDistCon[n, :, 1, :] = res_con[7][:, [1, 3, 5, 7]].T if (
+                not np.any(np.isnan(res_con[7]))) else np.nan
+
         except Exception:
             print("fail " + str(n))
             print(traceback.format_exc())
@@ -285,7 +322,11 @@ for currSession in sessions:
         np.save(os.path.join(
             saveDir, "gratingOriTuning.expVar.runningSplit.npy"), varOriSplit)
         np.save(os.path.join(
+            saveDir, "gratingOriTuning.expVar.runningSplitSpecific.npy"), varSpecificOri)
+        np.save(os.path.join(
             saveDir, "gratingOriTuning.pVal.runningSplit.npy"), pvalOri)
+        np.save(os.path.join(
+            saveDir, "gratingOriTuning.pVal.paramsRunningNullDist.npy"), paramsDistOri)
 
     if (ops["fitTf"]):
         np.save(os.path.join(saveDir, "gratingTfTuning.params.npy"), paramsTf)
@@ -297,7 +338,11 @@ for currSession in sessions:
         np.save(os.path.join(
             saveDir, "gratingTfTuning.expVar.runningSplit.npy"), varTfSplit)
         np.save(os.path.join(
+            saveDir, "gratingTfTuning.expVar.runningSplitSpecific.npy"), varSpecificTf)
+        np.save(os.path.join(
             saveDir, "gratingTfTuning.pVal.runningSplit.npy"), pvalTf)
+        np.save(os.path.join(
+            saveDir, "gratingTfTuning.pVal.paramsRunningNullDist.npy"), paramsDistTf)
 
     if (ops["fitSf"]):
         np.save(os.path.join(saveDir, "gratingSfTuning.params.npy"), paramsSf)
@@ -309,7 +354,11 @@ for currSession in sessions:
         np.save(os.path.join(
             saveDir, "gratingSfTuning.expVar.runningSplit.npy"), varSfSplit)
         np.save(os.path.join(
+            saveDir, "gratingSfTuning.expVar.runningSplitSpecific.npy"), varSpecificSf)
+        np.save(os.path.join(
             saveDir, "gratingSfTuning.pVal.runningSplit.npy"), pvalSf)
+        np.save(os.path.join(
+            saveDir, "gratingSfTuning.pVal.paramsRunningNullDist.npy"), paramsDistSf)
 
     if (ops["fitContrast"]):
         np.save(os.path.join(
@@ -323,16 +372,19 @@ for currSession in sessions:
         np.save(os.path.join(
             saveDir, "gratingContrastTuning.expVar.runningSplit.npy"), varConSplit)
         np.save(os.path.join(
+            saveDir, "gratingContrastTuning.expVar.runningSplitSpecific.npy"), varSpecificCon)
+        np.save(os.path.join(
             saveDir, "gratingContrastTuning.pVal.runningSplit.npy"), pvalCon)
+        np.save(os.path.join(
+            saveDir, "gratingContrastTuning.pVal.paramsRunningNullDist.npy"), paramsDistCon)
      # plotting
     if (ops['plot']):
         for n in fittingRange:
             try:
-
                 print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
-                                   paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, pvalOri, paramsTf, paramsTfSplit, np.vstack(
-                                       (varTfConst, varTfOne, varTfSplit)).T,
-                                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, pvalCon, n, respP, respDirection[n], None, saveDir)
+                                   paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, varSpecificOri, pvalOri, paramsTf, paramsTfSplit, np.vstack(
+                                       (varTfConst, varTfOne, varTfSplit)).T, varSpecificTf,
+                                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, respDirection[n], None, saveDir)
 
             except Exception:
                 print("fail " + str(n))
@@ -352,3 +404,5 @@ except Exception:
     print("fail " + str(n))
     print(traceback.format_exc())
 plt.close('all')
+
+# %%

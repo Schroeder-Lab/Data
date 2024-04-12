@@ -70,8 +70,9 @@ def get_trial_classification_running(
     stimSt,
     stimEt,
     quietVelocity=0.5,
-    activeVelocity=1,
-    criterion=0.9,
+    activeVelocity=None,
+    fractionToTest=1,
+    criterion=1,
 ):
     wheelVelocity = np.abs(wheelVelocity)
 
@@ -85,20 +86,20 @@ def get_trial_classification_running(
     whLow = wh <= quietVelocity
     # whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
     #     whLow.shape[0] / 2)
-    whLow = np.sum(whLow[: int(whLow.shape[0]), :, 0], 0) / int(
-        whLow.shape[0])
+    whLow = np.sum(whLow[: int(whLow.shape[0]/fractionToTest),
+                   :, 0], 0) / int(whLow.shape[0]/fractionToTest)
 
     quietTrials = np.where(whLow >= criterion)[0]
-    activeTrials = np.setdiff1d(np.arange(wh.shape[1]), quietTrials)
-    # whHigh = wh > activeVelocity
-    # # whHigh = np.sum(whHigh[: int(whHigh.shape[0] / 2), :, 0], 0) / int(
-    # #     whHigh.shape[0]
-    # # )
-    # whHigh = np.sum(whHigh[: int(whHigh.shape[0]), :, 0], 0) / int(
-    #     whHigh.shape[0]
-    # )
-    # quietTrials = np.where(whLow >= criterion)[0]
-    # activeTrials = np.where(whHigh > criterion)[0]
+
+    if (activeVelocity is None):
+        activeTrials = np.setdiff1d(np.arange(wh.shape[1]), quietTrials)
+    else:
+        whHigh = wh > activeVelocity
+
+        whHigh = np.sum(whHigh[: int(whHigh.shape[0]/fractionToTest),
+                        :, 0], 0) / int(whLow.shape[0]/fractionToTest)
+
+        activeTrials = np.where(whHigh > criterion)[0]
     return quietTrials, activeTrials
 
 
@@ -110,6 +111,7 @@ def make_neuron_db(
     data,
     n,
     blTime=-0.5,
+
 ):
     tf = data["gratingsTf"]
     sf = data["gratingsSf"]
@@ -258,8 +260,8 @@ def run_tests(
     splitter_name,
     x_name,
     y_name,
+    split_test_inds,
     direction=1,
-
 
 ):
     props_reg = np.nan
@@ -269,6 +271,8 @@ def run_tests(
     score_split = np.nan
     dist = np.nan
     p_split = np.nan
+    score_split_specific = np.nan
+    propsDist = np.nan
 
     tunerBase = tunerClass(base_name)
 
@@ -314,7 +318,6 @@ def run_tests(
             res[0] = props_reg
             res[2] = score_constant
             res[3] = score_reg
-            res[7] = tunerBase
             return tuple(res)
 
         # count values
@@ -336,57 +339,7 @@ def run_tests(
             res[0] = props_reg
             res[2] = score_constant
             res[3] = score_reg
-            res[7] = tunerBase
             return tuple(res)
-
-        # # check for each split whether there are still enough values left to fit
-        # if ((len(removeValuesQ) / len(qCounts)) > 0.33) | (((len(removeValuesA) / len(aCounts)) > 0.33)):
-        #     res = make_empty_results(x_name)
-        #     res = list(res)
-        #     res[0] = props_reg
-        #     res[2] = score_constant
-        #     res[3] = score_reg
-        #     res[7] = tunerBase
-        #     return tuple(res)
-        # else:
-        #     # remove only those data points that are missing
-        #     dfq = dfq.drop(dfq[dfq[x_name].isin(removeValues)].index)
-        #     dfa = dfa.drop(dfa[dfa[x_name].isin(removeValues)].index)
-
-        # # now check that there are still enough X values to fit
-        # if ((len(np.unique(dfq[x_name]))) <= 2) | ((len(np.unique(dfa[x_name]))) <= 2):
-        #     res = make_empty_results(x_name)
-        #     res = list(res)
-        #     res[0] = props_reg
-        #     res[2] = score_constant
-        #     res[3] = score_reg
-        #     res[7] = tunerBase
-        #     return tuple(res)
-        # else:
-        #     # now make sure that the same values are fitted
-        #     sharedVals = np.intersect1d(
-        #         np.unique(dfa[x_name]), np.unique(dfq[x_name]))
-        #     dfq = dfq[dfq[x_name].isin(sharedVals)]
-        #     dfa = dfa[dfa[x_name].isin(sharedVals)]
-        # # now make sure there are enough test cases at all
-
-        # if (len(np.unique(dfa[x_name]))) <= 2:
-        #     res = make_empty_results(x_name)
-        #     res = list(res)
-        #     res[0] = props_reg
-        #     res[2] = score_constant
-        #     res[3] = score_reg
-        #     res[7] = tunerBase
-        #     return tuple(res)
-
-        # if (np.any(totCounts<3)):
-        #     res = make_empty_results(x_name)
-        #     res = list(res)
-        #     res[0] = props_reg
-        #     res[2] = score_constant
-        #     res[3] = score_reg
-        #     res[7] = tunerBase
-        #     return tuple(res)
 
         x_sorted = np.append(dfq[x_name].to_numpy(), dfa[x_name].to_numpy())
         y_sorted = direction * np.append(
@@ -402,20 +355,31 @@ def run_tests(
             res[0] = props_reg
             res[2] = score_constant
             res[3] = score_reg
-            res[7] = tunerBase
             return tuple(res)
         score_split = tunerSplit.loo(
             x_sorted,
             y_sorted,
         )
         if score_split > score_reg:
-            dist = tunerSplit.shuffle_split(x_sorted, y_sorted)
+            dist, propsDist = tunerSplit.shuffle_split(
+                x_sorted, y_sorted, returnNull=True)
             p_split = sp.stats.percentileofscore(
                 dist, tunerSplit.auc_diff(df[x_name].to_numpy())
             )
             # if p_split > 50:
             p_split = 100 - p_split
             p_split = p_split / 100
+
+            if (p_split <= 0.05):
+                fixedProps = props_reg[split_test_inds.astype(int)]
+                score_split_specific, propsList = tunerSplit.loo_fix_variables(
+                    x_sorted, y_sorted, fixedProps)
+                maxFixedScore = np.max(score_split_specific)
+                if (maxFixedScore > score_split):
+                    props_split = propsList[np.argmax(score_split_specific), :]
+            else:
+                score_split_specific = np.ones(len(split_test_inds))*np.nan
+
         else:
             p_split = np.nan
     return (
@@ -426,8 +390,9 @@ def run_tests(
         score_split,
         dist,
         p_split,
-        tunerBase,
-        tunerSplit,
+        propsDist,
+        score_split_specific,
+
     )
 
 
@@ -442,7 +407,8 @@ def make_empty_results(resType, *args):
             np.nan,
             np.nan,
             np.nan,
-            np.nan,
+            np.nan
+
         )
     if (str.lower(resType) == "sf") | (str.lower(resType) == "tf"):
         return (
@@ -472,12 +438,28 @@ def make_empty_results(resType, *args):
     return np.nan
 
 
+def remove_blinking_trials(data):
+    blinkTrials = np.zeros(len(data["gratingsSt"]), dtype=bool)
+    if ('pupilDiameter' in data.keys()):
+        pu, pts = align_stim(
+            data['pupilDiameter'],
+            data['pupilTs'],
+            data["gratingsSt"],
+            np.hstack((data["gratingsSt"], data["gratingsEt"])
+                      ) - data["gratingsEt"],
+        )
+        blinksPerTrial = np.sum(np.isnan(pu), axis=0)
+        blinkTrials = blinksPerTrial > 0
+    return blinkTrials
+
+
 def run_complete_analysis(
     gratingRes,
     data,
     ts,
     quietI,
     activeI,
+    blinkTrials,
     n,
     runOri=True,
     runTf=True,
@@ -492,6 +474,9 @@ def run_complete_analysis(
         data,
         n,
     )
+
+    dfAll = dfAll.iloc[~blinkTrials]
+
     res_ori = make_empty_results("Ori")
     res_freq = make_empty_results("Tf")
     res_spatial = make_empty_results("Sf")
@@ -513,7 +498,8 @@ def run_complete_analysis(
             (dfAll.sf == 0.08) & (dfAll.tf == 2) & (dfAll.contrast == 1)
         ]
         res_ori = run_tests(
-            OriTuner, "gauss", "gauss_split", df, "movement", "ori", "avg", resp_direction
+            OriTuner, "gauss", "gauss_split", df, "movement", "ori", "avg", np.array([
+                0, 1]), np.sign(df['avg'].mean())  # resp_direction
         )
 
     else:
@@ -530,7 +516,8 @@ def run_complete_analysis(
 
         df = filter_nonsig_orientations(df, resp_direction, criterion=0.05)
         res_freq = run_tests(
-            FrequencyTuner, "gauss", "gauss_split", df, "movement", "tf", "avg", resp_direction
+            FrequencyTuner, "gauss", "gauss_split", df, "movement", "tf", "avg", np.array([
+                0, 1, 2, 3]), resp_direction
         )
     else:
         res_freq = make_empty_results("Tf")
@@ -543,7 +530,8 @@ def run_complete_analysis(
         ]
         df = filter_nonsig_orientations(df, resp_direction, criterion=0.05)
         res_spatial = run_tests(
-            FrequencyTuner, "gauss", "gauss_split", df, "movement", "sf", "avg", resp_direction
+            FrequencyTuner, "gauss", "gauss_split", df, "movement", "sf", "avg",  np.array([
+                0, 1, 2, 3]), resp_direction
         )
     else:
         res_spatial = make_empty_results("Sf")
@@ -558,6 +546,8 @@ def run_complete_analysis(
             "movement",
             "contrast",
             "avg",
+            np.array([
+                0, 1, 2, 3]),
             resp_direction
         )
     else:
@@ -588,6 +578,10 @@ def load_grating_data(directory):
         "gratingsTf": "gratings.temporalF.npy",
         "wheelTs": "wheel.timestamps.npy",
         "wheelVelocity": "wheel.velocity.npy",
+        "pupilDiameter": "eye.diameter.npy",
+        "pupilTs": "eye.timestamps.npy",
+        "gratingIntervals": "gratingsExp.intervals.npy",
+        "RoiId": "rois.id.npy",
     }
 
     # check if an update exists
@@ -596,6 +590,12 @@ def load_grating_data(directory):
 
     if os.path.exists(os.path.join(directory, "gratings.et.updated.npy")):
         fileNameDic["gratingsEt"] = "gratings.et.updated.npy"
+
+    if os.path.exists(os.path.join(directory, "gratings.temporalF.updated.npy")):
+        fileNameDic["gratingsTf"] = "gratings.temporalF.updated.npy"
+
+    if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
+        fileNameDic["gratingsSf"] = "gratings.spatialF.updated.npy"
     data = {}
     for key in fileNameDic.keys():
         if (key == "planes"):
@@ -603,8 +603,12 @@ def load_grating_data(directory):
                 if(os.path.exists(os.path.join(directory, "calcium.planes.npy"))):
                     os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
                         os.path.join(directory, fileNameDic[key])))
-
-        data[key] = np.load(os.path.join(directory, fileNameDic[key]))
+        if (os.path.exists(os.path.join(directory, fileNameDic[key]))):
+            data[key] = np.load(os.path.join(directory, fileNameDic[key]))
+        else:
+            Warning(
+                f"The file {os.path.join(directory, fileNameDic[key])} does not exist")
+            continue
     return data
 
 

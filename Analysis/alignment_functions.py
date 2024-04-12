@@ -27,11 +27,11 @@ import glob
 import re
 
 
-def get_calcium_aligned(signal, time, eventTimes, window, planes, delays):
+def get_calcium_aligned(signal, time, eventTimes, window, planes, delays, baseline_sub=True):
     aligned = []
     run = 0
-    ps = np.unique(planes).astype(int)    
-        
+    ps = np.unique(planes).astype(int)
+
     for p in range(len(ps)):
         aligned_tmp, t = align_stim(
             signal[:, np.where(planes == ps[p])[0]],
@@ -44,6 +44,9 @@ def get_calcium_aligned(signal, time, eventTimes, window, planes, delays):
             run += 1
         else:
             aligned = np.concatenate((aligned, aligned_tmp), axis=2)
+    aligned = np.array(aligned)
+    if (baseline_sub):
+        aligned -= np.nanmean(aligned[t <= 0, :, :], 0)
     return np.array(aligned), t
 
 

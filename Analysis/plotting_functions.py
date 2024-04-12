@@ -63,9 +63,12 @@ def plot_tf_resp(
             respQ = sp.ndimage.gaussian_filter1d(
                 resp[:, np.intersect1d(Inds, quiet), n], 1.5, axis=0
             )
-            respA = sp.ndimage.gaussian_filter1d(
-                resp[:, np.intersect1d(Inds, active), n], 1.5, axis=0
-            )
+            if (len(active) > 0):
+                respA = sp.ndimage.gaussian_filter1d(
+                    resp[:, np.intersect1d(Inds, active), n], 1.5, axis=0
+                )
+            else:
+                respA = []
 
             ax[-1, orii].set_xlabel(f"time\nOri: {oril}")
             ax[tfi, 0].set_ylabel(f"var: {tfl}\ndf/f")
@@ -79,19 +82,20 @@ def plot_tf_resp(
             ax[tfi, orii].fill_between(
                 ts, m - sd, m + sd, facecolor="b", alpha=0.2
             )
-            m = np.nanmean(respA, 1)
-            sd = sp.stats.sem(respA, 1)
-            ax[tfi, orii].plot(
-                ts,
-                m,
-                "r",
-            )
-            ax[tfi, orii].fill_between(
-                ts, m - sd, m + sd, facecolor="r", alpha=0.2
-            )
-            ax[tfi, orii].spines["right"].set_visible(False)
-            ax[tfi, orii].spines["top"].set_visible(False)
-            f.set_size_inches(8, 8)
+            if (len(respA) > 0):
+                m = np.nanmean(respA, 1)
+                sd = sp.stats.sem(respA, 1)
+                ax[tfi, orii].plot(
+                    ts,
+                    m,
+                    "r",
+                )
+                ax[tfi, orii].fill_between(
+                    ts, m - sd, m + sd, facecolor="r", alpha=0.2
+                )
+                ax[tfi, orii].spines["right"].set_visible(False)
+                ax[tfi, orii].spines["top"].set_visible(False)
+                f.set_size_inches(8, 8)
             # plt.tight_layout()
     return f, ax
 
@@ -140,18 +144,22 @@ def print_fitting_data(
     paramsOri,
     paramsOriSplit,
     varsOri,
+    varSpecificOri,
     pvalOri,
     paramsTf,
     paramsTfSplit,
     varsTf,
+    varSpecificTf,
     pvalTf,
     paramsSf,
     paramsSfSplit,
     varsSf,
+    varSpecificSf,
     pvalSf,
     paramsCon,
     paramsConSplit,
     varsCon,
+    varSpecificCon,
     pvalCon,
     n, respP, direction=1,
     sessionData=None,
@@ -220,7 +228,7 @@ def print_fitting_data(
             f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, pVal dAUC: {np.round(pvalOri[n],3)}"
+            f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, , \nSpecific Vars:{str(varSpecificOri[n,:])} , \n pVal dAUC: {np.round(pvalOri[n],3)}"
         )
         sns.lineplot(
             x=np.arange(0, 360, 0.01),
@@ -228,7 +236,7 @@ def print_fitting_data(
             ax=ax[0],
             color="black",
         )
-        plot_summary_plot(df, x="ori", y="avg", direction=direction,
+        plot_summary_plot(df, x="ori", y="avg", direction=np.sign(df['avg'].mean()),  # direction,
                           line=True, ax=ax[0], color="black")
 
         # divided
@@ -244,7 +252,7 @@ def print_fitting_data(
                 df[df.movement == 0],
                 x="ori",
                 y="avg",
-                direction=direction,
+                direction=np.sign(df['avg'].mean()),  # direction,
                 line=True,
                 ax=ax[1],
                 color="blue",
@@ -261,7 +269,7 @@ def print_fitting_data(
                 x="ori",
                 y="avg",
                 line=True,
-                direction=direction,
+                direction=np.sign(df['avg'].mean()),  # direction,
                 ax=ax[1],
                 color="red",
             )
@@ -298,7 +306,7 @@ def print_fitting_data(
             f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, pVal dAUC: {np.round(pvalTf[n],3)}"
+            f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, \nSpecific Vars:{str(varSpecificTf[n,:])} ,\n pVal dAUC: {np.round(pvalTf[n],3)}"
         )
         sns.lineplot(
             x=fittingRange,
@@ -368,7 +376,7 @@ def print_fitting_data(
             f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, pVal dAUC: {np.round(pvalSf[n],3)}"
+            f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, \nSpecific Vars:{str(varSpecificSf[n,:])} ,\npVal dAUC: {np.round(pvalSf[n],3)}"
         )
         fittingRange = np.arange(df.sf.min(), df.sf.max(), 0.01)
         sns.lineplot(
@@ -439,7 +447,7 @@ def print_fitting_data(
             f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, pVal dAUC: {np.round(pvalCon[n],3)}"
+            f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, \nSpecific Vars:{str(varSpecificCon[n,:])} ,\npVal dAUC: {np.round(pvalCon[n],3)}"
         )
         fittingRange = np.arange(0, 1, 0.01)
         sns.lineplot(
@@ -488,3 +496,337 @@ def print_fitting_data(
             plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.png"))
             plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.pdf"))
             plt.close(f)
+
+
+def print_fitting_combined(
+    gratingRes, ts,
+    quietI,
+    activeI,
+    data,
+    paramsOri,
+    paramsOriSplit,
+    varsOri,
+    varSpecificOri,
+    pvalOri,
+    paramsTf,
+    paramsTfSplit,
+    varsTf,
+    varSpecificTf,
+    pvalTf,
+    paramsSf,
+    paramsSfSplit,
+    varsSf,
+    varSpecificSf,
+    pvalSf,
+    paramsCon,
+    paramsConSplit,
+    varsCon,
+    varSpecificCon,
+    pvalCon,
+    n, respP, direction=1,
+    sessionData=None,
+    saveDir=None,
+    split=True
+):
+    # change structure to fit new data structure
+
+    paramsOriSplit_ = np.zeros((paramsOri.shape[0], 7))
+    paramsTfSplit_ = np.zeros((paramsOri.shape[0], 8))
+    paramsSfSplit_ = np.zeros((paramsOri.shape[0], 8))
+    paramsConSplit_ = np.zeros((paramsOri.shape[0], 8))
+
+    paramsOriSplit_[:, [0, 2, 4, 5, 6]] = paramsOriSplit[:, :, 0]
+    paramsOriSplit_[:, [1, 3, 4, 5, 6]] = paramsOriSplit[:, :, 1]
+
+    paramsTfSplit_[:, ::2] = paramsTfSplit[:, :, 0]
+    paramsTfSplit_[:, 1::2] = paramsTfSplit[:, :, 1]
+
+    paramsSfSplit_[:, ::2] = paramsSfSplit[:, :, 0]
+    paramsSfSplit_[:, 1::2] = paramsSfSplit[:, :, 1]
+
+    paramsConSplit_[:, ::2] = paramsConSplit[:, :, 0]
+    paramsConSplit_[:, 1::2] = paramsConSplit[:, :, 1]
+
+    paramsOriSplit = paramsOriSplit_
+    paramsTfSplit = paramsTfSplit_
+    paramsSfSplit = paramsSfSplit_
+    paramsConSplit = paramsConSplit_
+
+    #################################################################
+
+    dfAll = make_neuron_db(
+        gratingRes,
+        ts,
+        quietI,
+        activeI,
+        data,
+        n,
+    )
+
+    f, axes = plt.subplots(2, 2)
+    # ORI
+    tunerBase = OriTuner("gauss")
+    tunerBase.props = paramsOri[n, :]
+    tunerSplit = OriTuner("gauss_split")
+    tunerSplit.props = paramsOriSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsOri[n, :]))
+    canFitSplit = not np.all(np.isnan(paramsOriSplit[n, :]))
+    ax = axes[0, 0]
+    df = dfAll[(dfAll.sf == 0.08) & (
+        dfAll.tf == 2) & (dfAll.contrast == 1)]
+    ax.set_title('Ori')
+    if (canPrint) & ~split:
+
+        f, ax = plt.subplots(2)
+        f.suptitle(f"Ori Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+
+        # ax[0].set_title(
+        #     f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}"
+        # )
+        # ax[1].set_title(
+        #     f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, , \nSpecific Vars:{str(varSpecificOri[n,:])} , \n pVal dAUC: {np.round(pvalOri[n],3)}"
+        # )
+        sns.lineplot(
+            x=np.arange(0, 360, 0.01),
+            y=tunerBase.func(np.arange(0, 360, 0.01), *paramsOri[n, :]),
+            ax=ax,
+            color="black",
+        )
+        plot_summary_plot(df, x="ori", y="avg", direction=np.sign(df['avg'].mean()),  # direction,
+                          line=True, ax=ax[0], color="black")
+
+    if (canFitSplit) & split:
+        sns.lineplot(
+            x=np.arange(0, 360, 0.01),
+            y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 0),
+            ax=ax,
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="ori",
+            y="avg",
+            direction=np.sign(df['avg'].mean()),  # direction,
+            line=True,
+            ax=ax,
+            color="blue",
+        )
+
+        sns.lineplot(
+            x=np.arange(0, 360, 0.01),
+            y=tunerSplit.predict_split(np.arange(0, 360, 0.01), 1),
+            ax=ax,
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1],
+            x="ori",
+            y="avg",
+            line=True,
+            direction=np.sign(df['avg'].mean()),  # direction,
+            ax=ax,
+            color="red",
+        )
+
+    # temporal
+    tunerBase = FrequencyTuner("gauss")
+    tunerBase.props = paramsTf[n, :]
+    tunerSplit = FrequencyTuner("gauss_split")
+    tunerSplit.props = paramsTfSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsTf[n, :]))
+    # divided
+    canFitSplit = not np.all(np.isnan(paramsTfSplit[n, :]))
+
+    df = dfAll[
+        (dfAll.sf == 0.08)
+        & (dfAll.contrast == 1)
+        & (np.isin(dfAll.ori, [0, 90, 180, 270]))
+    ]
+    df = filter_nonsig_orientations(df, direction, criterion=0.05)
+    fittingRange = np.arange(df[df.tf > 0].tf.min(), df.tf.max(), 0.01)
+    ax = axes[1, 0]
+    ax.set_title('Tf')
+    if (canPrint) & ~split:
+
+        f, ax = plt.subplots(2)
+        f.suptitle(
+            f"Temporal frequency Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        # ax[0].set_title(
+        #     f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}"
+        # )
+        # ax[1].set_title(
+        #     f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, \nSpecific Vars:{str(varSpecificTf[n,:])} ,\n pVal dAUC: {np.round(pvalTf[n],3)}"
+        # )
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerBase.predict(fittingRange),
+            ax=ax,
+            color="black",
+        )
+        plot_summary_plot(df, x="tf", y="avg", direction=direction,
+                          line=True, ax=ax, color="black")
+
+    if (canFitSplit) & split:
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 0),
+            ax=ax,
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="tf",
+            y="avg",
+            direction=direction,
+            line=True,
+            ax=ax,
+            color="blue",
+        )
+
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 1),
+            ax=ax,
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1], x="tf", y="avg", direction=direction, line=True, ax=ax, color="red"
+        )
+
+    ax.set_xscale("log", base=2)
+
+    # spatial
+    tunerBase = FrequencyTuner("gauss")
+    tunerBase.props = paramsSf[n, :]
+    tunerSplit = FrequencyTuner("gauss_split")
+    tunerSplit.props = paramsSfSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsSf[n, :]))
+    # divided
+    canFitSplit = not np.all(np.isnan(paramsSfSplit[n, :]))
+    df = dfAll[
+        (dfAll.tf == 2)
+        & (dfAll.contrast == 1)
+        & (np.isin(dfAll.ori, [0, 90, 180, 270]))
+    ]
+    df = filter_nonsig_orientations(df, direction, criterion=0.05)
+    ax = axes[1, 1]
+    ax.set_title('Sf')
+    fittingRange = np.arange(df.sf.min(), df.sf.max(), 0.01)
+    if (canPrint) & ~split:
+
+        f, ax = plt.subplots(2)
+        f.suptitle(f"Spatial frequency Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        # ax[0].set_title(
+        #     f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)}"
+        # )
+        # ax[1].set_title(
+        #     f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, \nSpecific Vars:{str(varSpecificSf[n,:])} ,\npVal dAUC: {np.round(pvalSf[n],3)}"
+        # )
+
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerBase.predict(fittingRange),
+            ax=ax,
+            color="black",
+        )
+        plot_summary_plot(df, x="sf", y="avg", direction=direction,
+                          line=True, ax=ax, color="black")
+
+    if (canFitSplit) & split:
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 0),
+            ax=ax,
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="sf",
+            y="avg",
+            direction=direction,
+            line=True,
+            ax=ax,
+            color="blue",
+        )
+
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 1),
+            ax=ax,
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1], x="sf", y="avg", direction=direction, line=True, ax=ax, color="red"
+        )
+    ax.set_xscale("log", base=2)
+
+    # contrast
+    tunerBase = ContrastTuner("contrast")
+    tunerBase.props = paramsCon[n, :]
+    tunerSplit = ContrastTuner("contrast_split_full")
+    tunerSplit.props = paramsConSplit[n, :]
+    canPrint = not np.all(np.isnan(paramsCon[n, :]))
+    # divided
+    canFitSplit = not np.all(np.isnan(paramsConSplit[n, :]))
+    df = dfAll[
+        (dfAll.tf == 2)
+        & (dfAll.sf == 0.08)
+    ]
+    df = filter_nonsig_orientations(df, direction, criterion=0.05)
+    ax = axes[0, 1]
+    fittingRange = np.arange(0, 1, 0.01)
+    ax.set_title('Contrast')
+    if (canPrint) & ~split:
+
+        f, ax = plt.subplots(2)
+        f.suptitle(f"Contrast Tuning, Resp p: {np.round(respP[n],3)}")
+        f.subplots_adjust(hspace=2)
+        # ax[0].set_title(
+        #     f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)}"
+        # )
+        # ax[1].set_title(
+        #     f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, \nSpecific Vars:{str(varSpecificCon[n,:])} ,\npVal dAUC: {np.round(pvalCon[n],3)}"
+        # )
+
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerBase.predict(fittingRange),
+            ax=ax,
+            color="black",
+        )
+        plot_summary_plot(df, x="contrast", y="avg",
+                          line=True, direction=direction, ax=ax, color="black")
+
+    if (canFitSplit) & split:
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 0),
+            ax=ax,
+            color="blue",
+        )
+        plot_summary_plot(
+            df[df.movement == 0],
+            x="contrast",
+            y="avg",
+            line=True,
+            ax=ax,
+            direction=direction,
+            color="blue",
+        )
+
+        sns.lineplot(
+            x=fittingRange,
+            y=tunerSplit.predict_split(fittingRange, 1),
+            ax=ax,
+            color="red",
+        )
+        plot_summary_plot(
+            df[df.movement == 1], x="contrast", y="avg", direction=direction, line=True, ax=ax, color="red"
+        )
+
+    return f, ax
+    # ax[0].set_xscale("log", base=2)
+    # ax[1].set_xscale("log", base=2)

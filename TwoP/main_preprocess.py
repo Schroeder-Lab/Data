@@ -17,6 +17,7 @@ from Data.TwoP.general import get_ops_file
 from Data.TwoP.runners import *
 from Data.Bonsai.extract_data import *
 from Data.user_defs import *
+from Data.Bonsai.behaviour_protocol_functions import stimulus_prcoessing_dictionary
 
 # TODO: change folder_defs to user_defs and move one level up
 

@@ -73,6 +73,9 @@ def _process_s2p_singlePlane(
     if plane > len(planeDirs) - 1:
         return None
     currDir = planeDirs[plane]
+    if not(os.path.exists(os.path.join(currDir, "F.npy"))):
+        return None
+
     # Array of fluorescence traces [ROIs x timepoints].
     F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T
     # Array of neuropil traces [ROIs x timepoints].
@@ -611,12 +614,12 @@ def process_s2p_directory(
         os.makedirs(saveDirectory)
     # Creates a list which contains the directories to the subfolders for each
     # plane.
-    planeDirs = list(set(glob.glob(os.path.join(
-        suite2pDirectory, "plane[0-9]*"))) - set(glob.glob(os.path.join(suite2pDirectory, "*backup"))))
+    planeDirs = glob.glob(os.path.join(
+        suite2pDirectory, "plane*"))
     planeDirs = np.sort(planeDirs)
     # Loads the ops dictionary from the combined directory.
     ops = np.load(
-        os.path.join(planeDirs[0], "ops.npy"), allow_pickle=True
+        os.path.join(planeDirs[-1], "ops.npy"), allow_pickle=True
     ).item()
 
     isBoutons = ('selected_plane' in ops.keys())
@@ -625,15 +628,18 @@ def process_s2p_directory(
     # Creates an array with the plane range.
     planeRange = np.arange(len(planeDirs))
     # Removes the ignored plane (if specified) from the plane range array.
-    ignorePlanes = [i for i, s in enumerate(planeDirs) if int(
-        re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
+    if (isBoutons):
+        ignorePlanes = []
+    else:
+        ignorePlanes = [i for i, s in enumerate(planeDirs) if int(
+            re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
     # find what plane directories exist and match piezo plane number to them
 
     if not (len(ignorePlanes) == 0):
         planeRange = np.delete(planeRange, ignorePlanes)
-
-    repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
-    piezoTraces = piezoTraces[:, repPlanes]
+        repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
+        piezoTraces = piezoTraces[:, repPlanes] if not (
+            isBoutons) else piezoTraces[:, ops['selected_plane']]
 
     # Determine the absolute time before processing.
     preTime = time.time()
@@ -664,8 +670,8 @@ def process_s2p_directory(
         p = ops['selected_plane']
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, list([planeDirs[0]]), zstackPath, saveDirectory, piezoTraces[:,
-                                                                                   p].reshape(-1, 1), p
+                pops, list([planeDirs[-1]]), zstackPath, saveDirectory, piezoTraces[:,
+                                                                                    p].reshape(-1, 1), p
             )
             for p in [0]
         )
@@ -697,7 +703,9 @@ def process_s2p_directory(
             # Places the signal into an array.
             res = signalList[i]
             # Specifies which plane each ROI belongs to.
-            planes = np.append(planes, np.ones(res.shape[1]) * planeRange[i])
+
+            planes = np.append(planes, np.ones(res.shape[1]) * planeRange[i]) if not isBoutons else np.append(
+                planes, np.ones(res.shape[1]) * ops['selected_plane'])
     # Specifies number to compare the length of the signals to.
     minLength = np.inf
     for i in range(len(signalList)):
@@ -814,6 +822,10 @@ def process_metadata_directory(
     # The velocity given by the rotary encoder information.
     velocity = []
 
+    # lick spout data
+    licks = []
+    lickTimes = []
+
     stimulusProps = []
     stimulusTypes = []
 
@@ -850,6 +862,7 @@ def process_metadata_directory(
             print("Error is directory: " + di)
             print("Could not load nidaq data")
             print(traceback.format_exc())
+
         try:
             # Gets the frame clock data.
             frameclock = nidaq[:, chans == "frameclock"]
@@ -862,6 +875,7 @@ def process_metadata_directory(
             imagedFrames = np.zeros(frame_in_file) * np.nan
             imagedFrames[: len(firstFrames)] = firstFrames
             planeTimeDelta = np.arange(planes) * frameDiffMedian
+
         except:
             print("Error is directory: " + di)
             print("Could not extract frames, filling up with NaNs")
@@ -878,7 +892,7 @@ def process_metadata_directory(
             propsFile[0], dtype=str, delimiter=",", ndmin=2
         ).T
 
-        if (propTitles[0] == "Spont") | (len(sparseFile) != 0):
+        if ("Spont" in propTitles[0]) | (len(sparseFile) != 0):
             sparseNoise = True
 
         try:
@@ -889,6 +903,8 @@ def process_metadata_directory(
                 photodiode, plot=pops["plot"]
             )
             frameChanges += lastFrame
+            if (len(frameChanges) == 0):
+                raise Exception("No Frames")
 
         except:
             print("Error in frame time extraction in directory: " + di)
@@ -904,6 +920,15 @@ def process_metadata_directory(
             print("Error in stimulus processing in directory: " + di)
             print(traceback.format_exc())
 
+        try:
+            # lick spout
+            lickSpout = np.ones_like(frameclock)*np.nan
+            if ("lick" in chans):
+                lickSpout = nidaq[:, chans == "lick"]
+            licks.append(lickSpout)
+            lickTimes.append(nt+lastFrame)
+        except:
+            print("Could not load licking data")
         # Arduino data handling.
         try:
             # Gets the arduino data (see function for details).
@@ -1035,6 +1060,15 @@ def process_metadata_directory(
         np.save(
             os.path.join(saveDirectory, "body.timestamps.npy"),
             np.hstack(bodyTimes).reshape(-1, 1),
+        )
+    if (len(licks) > 0):
+        np.save(
+            os.path.join(saveDirectory, "spout.timestamps.npy"),
+            np.hstack(lickTimes).reshape(-1, 1),
+        )
+        np.save(
+            os.path.join(saveDirectory, "spout.licks.npy"),
+            np.vstack(licks).reshape(-1, 1),
         )
 
 

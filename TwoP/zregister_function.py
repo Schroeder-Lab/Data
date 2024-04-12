@@ -175,7 +175,14 @@ def z_register_one_file(ops):
         )
         ops_paths = [os.path.join(f, "ops.npy") for f in plane_folders]
         nplanes = len(ops_paths)
-        ops = np.load(ops_paths[0], allow_pickle=True).item()
+        foundOps = False
+        opsI = 0
+        while(not foundOps):
+            if (os.path.exists((ops_paths[opsI]))):
+                ops = np.load(ops_paths[opsI], allow_pickle=True).item()
+                foundOps = True
+            else:
+                opsI += 1
         # compute reference image
         refImgs = []
 
@@ -337,14 +344,18 @@ def z_register_one_file(ops):
 
         # find which plane gives the best median correlation
         maxPlaneCorr = np.nanmax(cmaxs, 2)
-        medianCorr = np.median(maxPlaneCorr, axis=0)
+        medianCorr = np.nanmean(maxPlaneCorr, axis=0)
         # go with the most stable plane and minorly correct according to the zpos
         # of the plane
         bestCorrRefPlane = np.nanargmax(medianCorr)
         ops = np.load(
             ops_paths_clean[bestCorrRefPlane], allow_pickle=True).item()
-        maxCorrId = zposList[bestCorrRefPlane]
+        # get the likelihood at each time point for the selected reference
+        maxCorr = cmaxs[:, bestCorrRefPlane, :]
+        # planeList = np.nanargmax(maxCorr,1)
+        # maxCorrId = zposList[bestCorrRefPlane]
         smooth_images_by_correlation(ops_paths_clean, corrs_all)
+        cmax_selected = cmaxs[:, :, bestCorrRefPlane]
         print("Creating new file")
         # At this point the files are registered properly according to where they are
         # now we need to go over each zposition and replace the frame on the channel with a weighted
@@ -352,8 +363,8 @@ def z_register_one_file(ops):
         # replace_frames_by_zpos(ops, ops_paths, ipl)
         ops = create_new_plane_file(
             ops_paths_clean,
-            maxCorrId,
-            bestCorrRefPlane + 1,
+            bestCorrRefPlane,
+            cmaxs,
             ops["delete_extra_frames"],
         )
     else:
@@ -370,8 +381,8 @@ def z_register_one_file(ops):
     return ops
 
 
-def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra=False):
-    ops0 = np.load(ops_paths[selected_plane - 1], allow_pickle=True).item()
+def create_new_plane_file(ops_paths, selected_plane, cmaxs, delete_extra=False, bfTh=4):
+    ops0 = np.load(ops_paths[selected_plane], allow_pickle=True).item()
     newSavePath = os.path.join(
         ops0["save_path0"], "suite2p", "plane")
 
@@ -384,20 +395,32 @@ def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra=Fal
     newOps["raw_file"] = []
     newOps["reg_file"] = newBinFilePath
     newOps["selected_plane"] = selected_plane
+    # get the likelihood at each time point for the selected reference
+    maxCorr = cmaxs[:, selected_plane, :]
+    planeList = np.nanargmax(maxCorr, 1)
     newOps["ignore_flyback"] = [-1]
     # remove frames with low maximal correlation value
-    cmax = newOps["cmax_registration"]
-    maxCorr = np.nanmax(cmax, 1)
-    newOps["badframes"] = maxCorr < 0.01
+    # cmax = newOps["cmax_registration"]
+    # maxCorr = np.nanmax(cmax, 1)
 
+    maxCorrVals = np.nanmax(maxCorr, 1)
+    meanMax = np.nanmean(maxCorrVals)
+    stdMax = np.nanstd(maxCorrVals)
+    newOps["badframes"] = maxCorrVals <= meanMax-bfTh*stdMax
+
+    newOps['cmaxs'] = cmaxs
+    newOps['current_plane'] = planeList
     n_frames = len(planeList)
     n_chan = newOps["nchannels"]
     align_chan = newOps["align_by_chan"]
+
+    # load ops files
+    ops_list = [np.load(opsp, allow_pickle=True).item() for opsp in ops_paths]
     with BinaryFile(
         Ly=ops0["Ly"], Lx=ops0["Lx"], filename=newBinFilePath, n_frames=n_frames
     ) as newFile:
         for pi, p in enumerate(planeList):
-            ops = np.load(ops_paths[p], allow_pickle=True).item()
+            ops = ops_list[p]
             with BinaryFile(
                 Ly=ops0["Ly"], Lx=ops0["Lx"], filename=ops["reg_file"], n_frames=n_frames
             ) as planeFile:
@@ -413,7 +436,7 @@ def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra=Fal
             Ly=ops0["Ly"], Lx=ops0["Lx"], filename=newBinFilePath_chan2, n_frames=n_frames
         ) as newFile:
             for pi, p in enumerate(planeList):
-                ops = np.load(ops_paths[p], allow_pickle=True).item()
+                ops = ops_list[p]
                 with BinaryFile(
                     Ly=ops0["Ly"], Lx=ops0["Lx"], filename=ops["reg_file_chan2"], n_frames=n_frames
                 ) as planeFile:
@@ -429,7 +452,7 @@ def create_new_plane_file(ops_paths, planeList, selected_plane, delete_extra=Fal
             if twoc else null as f_reg_chan2:
         registration_outputs = register.registration_wrapper(
             f_reg, f_raw=None, f_reg_chan2=f_reg_chan2, f_raw_chan2=None,
-            refImg=newOps['refImg'], align_by_chan2=align_by_chan2, ops=newOps)
+            refImg=newOps['refImg'][selected_plane], align_by_chan2=align_by_chan2, ops=newOps)
         newOps = register.save_registration_outputs_to_ops(
             registration_outputs, newOps)
 

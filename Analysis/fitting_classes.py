@@ -50,6 +50,9 @@ import statsmodels.formula.api as smf
 import traceback
 from abc import ABC, abstractmethod
 import inspect
+import types
+
+from textwrap import dedent
 
 
 # a base class for all fitting classes
@@ -245,6 +248,93 @@ class BaseTuner(ABC):
         R2 = self.score(preds, y)
         return R2
 
+    # expecting a specific ordering
+    # make sure to save the proper func beforehand
+    def dynamic_variable_clamp(self, fixParamInd):
+        saveFunc = self.func
+        fixedVariableName = inspect.getfullargspec(
+            self.func)[0][2*(fixParamInd+1)]
+        clamppedVariable = inspect.getfullargspec(
+            self.func)[0][2*(fixParamInd+1)+1]
+        funcText = dedent(inspect.getsource(self.func))
+        firstNewLine = funcText.find('\n')
+        newfunc = funcText[:firstNewLine] + '\r' + \
+            f"    {fixedVariableName}={clamppedVariable}\n" + \
+            funcText[firstNewLine+1:]
+        newfunc = newfunc.replace(self.func.__name__, 'tempFunc')
+        locals_dict = {}
+        exec(newfunc, globals(), locals_dict)
+        self.__setattr__('tempFunc', locals_dict['tempFunc'])
+        self.func = types.MethodType(self.tempFunc, self)
+        return saveFunc
+
+    def revert_clamp(self, saveFunc):
+        self.func = saveFunc
+
+    def parameter_number(self):
+        return (len(inspect.getfullargspec(self.func)[0])-2)
+
+    def loo_fix_variables(self, x, y, fixedValues, fixedInds=None):
+        N = len(x)
+        R2s = np.ones_like(fixedValues)*np.nan
+        propss = []
+        for vi, v in enumerate(fixedValues):
+            preds = np.ones_like(y) * np.nan
+            p0, bounds = self.set_bounds_p0(x, y)
+            if fixedInds is None:
+                fixedInds = np.arange(0, len(fixedValues)*2, 2, dtype=int)
+            saveFunc = self.dynamic_variable_clamp(vi)
+            # blow = np.asarray(bounds[0], dtype=(np.float64))
+            # bhigh = np.asarray(bounds[1], dtype=(np.float64))
+
+            # blow[fixedInds[vi]] = v-np.finfo(np.float16).eps*2
+            # blow[fixedInds[vi]+1] = v-np.finfo(np.float16).eps*2
+            # bhigh[fixedInds[vi]] = v+np.finfo(np.float16).eps*2
+            # bhigh[fixedInds[vi]+1] = v+np.finfo(np.float16).eps*2
+            # bounds = (blow, bhigh)
+
+            for i in range(N):
+                l = x[i]
+                try:
+                    if not (self.sep is None):
+                        self.sep -= 1
+                    props = self.fit_(
+                        x[np.setdiff1d(range(x.shape[0]), i)],
+                        y[np.setdiff1d(range(y.shape[0]), i)],
+                        self.func,
+                        p0,
+                        bounds,
+                    )
+
+                    if not (self.sep is None):
+                        self.sep += 1
+                        self.state = i
+                    if np.any(np.isnan(props)):
+                        preds[i] = np.nan
+                    else:
+                        props[2*vi] = props[2*vi+1]
+                        preds[i] = self.func(l, *props)
+                except:
+                    print(traceback.format_exc())
+            props = self.fit_(
+                x,
+                y,
+                self.func,
+                p0,
+                bounds,
+            )
+            if not np.any(np.isnan(props)):
+                props[2*vi] = props[2*vi+1]
+            else:
+                props = np.zeros(self.parameter_number())*np.nan
+            propss.append(props)
+            R2 = self.score(preds, y)
+            R2s[vi] = R2
+            self.revert_clamp(saveFunc)
+
+        propss = np.vstack(propss)
+        return R2s, propss
+
     # leave one out
     # @jit(target_backend="cuda")
     def loo(self, x, y):
@@ -321,7 +411,7 @@ class BaseTuner(ABC):
         # pred2 -= np.min(pred2)
         return np.trapz(abs(pred2 - pred1), x=valRange)
 
-    def shuffle_split(self, x, y, nshuff=500):
+    def shuffle_split(self, x, y, nshuff=500, returnNull=False):
         """
         Creates a null distribution for the AUC of the difference between states.
 
@@ -345,7 +435,7 @@ class BaseTuner(ABC):
         vrn = len(valRange)
         vals = np.append(valRange, valRange)
         sep_save = self.sep
-
+        propsDist = []
         for i in range(nshuff):
             ind_surr = np.random.permutation(len(x))
             x_surr = x.copy()[ind_surr]
@@ -361,9 +451,19 @@ class BaseTuner(ABC):
                 # pred2 -= np.nanmin(pred2)
                 diff_auc = np.trapz(np.abs(pred2 - pred1), x=valRange)
                 dist[i] = diff_auc
+
+                if returnNull:
+                    propsDist.append(props)
             else:
                 dist[i] = 0
+                if returnNull:
+                    props = np.ones(self.parameter_number())*np.nan
+                    propsDist.append(props)
+
         self.sep = sep_save
+        if returnNull:
+            propsDist = np.vstack(propsDist)
+            return dist, propsDist
         return dist
 
     # @jit(target_backend="cuda", forceobj=True)
@@ -450,7 +550,7 @@ class BaseTuner(ABC):
         xu = np.unique(x1)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y1[x1 == xuu])
+            avgy[xi] = np.nanmean(y1[x1 == xuu])
 
         min1 = np.nanmin(avgy)
         max1 = np.nanmax(avgy)
@@ -458,7 +558,7 @@ class BaseTuner(ABC):
         xu = np.unique(x2)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y2[x2 == xuu])
+            avgy[xi] = np.nanmean(y2[x2 == xuu])
 
         min2 = np.nanmin(avgy)
         max2 = np.nanmax(avgy)
@@ -484,7 +584,7 @@ class FrequencyTuner(BaseTuner):
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y[x == xuu])
+            avgy[xi] = np.nanmean(y[x == xuu])
         return (
             np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
@@ -502,7 +602,7 @@ class FrequencyTuner(BaseTuner):
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y[x == xuu])
+            avgy[xi] = np.nanmean(y[x == xuu])
 
         p0 = self._make_prelim_guess(x, y)
         xu = np.unique(x)
@@ -511,11 +611,11 @@ class FrequencyTuner(BaseTuner):
 
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
-        bounds = (
-            (np.nanmin(avgy)-0.2*np.abs(np.nanmin(avgy)),
-             0, np.min(xu), 1),
+        bounds = ((
+            np.nanmin(avgy),
+            0, np.min(xu), 1),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             maxAvg+0.2*np.abs(maxAvg), np.max(xu), 10),
+             maxAvg+0.2*np.abs(maxAvg), np.max(xu), 5),
         )
         if ((func is None) & (self.func == self.gauss)) | (
             (not (func is None)) & (func == self.gauss)
@@ -561,8 +661,8 @@ class FrequencyTuner(BaseTuner):
 
                 bounds = (
                     (
-                        min1-0.2*np.abs(min1),
-                        min2-0.2*np.abs(min2),
+                        min1,
+                        min2,
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -663,7 +763,7 @@ class OriTuner(BaseTuner):
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y[x == xuu])
+            avgy[xi] = np.nanmean(y[x == xuu])
         return (
             np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
@@ -676,13 +776,13 @@ class OriTuner(BaseTuner):
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y[x == xuu])
+            avgy[xi] = np.nanmean(y[x == xuu])
 
         p0 = self._make_prelim_guess(x, y)
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (minAvg-0.2*np.abs(minAvg),
+            (minAvg,
              0, 0, 0, 0.7*np.median(np.diff(xu))),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
              maxAvg+0.2*np.abs(maxAvg), 1, 360, 80),
@@ -722,8 +822,8 @@ class OriTuner(BaseTuner):
 
                 bounds = (
                     (
-                        min1-0.2*np.abs(min1),
-                        min2-0.2*np.abs(min2),
+                        min1,
+                        min2,
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -855,7 +955,7 @@ class ContrastTuner(BaseTuner):
         c50d = xu[np.where((avgyn-c50val) < 0)[0][-1]]
         c50 = (c50u + c50d)/2
         return (
-            np.nanmin(avgy),
+            0,  # np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
             c50,
             2,
@@ -872,7 +972,7 @@ class ContrastTuner(BaseTuner):
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (minAvg-0.2*np.abs(minAvg),
+            (0,  # minAvg-0.2*np.abs(minAvg),
              0, np.nanmax([0, p0[-2]-0.5*p0[-2]]), 1),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
              maxAvg+0.2*np.abs(maxAvg), np.nanmin([1, p0[-2]+0.5*p0[-2]]), 10),
@@ -912,8 +1012,8 @@ class ContrastTuner(BaseTuner):
 
                 bounds = (
                     (
-                        min1-0.2*np.abs(min1),
-                        min2-0.2*np.abs(min2),
+                        0,  # min1-0.2*np.abs(min1),
+                        0,  # min2-0.2*np.abs(min2),
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -1115,8 +1215,8 @@ class GammaTuner(BaseTuner):
             np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmedian(avgy),
             1,
-            # 0,
-            2,
+            0,
+            2  # xu[np.argmax(avgy)],
         )
 
     def set_bounds_p0(self, x, y, func=None):
@@ -1129,18 +1229,18 @@ class GammaTuner(BaseTuner):
         maxAvg = np.nanmax(avgy) - np.nanmin(avgy)
         bounds = (
             (
-                minAvg-0.2*np.abs(minAvg),
+                np.min(y),  # minAvg,
                 0,
-                0.01,
-                # -10,
+                -0.01,
+                0,
                 0,
             ),
             (
-                np.nanmedian(avgy),
+                maxAvg,
                 maxAvg,
                 100,
-                # 0,
-                100,
+                5,
+                200,
             ),  # np.nanmax(y),  # np.nanmax(y),
         )
         if ((func is None) & (self.func == self.gamma)) | (
@@ -1275,31 +1375,31 @@ class GammaTuner(BaseTuner):
         else:
             return self.gamma(x, *self.props[[1, 3, 5, 7, 9]])
 
-    def gamma(self, s, r0, A, a, n):
-        # r0 = np.float32(r0)
-        # A = np.float32(A)
-        # a = np.float32(a)
-        tau = 0
-        # n = int(n)
-        res = r0 + A * (
-            (((a * (s - tau)) ** n) * np.exp(-a * (s - tau)))
-            / ((n**n) * np.exp(-n))
-        )
+    # def gamma(self, s, r0, A, a, n):
+    #     # r0 = np.float32(r0)
+    #     # A = np.float32(A)
+    #     # a = np.float32(a)
+    #     tau = 0
+    #     # n = int(n)
+    #     res = r0 + A * (
+    #         (((a * (s - tau)) ** n) * np.exp(-a * (s - tau)))
+    #         / ((n**n) * np.exp(-n))
+    #     )
 
-        return res
+    #     return res
 
-    def gamma_split(self, s, r0q, r0a, Aq, Aa, aq, aa, nq, na):
-        sep = self.sep
+    # def gamma_split(self, s, r0q, r0a, Aq, Aa, aq, aa, nq, na):
+    #     sep = self.sep
 
-        # have one state only to predict
-        if len(np.atleast_1d(c)) == 1:
-            if self.state <= sep:
-                # quiet
-                y = self.gamma(s, r0q, Aq, aq, nq)
-            else:
-                # active
-                y = self.gamma(s, r0a, Aa, aa, na)
-            return y
+    #     # have one state only to predict
+    #     if len(np.atleast_1d(c)) == 1:
+    #         if self.state <= sep:
+    #             # quiet
+    #             y = self.gamma(s, r0q, Aq, aq, nq)
+    #         else:
+    #             # active
+    #             y = self.gamma(s, r0a, Aa, aa, na)
+    #         return y
 
         if not (sep is None):
             quiet = c[:sep]
@@ -1312,40 +1412,40 @@ class GammaTuner(BaseTuner):
 
         return res
 
-    # def gamma(self, s, r0, A, a, tau, n):
-    #     # r0 = np.float32(r0)
-    #     # A = np.float32(A)
-    #     # a = np.float32(a)
-    #     n = int(n)
-    #     res = r0 + A * (
-    #         (((a * (s - tau)) ** n) * np.exp(-a * (s - tau)))
-    #         / ((n**n) * np.exp(-n))
-    #     )
+    def gamma(self, s, r0, A, a, tau, n):
+        # r0 = np.float32(r0)
+        # A = np.float32(A)
+        # a = np.float32(a)
+        n = int(n)
+        res = r0 + A * (
+            (((a * (s - tau)) ** n) * np.exp(-a * (s - tau)))
+            / ((n**n) * np.exp(-n))
+        )
 
-    #     return res
+        return res
 
-    # def gamma_split(self, s, r0q, r0a, Aq, Aa, aq, aa, tauq, taua, nq, na):
-    #     sep = self.sep
-    #     # have one state only to predict
-    #     if len(np.atleast_1d(c)) == 1:
-    #         if self.state <= sep:
-    #             # quiet
-    #             y = self.gamma(s, r0q, Aq, aq, tauq, nq)
-    #         else:
-    #             # active
-    #             y = self.gamma(s, r0a, Aa, aa, taua, na)
-    #         return y
+    def gamma_split(self, s, r0q, r0a, Aq, Aa, aq, aa, tauq, taua, nq, na):
+        sep = self.sep
+        # have one state only to predict
+        if len(np.atleast_1d(c)) == 1:
+            if self.state <= sep:
+                # quiet
+                y = self.gamma(s, r0q, Aq, aq, tauq, nq)
+            else:
+                # active
+                y = self.gamma(s, r0a, Aa, aa, taua, na)
+            return y
 
-    #     if not (sep is None):
-    #         quiet = c[:sep]
-    #         active = c[sep:]
-    #         yq = self.gamma(s, r0q, Aq, aq, tauq, nq)
-    #         ya = self.gamma(s, r0a, Aa, aa, taua, na)
-    #         return np.append(yq, ya)
-    #     else:
-    #         return np.nan
+        if not (sep is None):
+            quiet = c[:sep]
+            active = c[sep:]
+            yq = self.gamma(s, r0q, Aq, aq, tauq, nq)
+            ya = self.gamma(s, r0a, Aa, aa, taua, na)
+            return np.append(yq, ya)
+        else:
+            return np.nan
 
-    #     return res
+        return res
 
 
 class Gauss2DTuner(BaseTuner):
