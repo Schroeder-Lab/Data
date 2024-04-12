@@ -224,16 +224,17 @@ def stimulus_flicker(directory, frameChanges):
     # Gets the identity of the stimuli (see function for
     # further details).
     # stimProps = get_stimulus_info(directory)
-    flicker_stimType = np.zeros(21)  # Asuming 10 reps per each contrast block
+    flicker_stimType = np.zeros(20)  # Asuming 10 reps per each contrast block
 
     flicker_stimType[0::2] = 0.05  # SD from Low contrast
     flicker_stimType[1::2] = 0.175  # SD from High contrast
-
+    flicker_stimType = flicker_stimType.reshape(-1, 1)
+    
     # Checks if number of frames and stimuli match (if not, there
     # could have been an issue with the photodiode, check if there
     # are irregular frames in the photodiode trace).
 
-    if len(flicker_stimType) == len(frameChanges):
+    if (len(flicker_stimType)+1) == len(frameChanges):
 
         # Gets the start times of each stimulus.
         st = frameChanges[:-1].reshape(-1, 1).copy()
@@ -248,7 +249,7 @@ def stimulus_flicker(directory, frameChanges):
 
     return {"flicker.startTime.npy": st,
             "flicker.endTime.npy": et,
-            "flicker.contrast.npy": '',
+            "flicker.contrast.npy": flicker_stimType,
             "flickerExp.intervals.npy": [st[0], et[-1]],
             }
 
@@ -312,8 +313,12 @@ def stimulus_gratingsStep(directory, frameChanges):
     if len(stimProps) != len(st):
 
         warnings.warn("Number of frames and stimuli do not match")
-
-    # TODO: add here corrections for general issues
+        if (len(et) == len(stimProps)):
+            warnings.warn(
+                "Assuming there was a false photodiode rise in the beginning, but check!")
+            st = frameChanges[1::2].reshape(-1, 1).copy()
+            # Gets the end times  of each stimulus.
+            et = frameChanges[2::2].reshape(-1, 1).copy()
 
     # Adds the start and end times from above to the respective
     # lists.

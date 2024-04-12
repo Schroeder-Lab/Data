@@ -59,6 +59,7 @@ for i in range(len(database)):
     (                   
         ephysDirectory,
         metadataDirectory,
+        preprocessedDirectory,
         saveDirectory,
     ) = read_csv_produce_directories_ephys(
         database.loc[i], metadataDir,preprocessedDataDir
@@ -91,10 +92,10 @@ for i in range(len(database)):
             #Find experiment folders dirs
             if database.loc[i].Experiments == 'all':
                 #find experiment folders only, assuming that are all digits
-                experiments  = [os.path.join(metadataDirectory,x) 
-                                for x in os.listdir(metadataDirectory)
-                                if x.isdigit()]
-
+                experiments  = sorted([os.path.join(metadataDirectory,x) 
+                                       for x in os.listdir(metadataDirectory)
+                                       if x.isdigit()],
+                                       key=lambda x: int(os.path.basename(x)))
             else:    
                 experiments = [os.path.join(metadataDirectory,x) 
                                for x in database.loc[i].Experiments.split(',')] 
@@ -103,10 +104,12 @@ for i in range(len(database)):
             ops = {
                     'Experiments':experiments,
                     }
-            
+
+
             process_metadata_directory_ephys(
-                    metadataDirectory, ops, pops, saveDirectory
+                    metadataDirectory, ops, pops, preprocessedDirectory, saveDirectory
                 )
+            
         except Exception:
             print("Could not process due to errors, moving to next batch.")
             print(traceback.format_exc())
