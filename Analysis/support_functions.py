@@ -179,55 +179,22 @@ def is_responsive_direction(df, criterion=0.05):
     """
     direction = 0
 
-    a = df[["ori", "tf", "sf", "contrast"]].to_numpy()
-    b = df["avg_corrected"].to_numpy()
+    # group to find best values
+    dGroups = df.groupby(['ori', 'tf', 'sf', 'contrast'])
+    groupCounts = dGroups.count()
+    groupMeans = dGroups.mean()
+    enoughTrials = np.where(groupCounts['avg_corrected'] >= 10)[0]
+    groupMeans_enough = groupMeans.iloc[enoughTrials]
+    groupMeans_enough['avg_corrected'] = np.abs(
+        groupMeans_enough['avg_corrected'])
+    maxId = groupMeans_enough.idxmax()['avg_corrected']
 
-    # Identify and remove rows with non-finite (NaN or Inf) values.
-    goodInds = np.where(np.isfinite(b))[0]
-    a = a[goodInds, :]
-    b = b[goodInds]
+    bestData = dGroups.get_group(maxId)
 
-    # make sure you can split by rempving single combinations of variables
-    uniqueCombos, comboCount = np.unique(a, axis=0, return_counts=True)
-    uniqueCombos = uniqueCombos[comboCount < 2, :]
+    _, p = sp.stats.ttest_rel(bestData['bl'], bestData['avg'])
 
-    badInds = []
-    for combo in uniqueCombos:
-        badInds_ = np.where((a == combo).all(axis=1))[0]
-        if (len(badInds_) > 0):
-            badInds.append(badInds_)
-    if len(badInds) > 0:
-        badInds = np.vstack(badInds)
-        a = np.delete(a, badInds, axis=0)
-        b = np.delete(b, badInds, axis=0)
-
-    # Split the dataset into training and testing sets.
-    X_train, X_test, y_train, y_test = train_test_split(
-        a, b, test_size=0.20, stratify=a)
-
-    # Fit a linear model to the training data.
-    res = sp.linalg.lstsq(X_train, y_train)
-    # res = sp.linalg.lstsq(a, b)
-    # Calculate the R-squared score for the test data.
-
-    score = r2_score(y_test, X_test @ res[0])
-    # score = r2_score(b, a @ res[0])
-
-    shuffscore = np.zeros(500)
-    for s in range(500):
-        # Shuffle the target variable (b) and fit the model to the shuffled data.`
-        b_ = np.random.permutation(b)
-        res = sp.linalg.lstsq(a, b_)
-        shuffscore[s] = r2_score(b_, a @ res[0])
-
-    # Calculate the percentile rank of the actual score among shuffled scores.
-    p = sp.stats.percentileofscore(shuffscore, score)
-    # Convert the percentile rank to a p-value.
-    p = (100 - p) / 100
-
-    # If the p-value is below the criterion, determine the responsiveness direction.
     if p < (criterion):
-        direction = np.sign(np.nanmean(df["avg_corrected"]))
+        direction = np.sign(np.nanmean(bestData["avg_corrected"]))
     return p, direction
 
 

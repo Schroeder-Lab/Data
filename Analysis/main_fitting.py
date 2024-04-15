@@ -78,7 +78,6 @@ sessions = pd.read_csv(csvDir)
 sessions = sessions[['Name', 'Date',
                      'SpecificNeurons', 'Process']].to_dict('records')
 
-
 # Loads the save directory from the fitting_ops in user_defs.
 saveDirBase = ops["save_dir"]
 processedDataDir = ops["processed files"]
