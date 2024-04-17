@@ -18,7 +18,7 @@ Set  get_sparsenoise_info with only one session and the save directory
 from Data.TwoP.runners import read_directory_dictionary
 from Data.user_defs import (
     define_directories,
-    create_ops_boutton_registration,
+    create_sparse_registration,
     get_sparsenoise_info,
 )
 import numpy as np
@@ -51,7 +51,7 @@ defs = define_directories()
 s2pDir = defs["metadataDir"]
 filePath = read_directory_dictionary(sparseSession, s2pDir)
 # REMEMB
-ops = create_ops_boutton_registration(filePath)
+ops = create_sparse_registration(filePath, tmpSave)
 ops["save_path0"] = tmpSave
 
 # %%
@@ -213,9 +213,9 @@ process_metadata_directory(
 
 # %%
 ts = np.load(os.path.join(ops["save_path0"], "calcium.timestamps.npy"))
-st = np.load(os.path.join(ops["save_path0"], "sparse.st.npy"))
+st = np.load(os.path.join(ops["save_path0"], "sparse.startTime.npy"))
 smap = np.load(os.path.join(ops["save_path0"], "sparse.map.npy"))
-edges = np.load(os.path.join(ops["save_path0"], "sparse.edges.npy"))
+edges = np.load(os.path.join(ops["save_path0"], "sparseExp.edges.npy"))
 
 
 readDir = os.path.join(ops["save_path0"], "suite2p", f"plane{plane}")
@@ -241,6 +241,8 @@ for y in range(smap.shape[1]):
             # find the first instance where s is after the clock time
             firstInd = np.where(s >= ts)[0][-1]
             sw = wt + firstInd
+            if (np.any((t+firstInd)>n_frames)):
+                continue;
             with BinaryFile(
                 Ly=ops["Ly"], Lx=ops["Lx"], filename=binPath, n_frames=n_frames
             ) as f_bin:

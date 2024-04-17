@@ -66,14 +66,14 @@ def define_directories():
         # "D:\\dlc.csv",  # "D:\\preprocess.csv",
         # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
         # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
-        "dataDefFile": "D:\\preprocess.csv",
+        "dataDefFile": "D:\\preprocess_new.csv",
         # "Z:\\ProcessedData\\",  # "D:\\Test\\",
         # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
         # "Z:\\ProcessedData\\",
         # r"D:\\ZcorrectionTest\\BoutonsCorrected\\",
         # "Z:\\ProcessedData\\",
-        "preprocessedDataDir": r"D:\LongitudinalTest",  # "Z:\\ProcessedData\\",
-        # "preprocessedDataDir": "Z://ProcessedData//",
+        # "preprocessedDataDir": r"D:\LongitudinalTest",  # "Z:\\ProcessedData\\",
+        "preprocessedDataDir": "E://ProcessedData//",
         "zstackDir": "Z:\\RawData\\",
         "metadataDir":   "Z:\\RawData\\"  # "Z:\\RawData\\"  # "D:\\Test\\" #", # "D:\\"
     }
@@ -119,7 +119,7 @@ def create_2p_processing_ops():
     """
     pops = {
         "debug": True,
-        "plot": False,
+        "plot": True,
         "f0_percentile": 8,
         "f0_window": 300,
         "Npil_f0_window": 60,
@@ -156,16 +156,16 @@ def create_ops_boutton_registration(filePath, saveDir=None):
     ops["data_path"] = filePath[1:]
 
     ops["look_one_level_down"] = False
-    ops["ignore_flyback"] = [0, 1]
+    ops["ignore_flyback"] = [-1]
     ops["nchannels"] = 2
-    ops["nplanes"] = 8
+    ops["nplanes"] = 1
     ops["functional_chan"] = 1
 
     # registration ops
     ops["keep_movie_raw"] = True
     ops["align_by_chan"] = 2
 
-    ops["block_size"] = [16, 256]
+    ops["block_size"] = [128, 256]
     ops["nonrigid"] = False
     # run for only X number frames
     # ops['frames_include'] = 1000
@@ -173,6 +173,50 @@ def create_ops_boutton_registration(filePath, saveDir=None):
 
     ops["reg_tif"] = False
     ops["reg_tif_chan2"] = False
+    ops["fs"] = 29.97
+
+    # set save folder
+    if (saveDir is None):
+        ops["save_path0"] = filePath[0]
+    else:
+        # get rid of first path
+        p = pathlib.Path(filePath[0])
+        ops["save_path0"] = os.path.join(saveDir, *p.parts[-2:])
+
+    ops["fast_disk"] = ops["save_path0"]
+    # localised optioed
+    ops["delete_extra_frames"] = False
+    ops["run_registration"] = True
+    ops["run_detection"] = True
+
+    # detection settings - do not change
+    ops = create_detection_ops(ops)
+
+    return ops
+
+def create_sparse_registration(filePath, saveDir=None):
+    ops = default_ops()
+    ops["data_path"] = filePath[1:]
+
+    ops["look_one_level_down"] = False
+    ops["ignore_flyback"] = [-1]
+    ops["nchannels"] = 2
+    ops["nplanes"] = 1
+    ops["functional_chan"] = 1
+
+    # registration ops
+    ops["keep_movie_raw"] = True
+    ops["align_by_chan"] = 2
+
+    ops["block_size"] = [128, 256]
+    ops["nonrigid"] = False
+    # run for only X number frames
+    # ops['frames_include'] = 1000
+    ops["maxregshift"] = 0.1
+
+    ops["reg_tif"] = False
+    ops["reg_tif_chan2"] = False
+    ops["fs"] = 29.97
 
     # set save folder
     if (saveDir is None):
@@ -535,13 +579,13 @@ def get_sparsenoise_info():
     session = pd.DataFrame(
         [
             {
-                "Name": "Tara",
-                "Date": "2023-11-01",
+                "Name": "Vesta",
+                "Date": "2024-04-11",
                 "Experiments": [1],
-                "Plane": 2,
+                "Plane": 0,
             }
         ]
     ).iloc[0]
 
-    tempDir = "D:\\sparseTemp\\"
+    tempDir = "D:\\sparseTemp\\test\\"
     return session, tempDir

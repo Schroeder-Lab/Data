@@ -265,7 +265,7 @@ def _process_s2p_singlePlane(
             # Gets the location of each frame in Z based on the highest
             # correlation value.
             zTrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
-                zcorr3, 2, axis=0), axis=0)).astype(int)
+                zcorr, 2, axis=0), axis=0)).astype(int)
             # Computes the Z profiles for each ROI.
             zprofiles = extract_zprofiles(
                 currDir,
@@ -318,7 +318,7 @@ def _process_s2p_singlePlane(
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
-            if not zprofiles is None:
+            if  zprofiles is not None:
                 plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
                 plt.legend(
                     ["Z profile"],
@@ -392,7 +392,7 @@ def _process_s2p_singlePlane(
 
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
-            if not zTrace is None:
+            if zTrace is not None:
 
                 plt.plot(zTrace)
                 plt.gca().invert_yaxis()
@@ -469,7 +469,7 @@ def _process_s2p_singlePlane(
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
-            if not zprofiles is not None:
+            if zprofiles is not None:
                 plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
                 plt.legend(
                     ["Z profile"],
@@ -534,7 +534,7 @@ def _process_s2p_singlePlane(
 
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
-            if not zTrace is not None:
+            if zTrace is not None:
                 plt.plot(zTrace[:500])
                 plt.gca().invert_yaxis()
                 plt.axhline(np.nanmedian(zTrace), c="green")
