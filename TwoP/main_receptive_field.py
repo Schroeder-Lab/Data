@@ -241,8 +241,8 @@ for y in range(smap.shape[1]):
             # find the first instance where s is after the clock time
             firstInd = np.where(s >= ts)[0][-1]
             sw = wt + firstInd
-            if (np.any((t+firstInd)>n_frames)):
-                continue;
+            if (np.any((t+firstInd) > n_frames)):
+                continue
             with BinaryFile(
                 Ly=ops["Ly"], Lx=ops["Lx"], filename=binPath, n_frames=n_frames
             ) as f_bin:
@@ -263,10 +263,10 @@ averageMap_n = averageMap - np.nanmin(averageMap)
 averageMap_n = averageMap_n / np.nanmax(averageMap_n)
 
 
-xEdges = np.linspace(edges[2], edges[3], averageMap.shape[1] + 1)[:, 0]
-yEdges = np.linspace(edges[1], edges[0], averageMap.shape[0] + 1)[:, 0]
-xps = np.round(np.abs((edges[3] - edges[2]) / averageMap.shape[1]), 1)
-yps = np.round(np.abs((edges[0] - edges[1]) / averageMap.shape[0]), 1)
+xEdges = np.linspace(edges[5], edges[6], averageMap.shape[1] + 1)[:, 0]
+yEdges = np.linspace(edges[4], edges[3], averageMap.shape[0] + 1)[:, 0]
+xps = np.round(np.abs((edges[6] - edges[5]) / averageMap.shape[1]), 1)
+yps = np.round(np.abs((edges[4] - edges[3]) / averageMap.shape[0]), 1)
 
 f, ax = plt.subplots(averageMap.shape[0], averageMap.shape[1])
 f.suptitle(
