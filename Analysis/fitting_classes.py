@@ -765,7 +765,7 @@ class OriTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmean(y[x == xuu])
         return (
-            np.nanmin(avgy),
+            0,  # np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
             0,
             xu[np.nanargmax(avgy)],
@@ -782,7 +782,7 @@ class OriTuner(BaseTuner):
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (minAvg,
+            (0,  # minAvg,
              0, 0, 0, 0.7*np.median(np.diff(xu))),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
              maxAvg+0.2*np.abs(maxAvg), 1, 360, 80),
@@ -822,8 +822,8 @@ class OriTuner(BaseTuner):
 
                 bounds = (
                     (
-                        min1,
-                        min2,
+                        0,  # min1,
+                        0,  # min2,
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
