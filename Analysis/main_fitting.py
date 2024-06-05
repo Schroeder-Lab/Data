@@ -73,10 +73,14 @@ ops = create_fitting_ops()
 csvDir = ops["fitting_list"]
 
 sessions = pd.read_csv(csvDir)
-# sessions.insert(2, column='SpecificNeurons', value=[
-#                 [] for _ in range(len(sessions))])
-sessions = sessions[['Name', 'Date',
-                     'SpecificNeurons', 'Process']].to_dict('records')
+
+keys = sessions.keys()
+
+sessions = sessions.to_dict('records')
+
+# did the user specify only specific trials to take
+isSpecificTrials = 'SpecificTrials' in keys
+
 
 # Loads the save directory from the fitting_ops in user_defs.
 saveDirBase = ops["save_dir"]
@@ -99,6 +103,35 @@ for currSession in sessions:
         # Makes save dir for later.
         if not os.path.isdir(saveDir):
             os.makedirs(saveDir)
+
+        # remove unwanted trials if required
+        if (isSpecificTrials):
+            if type(currSession['SpecificTrials']) is str:
+                specificTrials = eval(currSession['SpecificTrials'])
+                gratingsIntervals = data["gratingIntervals"]
+
+                if gratingsIntervals.shape[1] == 1:
+                    # mistake reshape properly
+                    gratingsIntervals = gratingsIntervals.reshape(-1, 2)
+                chosenIntervals = gratingsIntervals[specificTrials, :]
+
+                # find indices of trials in ranges
+                totalInds = []
+                for interval in chosenIntervals:
+                    inds = np.where((data["gratingsSt"] >= interval[0]) & (
+                        data["gratingsEt"] <= interval[1]))[0]
+                    totalInds.append(inds)
+
+                totalInds = np.vstack(totalInds)
+
+                # change all possible data
+                data["gratingIntervals"] = chosenIntervals
+                data["gratingsContrast"] = data["gratingsContrast"][totalInds, :]
+                data["gratingsEt"] = data["gratingsEt"][totalInds, :]
+                data["gratingsOri"] = data["gratingsOri"][totalInds, :]
+                data["gratingsSf"] = data["gratingsSf"][totalInds, :]
+                data["gratingsSt"] = data["gratingsSt"][totalInds, :]
+                data["gratingsTf"] = data["gratingsTf"][totalInds, :]
 
         print("getting aligned signal")
         gratingRes, ts = get_calcium_aligned(
@@ -185,39 +218,83 @@ for currSession in sessions:
         fittingRange = currSession["SpecificNeurons"]
         # assume to wants to redo only those, so try reloading existing data first
         try:
-            respP = np.load(os.path.join(saveDir, "resp.pval.npy"))
-            respDirection = np.load(
-                os.path.join(saveDir, "resp.direction.npy")
-            )
+            respP = np.load(os.path.join(saveDir, "gratingResp.pVal.npy"))
+            respDirection = np.load(os.path.join(
+                saveDir, "gratingResp.direction.npy"))
 
-            paramsOri = np.load(os.path.join(saveDir, "fit.ori.params.npy"))
-            paramsOriSplit = np.load(
-                os.path.join(saveDir, "fit.ori.split.params.npy")
-            )
-            varsOri = np.load(os.path.join(saveDir, "fit.ori.vars.npy"))
-            pvalOri = np.load(os.path.join(saveDir, "fit.ori.pval.npy"))
+            if (ops["fitOri"]):
+                paramsOri = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.params.npy"))
+                paramsOriSplit = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.paramsRunning.npy"))
+                varOriConst = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.expVar.constant.npy"))
+                varOriOne = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.expVar.noSplit.npy"))
+                varOriSplit = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.expVar.runningSplit.npy"))
+                varSpecificOri = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.expVar.runningSplitSpecific.npy"))
+                pvalOri = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.pVal.runningSplit.npy"))
+                paramsDistOri = np.load(os.path.join(
+                    saveDir, "gratingOriTuning.pVal.paramsRunningNullDist.npy"))
 
-            paramsTf = np.load(os.path.join(saveDir, "fit.tf.params.npy"))
-            paramsTfSplit = np.load(
-                os.path.join(saveDir, "fit.tf.split.params.npy")
-            )
-            varsTf = np.load(os.path.join(saveDir, "fit.tf.vars.npy"))
-            pvalTf = np.load(os.path.join(saveDir, "fit.tf.pval.npy"))
+            if (ops["fitTf"]):
+                paramsTf = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.params.npy"))
+                paramsTfSplit = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.paramsRunning.npy"))
+                varTfConst = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.expVar.constant.npy"))
+                varTfOne = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.expVar.noSplit.npy"))
+                varTfSplit = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.expVar.runningSplit.npy"))
+                varSpecificTf = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.expVar.runningSplitSpecific.npy"))
+                pvalTf = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.pVal.runningSplit.npy"))
+                paramsDistTf = np.load(os.path.join(
+                    saveDir, "gratingTfTuning.pVal.paramsRunningNullDist.npy"))
 
-            paramsSf = np.load(os.path.join(saveDir, "fit.sf.params.npy"))
-            paramsSfSplit = np.load(
-                os.path.join(saveDir, "fit.sf.split.params.npy")
-            )
-            varsSf = np.load(os.path.join(saveDir, "fit.sf.vars.npy"))
-            pvalSf = np.load(os.path.join(saveDir, "fit.sf.pval.npy"))
+            if (ops["fitSf"]):
+                paramsSf = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.params.npy"))
+                paramsSfSplit = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.paramsRunning.npy"))
+                varSfConst = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.expVar.constant.npy"))
+                varSfOne = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.expVar.noSplit.npy"))
+                varSfSplit = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.expVar.runningSplit.npy"))
+                varSpecificSf = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.expVar.runningSplitSpecific.npy"))
+                pvalSf = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.pVal.runningSplit.npy"))
+                paramsDistSf = np.load(os.path.join(
+                    saveDir, "gratingSfTuning.pVal.paramsRunningNullDist.npy"))
 
-            paramsCon = np.load(os.path.join(saveDir, "fit.con.params.npy"))
-            paramsConSplit = np.load(
-                os.path.join(saveDir, "fit.con.split.params.npy")
-            )
-            varsCon = np.load(os.path.join(saveDir, "fit.con.vars.npy"))
-            pvalCon = np.load(os.path.join(saveDir, "fit.con.pval.npy"))
+            if (ops["fitContrast"]):
+                paramsCon = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.params.npy"))
+                paramsConSplit = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.paramsRunning.npy"))
+                varConConst = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.expVar.constant.npy"))
+                varConOne = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.expVar.noSplit.npy"))
+                varConSplit = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.expVar.runningSplit.npy"))
+                varSpecificCon = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.expVar.runningSplitSpecific.npy"))
+                pvalCon = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.pVal.runningSplit.npy"))
+                paramsDistCon = np.load(os.path.join(
+                    saveDir, "gratingContrastTuning.pVal.paramsRunningNullDist.npy"))
         except:
+            print('could not load existing data')
             pass
 
     blinkTrials = remove_blinking_trials(data)

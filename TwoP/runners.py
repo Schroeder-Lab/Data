@@ -318,7 +318,7 @@ def _process_s2p_singlePlane(
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
-            if  zprofiles is not None:
+            if ((not (zprofiles is None)) & (not (zTrace is None))):
                 plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
                 plt.legend(
                     ["Z profile"],
@@ -351,7 +351,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace.shape[0])
+            plt.xlim(0, dF.shape[0])
 
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
 
@@ -364,7 +364,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace.shape[0])
+            plt.xlim(0, dF.shape[0])
 
             xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
 
@@ -376,7 +376,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace.shape[0])
+            plt.xlim(0, dF.shape[0])
 
             xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
 
@@ -388,7 +388,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace.shape[0])
+            plt.xlim(0, dF.shape[0])
 
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
@@ -499,7 +499,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace[:500].shape[0])
+            plt.xlim(0, dF[:500].shape[0])
 
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
             plt.plot(Fc[:500, i], "k")
@@ -510,7 +510,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace[:500].shape[0])
+            plt.xlim(0, dF[:500].shape[0])
 
             xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
             plt.plot(dF[:500, i], "b", linewidth=3)
@@ -520,7 +520,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace[:500].shape[0])
+            plt.xlim(0, dF[:500].shape[0])
 
             xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
             plt.plot(Fcz[:500, i], c="purple")
@@ -530,7 +530,7 @@ def _process_s2p_singlePlane(
             )
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, zTrace[:500].shape[0])
+            plt.xlim(0, dF[:500].shape[0])
 
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
@@ -544,7 +544,7 @@ def _process_s2p_singlePlane(
                 )
                 plt.xlabel("time (frames)")
                 plt.tick_params(axis='y', labelright=True, labelleft=False)
-                plt.xlim(0, zTrace[:500].shape[0])
+                plt.xlim(0, dF[:500].shape[0])
 
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()

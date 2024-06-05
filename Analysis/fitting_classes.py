@@ -328,6 +328,7 @@ class BaseTuner(ABC):
             else:
                 props = np.zeros(self.parameter_number())*np.nan
             propss.append(props)
+            preds[np.isnan(preds)] = np.nanmean(y)
             R2 = self.score(preds, y)
             R2s[vi] = R2
             self.revert_clamp(saveFunc)
@@ -765,7 +766,7 @@ class OriTuner(BaseTuner):
         for xi, xuu in enumerate(xu):
             avgy[xi] = np.nanmean(y[x == xuu])
         return (
-            0,  # np.nanmin(avgy),
+            np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
             0,
             xu[np.nanargmax(avgy)],
@@ -782,7 +783,7 @@ class OriTuner(BaseTuner):
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (0,  # minAvg,
+            (minAvg,
              0, 0, 0, 0.7*np.median(np.diff(xu))),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
              maxAvg+0.2*np.abs(maxAvg), 1, 360, 80),
@@ -822,8 +823,8 @@ class OriTuner(BaseTuner):
 
                 bounds = (
                     (
-                        0,  # min1,
-                        0,  # min2,
+                        min1,
+                        min2,
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -950,14 +951,16 @@ class ContrastTuner(BaseTuner):
 
         avgyn = avgy-np.nanmin(avgy)
         c50val = 0.5*(np.nanmax(avgyn))
-
-        c50u = xu[np.where((avgyn-c50val) > 0)[0][0]]
-        c50d = xu[np.where((avgyn-c50val) < 0)[0][-1]]
-        c50 = (c50u + c50d)/2
+        try:
+            c50u = xu[np.where((avgyn-c50val) > 0)[0][0]]
+            c50d = xu[np.where((avgyn-c50val) < 0)[0][-1]]
+            c50 = (c50u + c50d)/2
+        except:
+            c50 = 0.5
         return (
-            0,  # np.nanmin(avgy),
+            np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
-            c50,
+            np.nanmin(c50, 1),
             2,
         )
 
@@ -972,10 +975,10 @@ class ContrastTuner(BaseTuner):
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (0,  # minAvg-0.2*np.abs(minAvg),
-             0, np.nanmax([0, p0[-2]-0.5*p0[-2]]), 1),
+            (minAvg,
+             0, 0, 1),
             (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             maxAvg+0.2*np.abs(maxAvg), np.nanmin([1, p0[-2]+0.5*p0[-2]]), 10),
+             maxAvg+0.2*np.abs(maxAvg), 1, 10),
         )
         if ((func is None) & (self.func == self.hyperbolic)) | (
             (not (func is None)) & (func == self.hyperbolic)
@@ -1012,8 +1015,8 @@ class ContrastTuner(BaseTuner):
 
                 bounds = (
                     (
-                        0,  # min1-0.2*np.abs(min1),
-                        0,  # min2-0.2*np.abs(min2),
+                        min1-0.2*np.abs(min1),
+                        min2-0.2*np.abs(min2),
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -1213,10 +1216,10 @@ class GammaTuner(BaseTuner):
 
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy) - np.nanmedian(avgy),
-            1,
+            np.nanmax(avgy),
+            0.1,
             0,
-            2  # xu[np.argmax(avgy)],
+            2,
         )
 
     def set_bounds_p0(self, x, y, func=None):
@@ -1229,17 +1232,17 @@ class GammaTuner(BaseTuner):
         maxAvg = np.nanmax(avgy) - np.nanmin(avgy)
         bounds = (
             (
-                np.min(y),  # minAvg,
+                minAvg,
                 0,
-                -0.01,
+                -0.1,
                 0,
                 0,
             ),
             (
-                maxAvg,
-                maxAvg,
+                np.nanmax(avgy),
+                2*maxAvg,
                 100,
-                5,
+                1,
                 200,
             ),  # np.nanmax(y),  # np.nanmax(y),
         )
@@ -1291,8 +1294,8 @@ class GammaTuner(BaseTuner):
                     p0_[2],
                     p0_[3],
                     p0_[3],
-                    # p0_[4],
-                    # p0_[4],
+                    p0_[4],
+                    p0_[4],
 
                 )
 
@@ -1401,16 +1404,16 @@ class GammaTuner(BaseTuner):
     #             y = self.gamma(s, r0a, Aa, aa, na)
     #         return y
 
-        if not (sep is None):
-            quiet = c[:sep]
-            active = c[sep:]
-            yq = self.gamma(s, r0q, Aq, aq, nq)
-            ya = self.gamma(s, r0a, Aa, aa, na)
-            return np.append(yq, ya)
-        else:
-            return np.nan
+    #     if not (sep is None):
+    #         quiet = c[:sep]
+    #         active = c[sep:]
+    #         yq = self.gamma(s, r0q, Aq, aq, nq)
+    #         ya = self.gamma(s, r0a, Aa, aa, na)
+    #         return np.append(yq, ya)
+    #     else:
+    #         return np.nan
 
-        return res
+    #     return res
 
     def gamma(self, s, r0, A, a, tau, n):
         # r0 = np.float32(r0)
@@ -1425,7 +1428,7 @@ class GammaTuner(BaseTuner):
         return res
 
     def gamma_split(self, s, r0q, r0a, Aq, Aa, aq, aa, tauq, taua, nq, na):
-        sep = self.sep
+        # sep = self.sep
         # have one state only to predict
         if len(np.atleast_1d(c)) == 1:
             if self.state <= sep:

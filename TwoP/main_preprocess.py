@@ -99,9 +99,11 @@ for i in range(len(database)):
                 process_metadata_directory(
                     metadataDirectory, ops, pops, saveDirectory
                 )
+
         except Exception:
             print("Could not process due to errors, moving to next batch.")
             print(traceback.format_exc())
+        plt.close('all')
     # if False in the column "Process", the processing of those experiments is
     # skipped.
     else:

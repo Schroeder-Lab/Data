@@ -76,6 +76,9 @@ def get_trial_classification_running(
 ):
     wheelVelocity = np.abs(wheelVelocity)
 
+    stimSt = stimSt.reshape(-1, 1)
+    stimEt = stimEt.reshape(-1, 1)
+
     wh, ts = align_stim(
         wheelVelocity,
         wheelTs,
@@ -341,9 +344,21 @@ def run_tests(
                 fixedProps = props_reg[split_test_inds.astype(int)]
                 score_split_specific, propsList = tunerSplit.loo_fix_variables(
                     x_sorted, y_sorted, fixedProps)
-                maxFixedScore = np.max(score_split_specific)
-                if (maxFixedScore > score_split):
-                    props_split = propsList[np.argmax(score_split_specific), :]
+
+                # ignore cases were the fixed case could not actually fit well
+                score_split_specific_ = score_split_specific[~np.any(
+                    np.isnan(propsList), axis=1)]
+                propsList_ = propsList[~np.any(np.isnan(propsList), axis=1)]
+
+                score_split_specific[np.any(
+                    np.isnan(propsList), axis=1)] = np.nan
+                propsList[np.any(np.isnan(propsList), axis=1)] = np.nan
+
+                if (len(propsList_) > 0):
+                    maxFixedScore = np.max(score_split_specific_)
+                    if (maxFixedScore > score_split):
+                        props_split = propsList_[
+                            np.argmax(score_split_specific_), :]
             else:
                 score_split_specific = np.ones(len(split_test_inds))*np.nan
 
@@ -412,8 +427,8 @@ def remove_blinking_trials(data):
             data['pupilDiameter'],
             data['pupilTs'],
             data["gratingsSt"],
-            np.hstack((data["gratingsSt"], data["gratingsEt"])
-                      ) - data["gratingsEt"],
+            np.hstack((data["gratingsSt"].reshape(-1, 1), data["gratingsEt"].reshape(-1, 1))
+                      ) - data["gratingsEt"].reshape(-1, 1),
         )
         blinksPerTrial = np.sum(np.isnan(pu), axis=0)
         blinkTrials = blinksPerTrial > 0
@@ -563,6 +578,11 @@ def load_grating_data(directory):
 
     if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
         fileNameDic["gratingsSf"] = "gratings.spatialF.updated.npy"
+
+    if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
+        fileNameDic["gratingsOri"] = "gratings.direction.updated.npy"
+    if os.path.exists(os.path.join(directory, "gratings.contrast.updated.npy")):
+        fileNameDic["gratingsContrast"] = "gratings.contrast.updated.npy"
     data = {}
     for key in fileNameDic.keys():
         if (key == "planes"):
