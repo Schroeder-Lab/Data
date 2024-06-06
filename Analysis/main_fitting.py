@@ -144,16 +144,18 @@ for currSession in sessions:
         )
 
         print("getting trial classification")
-        quietI, activeI = get_trial_classification_running(
-            data["wheelVelocity"],
-            data["wheelTs"],
-            data["gratingsSt"],
-            data["gratingsEt"],
-            activeVelocity=ops["active_velocity"],
-            quietVelocity=ops["quiet_velocity"],
-            fractionToTest=ops["fraction_to_test"],
-            criterion=ops["criterion"],
-        )
+        if (ops["classifciationType"] == "running"):
+            quietI, activeI = get_trial_classification_running(
+                data["wheelVelocity"],
+                data["wheelTs"],
+                data["gratingsSt"],
+                data["gratingsEt"],
+                activeVelocity=ops["active_velocity"],
+                quietVelocity=ops["quiet_velocity"],
+                fractionToTest=ops["fraction_to_test"],
+                criterion=ops["criterion"],
+            )
+
     except:
         print(
             f"Could not loads basic files needed for session\n {currSession}")
