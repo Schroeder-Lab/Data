@@ -66,14 +66,14 @@ def define_directories():
         # "D:\\dlc.csv",  # "D:\\preprocess.csv",
         # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
         # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
-        "dataDefFile": "D:\\preprocess_new.csv",
+        "dataDefFile": "D:\\preprocessTest.csv",
         # "Z:\\ProcessedData\\",  # "D:\\Test\\",
         # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
         # "Z:\\ProcessedData\\",
         # r"D:\\ZcorrectionTest\\BoutonsCorrected\\",
         # "Z:\\ProcessedData\\",
         # "preprocessedDataDir": r"D:\LongitudinalTest",  # "Z:\\ProcessedData\\",
-        "preprocessedDataDir": "E://ProcessedData//",
+        "preprocessedDataDir": "Z:\\ProcessedData\\",
         "zstackDir": "Z:\\RawData\\",
         "metadataDir":   "Z:\\RawData\\"  # "Z:\\RawData\\"  # "D:\\Test\\" #", # "D:\\"
     }
@@ -125,7 +125,7 @@ def create_2p_processing_ops():
         "Npil_f0_window": 60,
         "zcorrect_mode": "Stack",
         "remove_z_extremes": True,
-        "process_suite2p": True,
+        "process_suite2p": False,
         "process_bonsai": True,
         "absZero": None,
     }
@@ -194,6 +194,7 @@ def create_ops_boutton_registration(filePath, saveDir=None):
 
     return ops
 
+
 def create_sparse_registration(filePath, saveDir=None):
     ops = default_ops()
     ops["data_path"] = filePath[1:]
@@ -246,11 +247,15 @@ def create_fitting_ops():
         "quiet_velocity": 0.5,
         "fraction_to_test": 1,
         "criterion": 0.9,
-        "save_dir": r"D:\\fitting_test_harsh_complete\\",
+        "save_dir": r"D:\\OCNCData\\",
         "processed files": "Z:\\ProcessedData",
         "fitting_list": "D:\\fitting_all.csv",
+
+        # how to classify trials can be: "running"/"pupil"/"pupil-stationary"
+        "classification": "running",
+
         "fitOri": True,
-        "fitTf": True,
+        "fitTf": False,
         "fitSf": True,
         "fitContrast": True
     }

@@ -144,7 +144,7 @@ for currSession in sessions:
         )
 
         print("getting trial classification")
-        if (ops["classifciationType"] == "running"):
+        if (ops["classification"] == "running"):
             quietI, activeI = get_trial_classification_running(
                 data["wheelVelocity"],
                 data["wheelTs"],
