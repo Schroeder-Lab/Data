@@ -929,6 +929,28 @@ def process_metadata_directory(
             lickTimes.append(nt+lastFrame)
         except:
             print("Could not load licking data")
+        # get video data if possible
+        try:
+            nframes1 = np.nan
+            nframes2 = np.nan
+            # Get actual video data
+            vfile = glob.glob(os.path.join(
+                di, "Video[0-9]*.avi"))  # eye
+            if (len(vfile) > 0):
+                vfile = vfile[0]
+                video1 = cv2.VideoCapture(vfile)
+                nframes1 = int(video1.get(cv2.CAP_PROP_FRAME_COUNT))
+            vfile = glob.glob(os.path.join(
+                di, "Video[a-zA-Z]*.avi"))  # body
+            if (len(vfile) > 0):
+                vfile = vfile[0]
+                video2 = cv2.VideoCapture(vfile)
+                nframes2 = int(video2.get(cv2.CAP_PROP_FRAME_COUNT))
+            # number of frames
+
+        except:
+            print("Error in loading video file in directory: " + di)
+            print(traceback.format_exc())
         # Arduino data handling.
         try:
             # Gets the arduino data (see function for details).
@@ -1020,9 +1042,22 @@ def process_metadata_directory(
             except:
                 print("Error in camera processing in directory: " + di)
                 print(traceback.format_exc())
+                # make a nan array with length of video (cannot place the time)
+                print('filling the possible times with empty timestamps')
+                if ~np.isnan(nframes1):
+                    faceTimes.append(np.ones(nframes1)*np.nan)
+                if ~np.isnan(nframes2):
+                    bodyTimes.append(np.ones(nframes2)*np.nan)
+
         except:
             print("Error in arduino processing in directory: " + di)
             print(traceback.format_exc())
+
+            print('filling the possible times with empty timestamps')
+            if ~np.isnan(nframes1):
+                faceTimes.append(np.ones(nframes1)*np.nan)
+            if ~np.isnan(nframes2):
+                bodyTimes.append(np.ones(nframes2)*np.nan)
 
         # Gets the last frame from the previous experiment.
         # This is then added to all the different times so the times for the

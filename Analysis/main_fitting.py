@@ -54,7 +54,10 @@ from support_functions import (
     get_trial_classification_running,
     run_complete_analysis,
     get_directory_from_session,
-    remove_blinking_trials
+    remove_blinking_trials,
+    get_pupil_exponential_decay,
+    get_trial_classification_pupil,
+    take_specific_trials
 )
 
 from Data.user_defs import define_directories
@@ -78,9 +81,9 @@ keys = sessions.keys()
 
 sessions = sessions.to_dict('records')
 
+sessions = [sessions[88]]
 # did the user specify only specific trials to take
 isSpecificTrials = 'SpecificTrials' in keys
-
 
 # Loads the save directory from the fitting_ops in user_defs.
 saveDirBase = ops["save_dir"]
@@ -144,7 +147,7 @@ for currSession in sessions:
         )
 
         print("getting trial classification")
-        if (ops["classification"] == "running"):
+        if (ops["classification"] == "running") | (ops["classification"] == "pupil-stationary"):
             quietI, activeI = get_trial_classification_running(
                 data["wheelVelocity"],
                 data["wheelTs"],
@@ -152,6 +155,31 @@ for currSession in sessions:
                 data["gratingsEt"],
                 activeVelocity=ops["active_velocity"],
                 quietVelocity=ops["quiet_velocity"],
+                fractionToTest=ops["fraction_to_test"],
+                criterion=ops["criterion"],
+            )
+        if (ops["classification"] == "pupil-stationary"):
+            tau, decayTime, runPupilTimes, scaledTrace = get_pupil_exponential_decay(data['pupilTs'], data['pupilDiameter'].copy(
+            ), data['wheelTs'], data['wheelVelocity'], runTh=0.1, velTh=1, durTh=2, interTh=5)
+
+            data, gratingRes = take_specific_trials(
+                data, gratingRes, quietI, runPupilTimes)
+
+            quietI, activeI = get_trial_classification_pupil(
+                data["pupilDiameter"],
+                data["pupilTs"],
+                data["gratingsSt"],
+                data["gratingsEt"],
+                fractionToTest=ops["fraction_to_test"],
+                criterion=ops["criterion"],
+            )
+
+        if (ops["classification"] == "pupil"):
+            quietI, activeI = get_trial_classification_pupil(
+                data["pupilDiameter"],
+                data["pupilTs"],
+                data["gratingsSt"],
+                data["gratingsEt"],
                 fractionToTest=ops["fraction_to_test"],
                 criterion=ops["criterion"],
             )
@@ -388,73 +416,221 @@ for currSession in sessions:
     np.save(os.path.join(saveDir, "gratingResp.pVal.npy"), respP)
     np.save(os.path.join(saveDir, "gratingResp.direction.npy"), respDirection)
 
-    if (ops["fitOri"]):
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.params.npy"), paramsOri)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.paramsRunning.npy"), paramsOriSplit)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.expVar.constant.npy"), varOriConst)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.expVar.noSplit.npy"), varOriOne)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.expVar.runningSplit.npy"), varOriSplit)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.expVar.runningSplitSpecific.npy"), varSpecificOri)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.pVal.runningSplit.npy"), pvalOri)
-        np.save(os.path.join(
-            saveDir, "gratingOriTuning.pVal.paramsRunningNullDist.npy"), paramsDistOri)
+    if (ops["classification"] == "running"):
+        if (ops["fitOri"]):
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.params.npy"), paramsOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.paramsRunning.npy"), paramsOriSplit)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.constant.npy"), varOriConst)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.noSplit.npy"), varOriOne)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.runningSplit.npy"), varOriSplit)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.runningSplitSpecific.npy"), varSpecificOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.pVal.runningSplit.npy"), pvalOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.pVal.paramsRunningNullDist.npy"), paramsDistOri)
 
-    if (ops["fitTf"]):
-        np.save(os.path.join(saveDir, "gratingTfTuning.params.npy"), paramsTf)
-        np.save(os.path.join(
-            saveDir, "gratingTfTuning.paramsRunning.npy"), paramsTfSplit)
-        np.save(os.path.join(
-            saveDir, "gratingTfTuning.expVar.constant.npy"), varTfConst)
-        np.save(os.path.join(saveDir, "gratingTfTuning.expVar.noSplit.npy"), varTfOne)
-        np.save(os.path.join(
-            saveDir, "gratingTfTuning.expVar.runningSplit.npy"), varTfSplit)
-        np.save(os.path.join(
-            saveDir, "gratingTfTuning.expVar.runningSplitSpecific.npy"), varSpecificTf)
-        np.save(os.path.join(
-            saveDir, "gratingTfTuning.pVal.runningSplit.npy"), pvalTf)
-        np.save(os.path.join(
-            saveDir, "gratingTfTuning.pVal.paramsRunningNullDist.npy"), paramsDistTf)
+        if (ops["fitTf"]):
+            np.save(os.path.join(saveDir, "gratingTfTuning.params.npy"), paramsTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.paramsRunning.npy"), paramsTfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.constant.npy"), varTfConst)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.noSplit.npy"), varTfOne)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.runningSplit.npy"), varTfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.runningSplitSpecific.npy"), varSpecificTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.pVal.runningSplit.npy"), pvalTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.pVal.paramsRunningNullDist.npy"), paramsDistTf)
 
-    if (ops["fitSf"]):
-        np.save(os.path.join(saveDir, "gratingSfTuning.params.npy"), paramsSf)
-        np.save(os.path.join(
-            saveDir, "gratingSfTuning.paramsRunning.npy"), paramsSfSplit)
-        np.save(os.path.join(
-            saveDir, "gratingSfTuning.expVar.constant.npy"), varSfConst)
-        np.save(os.path.join(saveDir, "gratingSfTuning.expVar.noSplit.npy"), varSfOne)
-        np.save(os.path.join(
-            saveDir, "gratingSfTuning.expVar.runningSplit.npy"), varSfSplit)
-        np.save(os.path.join(
-            saveDir, "gratingSfTuning.expVar.runningSplitSpecific.npy"), varSpecificSf)
-        np.save(os.path.join(
-            saveDir, "gratingSfTuning.pVal.runningSplit.npy"), pvalSf)
-        np.save(os.path.join(
-            saveDir, "gratingSfTuning.pVal.paramsRunningNullDist.npy"), paramsDistSf)
+        if (ops["fitSf"]):
+            np.save(os.path.join(saveDir, "gratingSfTuning.params.npy"), paramsSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.paramsRunning.npy"), paramsSfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.constant.npy"), varSfConst)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.noSplit.npy"), varSfOne)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.runningSplit.npy"), varSfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.runningSplitSpecific.npy"), varSpecificSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.pVal.runningSplit.npy"), pvalSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.pVal.paramsRunningNullDist.npy"), paramsDistSf)
 
-    if (ops["fitContrast"]):
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.params.npy"), paramsCon)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.paramsRunning.npy"), paramsConSplit)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.expVar.constant.npy"), varConConst)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.expVar.noSplit.npy"), varConOne)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.expVar.runningSplit.npy"), varConSplit)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.expVar.runningSplitSpecific.npy"), varSpecificCon)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.pVal.runningSplit.npy"), pvalCon)
-        np.save(os.path.join(
-            saveDir, "gratingContrastTuning.pVal.paramsRunningNullDist.npy"), paramsDistCon)
+        if (ops["fitContrast"]):
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.params.npy"), paramsCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.paramsRunning.npy"), paramsConSplit)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.constant.npy"), varConConst)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.noSplit.npy"), varConOne)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.runningSplit.npy"), varConSplit)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.runningSplitSpecific.npy"), varSpecificCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.pVal.runningSplit.npy"), pvalCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.pVal.paramsRunningNullDist.npy"), paramsDistCon)
+
+    if (ops["classification"] == "pupil"):
+        if (ops["fitOri"]):
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.params.npy"), paramsOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.paramsPupil.npy"), paramsOriSplit)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.constant.npy"), varOriConst)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.noSplit.npy"), varOriOne)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.pupilSplit.npy"), varOriSplit)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.pupilSplitSpecific.npy"), varSpecificOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.pVal.pupilSplit.npy"), pvalOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.pVal.paramsPupilNullDist.npy"), paramsDistOri)
+
+        if (ops["fitTf"]):
+            np.save(os.path.join(saveDir, "gratingTfTuning.params.npy"), paramsTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.paramsPupil.npy"), paramsTfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.constant.npy"), varTfConst)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.noSplit.npy"), varTfOne)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.pupilSplit.npy"), varTfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.pupilSplitSpecific.npy"), varSpecificTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.pVal.pupilSplit.npy"), pvalTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.pVal.paramsPupilNullDist.npy"), paramsDistTf)
+
+        if (ops["fitSf"]):
+            np.save(os.path.join(saveDir, "gratingSfTuning.params.npy"), paramsSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.paramsPupil.npy"), paramsSfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.constant.npy"), varSfConst)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.noSplit.npy"), varSfOne)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.pupilSplit.npy"), varSfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.pupilSplitSpecific.npy"), varSpecificSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.pVal.pupilSplit.npy"), pvalSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.pVal.paramsPupilNullDist.npy"), paramsDistSf)
+
+        if (ops["fitContrast"]):
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.params.npy"), paramsCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.paramsPupil.npy"), paramsConSplit)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.constant.npy"), varConConst)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.noSplit.npy"), varConOne)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.pupilSplit.npy"), varConSplit)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.pupilSplitSpecific.npy"), varSpecificCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.pVal.pupilSplit.npy"), pvalCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.pVal.paramsPupilNullDist.npy"), paramsDistCon)
+
+    if (ops["classification"] == "pupil-stationary"):
+        if (ops["fitOri"]):
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.stationary.params.npy"), paramsOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.paramsPupilStationary.npy"), paramsOriSplit)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.stationay.constant.npy"), varOriConst)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.stationay.noSplit.npy"), varOriOne)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.pupilStationarySplit.npy"), varOriSplit)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.expVar.pupilStationarySplitSpecific.npy"), varSpecificOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.pVal.pupilStationarySplit.npy"), pvalOri)
+            np.save(os.path.join(
+                saveDir, "gratingOriTuning.pVal.paramsPupilStationaryNullDist.npy"), paramsDistOri)
+
+        if (ops["fitTf"]):
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.stationary.params.npy"), paramsTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.paramsPupilStationary.npy"), paramsTfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.stationay.constant.npy"), varTfConst)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.stationay.noSplit.npy"), varTfOne)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.pupilStationarySplit.npy"), varTfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.expVar.pupilStationarySplitSpecific.npy"), varSpecificTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.pVal.pupilStationarySplit.npy"), pvalTf)
+            np.save(os.path.join(
+                saveDir, "gratingTfTuning.pVal.paramsPupilStationaryNullDist.npy"), paramsDistTf)
+
+        if (ops["fitSf"]):
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.stationary.params.npy"), paramsSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.paramsPupilStationary.npy"), paramsSfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.stationay.constant.npy"), varSfConst)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.stationay.noSplit.npy"), varSfOne)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.pupilStationarySplit.npy"), varSfSplit)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.expVar.pupilStationarySplitSpecific.npy"), varSpecificSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.pVal.pupilStationarySplit.npy"), pvalSf)
+            np.save(os.path.join(
+                saveDir, "gratingSfTuning.pVal.paramsPupilStationaryNullDist.npy"), paramsDistSf)
+
+        if (ops["fitContrast"]):
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.stationary.params.npy"), paramsCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.paramsPupilStationary.npy"), paramsConSplit)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.stationay.constant.npy"), varConConst)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.stationay.noSplit.npy"), varConOne)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.pupilStationarySplit.npy"), varConSplit)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.expVar.pupilStationarySplitSpecific.npy"), varSpecificCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.pVal.pupilStationarySplit.npy"), pvalCon)
+            np.save(os.path.join(
+                saveDir, "gratingContrastTuning.pVal.paramsPupilStationaryNullDist.npy"), paramsDistCon)
+
      # plotting
     if (ops['plot']):
         for n in fittingRange:
@@ -462,7 +638,7 @@ for currSession in sessions:
                 print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
                                    paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, varSpecificOri, pvalOri, paramsTf, paramsTfSplit, np.vstack(
                                        (varTfConst, varTfOne, varTfSplit)).T, varSpecificTf,
-                                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, respDirection[n], None, saveDir)
+                                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, respDirection[n], None, saveDir, subDir=ops['classification'])
 
             except Exception:
                 print("fail " + str(n))

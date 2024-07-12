@@ -164,6 +164,7 @@ def print_fitting_data(
     n, respP, direction=1,
     sessionData=None,
     saveDir=None,
+    subDir=None
 ):
     # change structure to fit new data structure
 
@@ -200,8 +201,12 @@ def print_fitting_data(
         )
     if save:
         saveDir = os.path.join(saveDir, "plots")
-        if not os.path.isdir(saveDir):
-            os.makedirs(saveDir)
+
+    if not (subDir is None):
+        saveDir = os.path.join(saveDir, subDir)
+
+    if not os.path.isdir(saveDir):
+        os.makedirs(saveDir)
 
     dfAll = make_neuron_db(
         gratingRes,

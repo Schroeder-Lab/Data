@@ -106,6 +106,47 @@ def get_trial_classification_running(
     return quietTrials, activeTrials
 
 
+def get_trial_classification_pupil(
+    pupil,
+    pupilTs,
+    stimSt,
+    stimEt,
+    fractionToTest=1,
+    criterion=1,
+):
+
+    pupiFreq = int(1/np.nanmedian(np.diff(pupilTs, axis=0)))
+    pupil = sp.signal.medfilt(pupil, (pupiFreq*5+1, 1))
+
+    stimSt = stimSt.reshape(-1, 1)
+    stimEt = stimEt.reshape(-1, 1)
+
+    pu, ts = align_stim(
+        pupil,
+        pupilTs,
+        stimSt,
+        np.hstack((stimSt, stimEt)) - stimSt,
+    )
+
+    medianDia = np.nanmedian(pu)
+
+    puLow = pu <= medianDia
+    # whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
+    #     whLow.shape[0] / 2)
+    puLow = np.sum(puLow[: int(puLow.shape[0]/fractionToTest),
+                   :, 0], 0) / int(puLow.shape[0]/fractionToTest)
+
+    quietTrials = np.where(puLow >= criterion)[0]
+
+    puHigh = pu > medianDia
+
+    puHigh = np.sum(puHigh[: int(puHigh.shape[0]/fractionToTest),
+                    :, 0], 0) / int(puHigh.shape[0]/fractionToTest)
+
+    activeTrials = np.where(puHigh > criterion)[0]
+    return quietTrials, activeTrials
+
+
 def make_neuron_db(
     resp,
     ts,
@@ -632,3 +673,158 @@ def load_circle_data(directory):
 
         data[key] = np.load(os.path.join(directory, fileNameDic[key]))
     return data
+
+
+def fit_exponential(ts, puE, goodInds):
+    '''
+    get the time points from end of running sup to the future.
+    fit a general decay and then the offset for each case
+
+plt.plot()
+    Parameters
+    ----------
+    ts : TYPE
+        DESCRIPTION.
+    puS : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+
+    puEScaled = puE[:, goodInds].copy()
+    puEScaled_m = np.nanmean(puEScaled, 1)
+
+    puEScaled_m -= np.nanmin(puEScaled_m)
+    puEScaled_m /= puEScaled_m[ts == 0]
+
+    ydata = puEScaled_m[ts >= 0]
+    xdata = ts[ts >= 0]
+    A = ydata[0]
+    propsDecay, _ = sp.optimize.curve_fit(
+        lambda t, tau: A*np.exp(-t/tau), xdata, ydata)
+    tau = propsDecay[0]
+
+    return tau, puEScaled_m
+
+
+def get_pupil_exponential_decay(pupilTs, pupil, wheelTs, velocity, runTh=0.1, velTh=1, durTh=2, interTh=5, decayTh=0.9, plot=False):
+    pupiFreq = int(1/np.nanmedian(np.diff(pupilTs, axis=0)))
+    fpupil = sp.interpolate.interp1d(
+        pupilTs[:, 0], pupil[:, 0], fill_value='extrapolate')
+    pupil = fpupil(wheelTs).reshape(-1, 1)
+    pupilTs = wheelTs
+    pupil = sp.signal.medfilt(pupil, (pupiFreq*5+1, 1))
+
+    runningStartThreshold = (np.abs(velocity) > runTh).astype(int)
+    runDiff = np.diff(runningStartThreshold, axis=0)
+    runStInds = np.where(runDiff == 1)[0]
+    runEtInds = np.where(runDiff == -1)[0]
+
+    # make sure that first start is before first end
+    # if there is an end before the start at the beginning ignore first end
+    if (runEtInds[0] < runStInds[0]):
+        runEtInds = runEtInds[1:]
+
+    if (runEtInds[-1] < runStInds[-1]):
+        runStInds = runStInds[:-1]
+
+    # remove instances where running was not really fast
+    meanVels = np.zeros_like(runStInds)
+    for i, si in enumerate(runStInds):
+        meanVel = np.nanmean(velocity[si:runEtInds[i]])
+        meanVels[i] = meanVel
+
+    # make sure running bouts are long enough and there is enough time between them
+
+    runStInds_ = runStInds.copy()
+    runEtInds_ = runEtInds.copy()
+    runStInds = runStInds[meanVels > velTh]
+    runEtInds = runEtInds[meanVels > velTh]
+
+    runSt = wheelTs[runStInds]
+    runEt = wheelTs[runEtInds]
+    runSt_ = wheelTs[runStInds_]
+    runEt_ = wheelTs[runEtInds_]
+
+    runDurs = runEt-runSt
+
+    runDurThresholdInd = np.where(np.floor(runDurs) > durTh)[0]
+    interboutTimesSt = runSt[1:]-runEt[:-1]
+    interThInd = np.where(np.floor(interboutTimesSt) > interTh)[0]
+    goodIndsS = np.intersect1d(runDurThresholdInd, interThInd+1)
+    goodIndsE = np.intersect1d(runDurThresholdInd, interThInd)
+
+    whE, wts = align_stim(
+        velocity,
+        wheelTs,
+        runEt,  # [goodIndsE],
+        np.array([-0.5, 5]).reshape(1, -1),
+    )
+
+    puE, Ets = align_stim(
+        pupil,
+        pupilTs,
+        runEt,  # [goodIndsE],
+        np.array([-0.5, 10]).reshape(1, -1),
+    )
+
+    puE = np.squeeze(puE)
+    puEScaled = puE.copy()
+    puEScaled /= puEScaled[Ets == 0]
+
+    tau, scaledTrace = fit_exponential(Ets, puE, goodIndsE)
+
+    decayTime = -tau*np.log(0.1)
+
+    expFunc = 1*np.exp(-Ets/tau)
+
+    # make the timespans to exclude
+    runPupilTimes = np.hstack((runEt, runEt+decayTime))
+
+    if (plot):
+        f, ax = plt.subplots(1)
+        f.suptitle('running end')
+        ax.plot(Ets, scaledTrace, 'k')
+        ax.plot(Ets, expFunc, 'orange')
+        ax.set_xlabel('Time from running bout end (s)')
+        ax.set_ylabel('pupil diamater')
+        ax.hlines(1-decayTh, Ets[0], Ets[-1], 'r', ls='dashed')
+
+    return tau, decayTime, runPupilTimes, scaledTrace
+
+
+def take_specific_trials(data, gratingRes, specficTrials, timeWindows):
+    # take only stationary trials
+    data['gratingsContrast'] = data['gratingsContrast'][specficTrials, :]
+    data['gratingsEt'] = data['gratingsEt'][specficTrials, :]
+    data['gratingsOri'] = data['gratingsOri'][specficTrials, :]
+    data['gratingsReward'] = data['gratingsReward'][specficTrials, :]
+    data['gratingsSf'] = data['gratingsSf'][specficTrials, :]
+    data['gratingsSt'] = data['gratingsSt'][specficTrials, :]
+    data['gratingsTf'] = data['gratingsTf'][specficTrials, :]
+    gratingRes = gratingRes[:, specficTrials, :]
+
+    # go over time windwos and see if indices match
+    keepInd = np.zeros_like(data['gratingsSt'], dtype=bool)
+    for i in range(data['gratingsSt'].shape[0]):
+        st = data['gratingsSt'][i, 0]
+        biggerThan = st > timeWindows[:, 0]
+        smallerThan = st < timeWindows[:, 1]
+        inWindow = biggerThan & smallerThan
+        if (np.sum(inWindow) == 0):
+            keepInd[i] = True
+
+    keepInd = np.squeeze(keepInd)
+    data['gratingsContrast'] = data['gratingsContrast'][keepInd, :]
+    data['gratingsEt'] = data['gratingsEt'][keepInd, :]
+    data['gratingsOri'] = data['gratingsOri'][keepInd, :]
+    data['gratingsReward'] = data['gratingsReward'][keepInd, :]
+    data['gratingsSf'] = data['gratingsSf'][keepInd, :]
+    data['gratingsSt'] = data['gratingsSt'][keepInd, :]
+    data['gratingsTf'] = data['gratingsTf'][keepInd, :]
+    gratingRes = gratingRes[:, keepInd, :]
+
+    return data, gratingRes
