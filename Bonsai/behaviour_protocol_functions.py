@@ -96,7 +96,7 @@ def stimulus_sparse(directory, frameChanges):
     )
 
     sparse_st = frameChanges
-    sparseEdges = propTitles[2:].astype(int)
+    sparseEdges = propTitles[1:].astype(int)
 
     return {"sparse.map.npy": sparseMap.copy(),
             "sparse.startTime.npy": sparse_st.reshape(-1, 1).copy(),
@@ -295,7 +295,7 @@ def stimulus_oddball(directory, frameChanges):
             "gratings.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
-            "gratingsExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T, 
+            "gratingsExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
             # TODO: check if this is usefull; should add same line to gratings
             "gratingsExp.description.npy": 'Oddball'
             }
