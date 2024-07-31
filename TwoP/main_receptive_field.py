@@ -52,16 +52,17 @@ s2pDir = defs["metadataDir"]
 filePath = read_directory_dictionary(sparseSession, s2pDir)
 # REMEMB
 ops = create_sparse_registration(filePath, tmpSave)
-ops["save_path0"] = tmpSave
+ops["save_path"] = tmpSave
 
 # %%
 # do registration
 # convert tiffs to binaries
-if "save_folder" not in ops or len(ops["save_folder"]) == 0:
-    ops["save_folder"] = "suite2p"
-save_folder = os.path.join(ops["save_path0"], ops["save_folder"])
-os.makedirs(save_folder, exist_ok=True)
+# if "save_folder" not in ops or len(ops["save_folder"]) == 0:
+#     ops["save_folder"] = tmpSave +"\\suite2p"
+# save_folder = os.path.join(ops["save_path"], ops["save_folder"])
+# os.makedirs(save_folder, exist_ok=True)
 
+#%%
 ops = tiff_to_binary(ops)
 
 
@@ -263,10 +264,10 @@ averageMap_n = averageMap - np.nanmin(averageMap)
 averageMap_n = averageMap_n / np.nanmax(averageMap_n)
 
 
-xEdges = np.linspace(edges[5], edges[6], averageMap.shape[1] + 1)[:, 0]
-yEdges = np.linspace(edges[4], edges[3], averageMap.shape[0] + 1)[:, 0]
-xps = np.round(np.abs((edges[6] - edges[5]) / averageMap.shape[1]), 1)
-yps = np.round(np.abs((edges[4] - edges[3]) / averageMap.shape[0]), 1)
+xEdges = np.linspace(edges[4], edges[5], averageMap.shape[1] + 1)[:, 0]
+yEdges = np.linspace(edges[3], edges[2], averageMap.shape[0] + 1)[:, 0]
+xps = np.round(np.abs((edges[5] - edges[4]) / averageMap.shape[1]), 1)
+yps = np.round(np.abs((edges[3] - edges[2]) / averageMap.shape[0]), 1)
 
 f, ax = plt.subplots(averageMap.shape[0], averageMap.shape[1])
 f.suptitle(
