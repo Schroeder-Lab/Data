@@ -226,7 +226,7 @@ def stimulus_flicker(directory, frameChanges):
     # Gets the identity of the stimuli (see function for
     # further details).
     # stimProps = get_stimulus_info(directory)
-    flicker_stimType = np.zeros(20)  # Asuming 10 reps per each contrast block
+    flicker_stimType = np.zeros(60)  # Asuming 10 reps per each contrast block
 
     flicker_stimType[0::2] = 0.05  # SD from Low contrast
     flicker_stimType[1::2] = 0.175  # SD from High contrast

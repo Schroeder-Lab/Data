@@ -50,9 +50,9 @@ def define_directories():
     directoryDb = {
         "dataDefFile": "C:\\Software\\Data\\Ephys\\preprocess.csv", 
         "tocorrectDefFile": "C:\\Software\\Data\\Ephys\\correct.csv", 
-        "preprocessedDataDir": "D:\\Cloud\\Box\\Florencia\\Experiments\\Data", #this will be Z:\ProcessedData
-        "metadataDir":  "D:\\Experiments", #this will be Z:\RawData
-        "tempEphysDir": None #"E:\\tempEphys" 
+        "preprocessedDataDir": r"Z:\ProcessedData", #"D:\\Cloud\\Box\\Florencia\\Experiments\\Data", #this will be Z:\ProcessedData
+        "metadataDir":  "Z:\\RawData", #"D:\\Experiments"
+        "tempEphysDir": "E:\\tempEphys"
     }
     return (
         directoryDb  # dataDefFile, preprocessedDataDir, zstackDir, metadataDir
