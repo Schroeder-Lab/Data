@@ -90,7 +90,7 @@ def get_trial_classification_running(
     # whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
     #     whLow.shape[0] / 2)
     whLow = np.sum(whLow[: int(whLow.shape[0]/fractionToTest),
-                   :, 0], 0) / int(whLow.shape[0]/fractionToTest)
+                   :, 0], 0) / np.squeeze(np.sum(~np.isnan(wh), 0))  # int(whLow.shape[0]/fractionToTest)
 
     quietTrials = np.where(whLow >= criterion)[0]
 
@@ -100,10 +100,61 @@ def get_trial_classification_running(
         whHigh = wh > activeVelocity
 
         whHigh = np.sum(whHigh[: int(whHigh.shape[0]/fractionToTest),
-                        :, 0], 0) / int(whLow.shape[0]/fractionToTest)
+                        :, 0], 0) / np.sum(~np.isnan(wh), 0)  # int(whLow.shape[0]/fractionToTest)
 
         activeTrials = np.where(whHigh > criterion)[0]
     return quietTrials, activeTrials
+
+
+def get_running_distribution(
+    wheelVelocity,
+    wheelTs,
+    stimSt,
+    stimEt,
+    binSize=None
+):
+    wheelVelocity = np.abs(wheelVelocity)
+
+    stimSt = stimSt.reshape(-1, 1)
+    stimEt = stimEt.reshape(-1, 1)
+
+    wh, ts = align_stim(
+        wheelVelocity,
+        wheelTs,
+        stimSt,
+        np.hstack((stimSt, stimEt)) - stimSt,
+    )
+    wh = wh[~np.isnan(wh)]
+    if (binSize is None):
+        hist, bins = np.histogram(wh.flatten())
+    else:
+        dat = wh.flatten()
+        bins = np.arange(np.nanmin(dat), np.nanmax(dat), binSize)
+        hist, bins = np.histogram(dat, bins=bins)
+    return hist, bins
+
+
+def get_pupil_distribution(pupil, pupilTs, stimSt, stimEt, binSize=None):
+    pupiFreq = int(1/np.nanmedian(np.diff(pupilTs, axis=0)))
+    pupil = sp.signal.medfilt(pupil, (pupiFreq*5+1, 1))
+
+    stimSt = stimSt.reshape(-1, 1)
+    stimEt = stimEt.reshape(-1, 1)
+
+    pu, ts = align_stim(
+        pupil,
+        pupilTs,
+        stimSt,
+        np.hstack((stimSt, stimEt)) - stimSt,
+    )
+    pu = pu[~np.isnan(pu)]
+    if (binSize is None):
+        hist, bins = np.histogram(pu.flatten())
+    else:
+        dat = pu.flatten()
+        bins = np.arange(np.nanmin(dat), np.nanmax(dat), binSize)
+        hist, bins = np.histogram(dat, bins=bins)
+    return hist, bins
 
 
 def get_trial_classification_pupil(
@@ -113,6 +164,7 @@ def get_trial_classification_pupil(
     stimEt,
     fractionToTest=1,
     criterion=1,
+    medianMask=None,
 ):
 
     pupiFreq = int(1/np.nanmedian(np.diff(pupilTs, axis=0)))
@@ -128,7 +180,10 @@ def get_trial_classification_pupil(
         np.hstack((stimSt, stimEt)) - stimSt,
     )
 
-    medianDia = np.nanmedian(pu)
+    if (medianMask is None):
+        medianDia = np.nanmedian(pu)
+    else:
+        medianDia = np.nanmedian(pu[:, medianMask, :])
 
     puLow = pu <= medianDia
     # whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
@@ -464,16 +519,19 @@ def make_empty_results(resType, *args):
 def remove_blinking_trials(data):
     blinkTrials = np.zeros(len(data["gratingsSt"]), dtype=bool)
     if ('pupilDiameter' in data.keys()):
+        actualWindows = np.hstack((data["gratingsSt"].reshape(-1, 1), data["gratingsEt"].reshape(-1, 1))
+                                  ) - data["gratingsSt"].reshape(-1, 1)
+        avgWindow = np.nanmedian(actualWindows, axis=0)
         pu, pts = align_stim(
             data['pupilDiameter'],
             data['pupilTs'],
             data["gratingsSt"],
-            np.hstack((data["gratingsSt"].reshape(-1, 1), data["gratingsEt"].reshape(-1, 1))
-                      ) - data["gratingsEt"].reshape(-1, 1),
+            avgWindow.reshape(1, -1),
         )
+
         blinksPerTrial = np.sum(np.isnan(pu), axis=0)
         blinkTrials = blinksPerTrial > 0
-    return blinkTrials
+    return np.squeeze(blinkTrials)
 
 
 def run_complete_analysis(
@@ -482,7 +540,7 @@ def run_complete_analysis(
     ts,
     quietI,
     activeI,
-    blinkTrials,
+    ignoreTrials,
     n,
     runOri=True,
     runTf=True,
@@ -498,7 +556,7 @@ def run_complete_analysis(
         n,
     )
 
-    dfAll = dfAll.iloc[~blinkTrials]
+    dfAll = dfAll.iloc[~ignoreTrials]
 
     res_ori = make_empty_results("Ori")
     res_freq = make_empty_results("Tf")
@@ -632,7 +690,8 @@ def load_grating_data(directory):
                     os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
                         os.path.join(directory, fileNameDic[key])))
         if (os.path.exists(os.path.join(directory, fileNameDic[key]))):
-            data[key] = np.load(os.path.join(directory, fileNameDic[key]))
+            data[key] = np.load(os.path.join(
+                directory, fileNameDic[key]))
         else:
             Warning(
                 f"The file {os.path.join(directory, fileNameDic[key])} does not exist")
@@ -796,7 +855,38 @@ def get_pupil_exponential_decay(pupilTs, pupil, wheelTs, velocity, runTh=0.1, ve
     return tau, decayTime, runPupilTimes, scaledTrace
 
 
-def take_specific_trials(data, gratingRes, specficTrials, timeWindows):
+def get_ignored_index(sts, specficTrials, timeWindows):
+    '''
+
+
+    Parameters
+    ----------
+    sts : TYPE
+        DESCRIPTION.
+    specficTrials : Trials to keep. e.g. stationary trials
+    timeWindows : TYPE
+        windows of times to ignore. e.g. remnant of high pupil from running.
+
+    Returns
+    -------
+    ignore : TYPE
+        DESCRIPTION.
+
+    '''
+    ignore = np.ones(len(sts), dtype=bool)
+    ignore[specficTrials] = False
+    # go over time windwos and see if indices match
+    for i in range(len(sts)):
+        st = sts[i, 0]
+        biggerThan = st > timeWindows[:, 0]
+        smallerThan = st < timeWindows[:, 1]
+        inWindow = biggerThan & smallerThan
+        if (np.sum(inWindow) == 0):
+            ignore[i] = False
+    return ignore
+
+
+def take_specific_trials(data, gratingRes, gratingResOff, specficTrials, timeWindows, returnNumberRemoved=False):
     # take only stationary trials
     data['gratingsContrast'] = data['gratingsContrast'][specficTrials, :]
     data['gratingsEt'] = data['gratingsEt'][specficTrials, :]
@@ -806,6 +896,7 @@ def take_specific_trials(data, gratingRes, specficTrials, timeWindows):
     data['gratingsSt'] = data['gratingsSt'][specficTrials, :]
     data['gratingsTf'] = data['gratingsTf'][specficTrials, :]
     gratingRes = gratingRes[:, specficTrials, :]
+    gratingResOff = gratingResOff[:, specficTrials, :]
 
     # go over time windwos and see if indices match
     keepInd = np.zeros_like(data['gratingsSt'], dtype=bool)
@@ -826,5 +917,46 @@ def take_specific_trials(data, gratingRes, specficTrials, timeWindows):
     data['gratingsSt'] = data['gratingsSt'][keepInd, :]
     data['gratingsTf'] = data['gratingsTf'][keepInd, :]
     gratingRes = gratingRes[:, keepInd, :]
+    gratingResOff = gratingResOff[:, keepInd, :]
+    if (returnNumberRemoved):
+        data, gratingRes, gratingResOff,
 
-    return data, gratingRes
+    return data, gratingRes, gratingResOff, len(specficTrials)-len(keepInd)
+
+
+def make_sure_dimensionality(data):
+    if 'gratingsContrast' in data.keys():
+        data["gratingsContrast"] = data["gratingsContrast"].reshape(-1, 1)
+
+    if 'gratingsEt' in data.keys():
+        data["gratingsEt"] = data["gratingsEt"].reshape(-1, 1)
+
+    if 'gratingsOri' in data.keys():
+        data["gratingsOri"] = data["gratingsOri"].reshape(-1, 1)
+
+    if 'gratingsSf' in data.keys():
+        data["gratingsSf"] = data["gratingsSf"].reshape(-1, 1)
+
+    if 'gratingsSt' in data.keys():
+        data["gratingsSt"] = data["gratingsSt"].reshape(-1, 1)
+
+    if 'gratingsTf' in data.keys():
+        data["gratingsTf"] = data["gratingsTf"].reshape(-1, 1)
+
+    return data
+
+
+def find_osi_dsi(paramsOri, direction):
+    tuner = OriTuner('gauss')
+    rng = np.arange(0, 360, 30)
+    oris = np.zeros(paramsOri.shape[0], dtype=complex)
+    dris = np.zeros(paramsOri.shape[0], dtype=complex)
+    for i in range(len(paramsOri)):
+        prms = paramsOri[i, :]
+        fnc = direction[i]*tuner.func(rng, *prms)
+        fnc[fnc <= 0] = 0
+        dri = np.sum(np.exp(np.deg2rad(rng) * 1j)*(fnc/np.sum(fnc)))
+        ori = np.sum(np.exp(np.deg2rad(2*rng) * 1j)*(fnc/np.sum(fnc)))
+        oris[i] = ori
+        dris[i] = dri
+    return oris, dris

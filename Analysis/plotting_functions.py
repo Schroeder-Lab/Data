@@ -164,7 +164,8 @@ def print_fitting_data(
     n, respP, direction=1,
     sessionData=None,
     saveDir=None,
-    subDir=None
+    subDir=None,
+    onOff='On'
 ):
     # change structure to fit new data structure
 
@@ -282,8 +283,8 @@ def print_fitting_data(
         mng = plt.get_current_fig_manager()
         mng.window.showMaximized()
         if save:
-            plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.png"))
-            plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit.pdf"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit_{onOff}.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Ori_fit_{onOff}.pdf"))
             plt.close(f)
 
     # temporal
@@ -356,8 +357,8 @@ def print_fitting_data(
         mng = plt.get_current_fig_manager()
         mng.window.showMaximized()
         if save:
-            plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.png"))
-            plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit.pdf"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit_{onOff}.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Tf_fit_{onOff}.pdf"))
             plt.close(f)
 
     # spatial
@@ -427,8 +428,8 @@ def print_fitting_data(
         ax[0].set_xscale("log", base=2)
         ax[1].set_xscale("log", base=2)
         if save:
-            plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.png"))
-            plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit.pdf"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit_{onOff}.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Sf_fit_{onOff}.pdf"))
             plt.close(f)
 
     # contrast
@@ -498,8 +499,8 @@ def print_fitting_data(
         # ax[0].set_xscale("log", base=2)
         # ax[1].set_xscale("log", base=2)
         if save:
-            plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.png"))
-            plt.savefig(os.path.join(saveDir, f"{n}_Con_fit.pdf"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Con_fit_{onOff}.png"))
+            plt.savefig(os.path.join(saveDir, f"{n}_Con_fit_{onOff}.pdf"))
             plt.close(f)
 
 

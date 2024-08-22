@@ -173,6 +173,17 @@ class BaseTuner(ABC):
             print(traceback.format_exc())
             return np.nan
 
+    def check_bounds(self, p0, bounds):
+        p0a = np.array(p0)
+        bounds = np.array(bounds)
+
+        for pi, p in enumerate(p0):
+            if bounds[0, pi] > p:
+                bounds[0, pi] = p
+            if bounds[1, pi] < p:
+                bounds[0, pi] = p
+        return tuple(p0), (tuple(bounds[0, :]), tuple(bounds[1, :]))
+
     def fit(self, x, y, save=True):
         """
         fits the function given the parameters.
@@ -195,7 +206,7 @@ class BaseTuner(ABC):
         """
         props = np.nan
         p0, bounds = self.set_bounds_p0(x, y)
-
+        p0, bounds = self.check_bounds(p0, bounds)
         props = self.fit_(x, y, self.func, p0, bounds)
 
         if save:
@@ -947,7 +958,7 @@ class ContrastTuner(BaseTuner):
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y[x == xuu])
+            avgy[xi] = np.nanmean(y[x == xuu])
 
         avgyn = avgy-np.nanmin(avgy)
         c50val = 0.5*(np.nanmax(avgyn))
@@ -960,16 +971,21 @@ class ContrastTuner(BaseTuner):
         return (
             np.nanmin(avgy),
             np.nanmax(avgy) - np.nanmin(avgy),
-            np.nanmin(c50, 1),
+            np.nanmin([c50, 1]),
             2,
         )
+
+    def get_specific_boundaries(self, x, y):
+        y1 = y[:self.sep]
+        y2 = y[self.sep:]
+        return np.nanmin(y1), np.nanmin(y2), np.nanmax(y1), np.nanmax(y2)
 
     def set_bounds_p0(self, x, y, func=None):
 
         xu = np.unique(x)
         avgy = np.zeros_like(xu, dtype=float)
         for xi, xuu in enumerate(xu):
-            avgy[xi] = np.nanmedian(y[x == xuu])
+            avgy[xi] = np.nanmean(y[x == xuu])
 
         p0 = self._make_prelim_guess(x, y)
         minAvg = np.nanmin(avgy)
@@ -1008,10 +1024,9 @@ class ContrastTuner(BaseTuner):
 
                 p01 = self._make_prelim_guess(x[:self.sep], y[:self.sep])
                 p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
+                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
 
                 p0 = (p01[0], p02[0], p01[1], p02[1], p0[2], p0[3])
-
-                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
 
                 bounds = (
                     (
@@ -1216,7 +1231,7 @@ class GammaTuner(BaseTuner):
 
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy),
+            np.nanmax(avgy) - np.nanmin(avgy),
             0.1,
             0,
             2,
@@ -1234,15 +1249,15 @@ class GammaTuner(BaseTuner):
             (
                 minAvg,
                 0,
-                -0.1,
-                0,
-                0,
+                -100,
+                -1,
+                1,
             ),
             (
                 np.nanmax(avgy),
                 2*maxAvg,
                 100,
-                1,
+                0.5,
                 200,
             ),  # np.nanmax(y),  # np.nanmax(y),
         )

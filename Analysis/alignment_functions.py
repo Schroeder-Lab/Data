@@ -27,7 +27,7 @@ import glob
 import re
 
 
-def get_calcium_aligned(signal, time, eventTimes, window, planes, delays, baseline_sub=True):
+def get_calcium_aligned(signal, time, eventTimes, window, planes, delays, baseline_sub=True, blTime=0.5):
     aligned = []
     run = 0
     ps = np.unique(planes).astype(int)
@@ -46,7 +46,7 @@ def get_calcium_aligned(signal, time, eventTimes, window, planes, delays, baseli
             aligned = np.concatenate((aligned, aligned_tmp), axis=2)
     aligned = np.array(aligned)
     if (baseline_sub):
-        aligned -= np.nanmean(aligned[t <= 0, :, :], 0)
+        aligned -= np.nanmean(aligned[(t < 0) & (t >= -blTime), :, :], 0)
     return np.array(aligned), t
 
 
@@ -75,7 +75,8 @@ def align_stim(signal, time, eventTimes, window, timeUnit=1, timeLimit=1):
             tmp = range(mini, maxi)
     t = tmp * dt
 
-    aligned = np.zeros((t.shape[0], eventTimes.shape[0], signal.shape[1]))
+    aligned = np.zeros(
+        (t.shape[0], eventTimes.shape[0], signal.shape[1]))*np.nan
 
     for ev in range(eventTimes.shape[0]):
         #     evInd = find(time > eventTimes(ev), 1);
