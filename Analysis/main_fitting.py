@@ -139,6 +139,9 @@ for currSession in sessions:
                 data["gratingsSt"] = data["gratingsSt"][totalInds, :]
                 data["gratingsTf"] = data["gratingsTf"][totalInds, :]
 
+        ignoreOn = np.zeros(len(data["gratingsSt"]), dtype=bool)
+        ignoreOff = np.zeros(len(data["gratingsSt"]), dtype=bool)
+
         print("getting aligned signal")
         gratingRes, ts = get_calcium_aligned(
             data["sig"],
