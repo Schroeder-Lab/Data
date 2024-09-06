@@ -66,13 +66,15 @@ def define_directories():
         # "D:\\dlc.csv",  # "D:\\preprocess.csv",
         # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
         # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
-        "dataDefFile": "D:\\preprocessTest.csv",
+        # "D:\\preprocess.csv",  # "D:\\preprocessZCorrTest.csv",
+        "dataDefFile": "D:\\preprocess.csv",  # "D:\\fitting_all.csv",
         # "Z:\\ProcessedData\\",  # "D:\\Test\\",
         # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
         # "Z:\\ProcessedData\\",
         # r"D:\\ZcorrectionTest\\BoutonsCorrected\\",
         # "Z:\\ProcessedData\\",
         # "preprocessedDataDir": r"D:\LongitudinalTest",  # "Z:\\ProcessedData\\",
+        # "D:\\ZcorrectionTest\\NeuronsRed\\",
         "preprocessedDataDir": "Z:\\ProcessedData\\",
         "zstackDir": "Z:\\RawData\\",
         "metadataDir":   "Z:\\RawData\\"  # "Z:\\RawData\\"  # "D:\\Test\\" #", # "D:\\"
@@ -161,6 +163,8 @@ def create_ops_boutton_registration(filePath, saveDir=None):
     ops["nplanes"] = 1
     ops["functional_chan"] = 1
 
+    ops["spikedetect"] = 0
+
     # registration ops
     ops["keep_movie_raw"] = True
     ops["align_by_chan"] = 2
@@ -247,17 +251,21 @@ def create_fitting_ops():
         "quiet_velocity": 0.5,
         "fraction_to_test": 1,
         "criterion": 0.9,
-        "save_dir": r"D:\\OCNCData\\",
+        "save_dir": r"D:\\fittingPupilTest\\",
         "processed files": "Z:\\ProcessedData",
         "fitting_list": "D:\\fitting_all.csv",
 
+
         # how to classify trials can be: "running"/"pupil"/"pupil-stationary"
-        "classification": "running",
+        "classification": "pupil-stationary",
 
         "fitOri": True,
-        "fitTf": False,
+        "fitTf": True,
         "fitSf": True,
-        "fitContrast": True
+        "fitContrast": True,
+
+        "runOn": True,
+        "runOff": True,
     }
 
     return ops
