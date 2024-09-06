@@ -82,8 +82,6 @@ keys = sessions.keys()
 
 sessions = sessions.to_dict('records')
 
-sessions = sessions[47:]
-
 
 # did the user specify only specific trials to take
 isSpecificTrials = 'SpecificTrials' in keys
@@ -130,7 +128,7 @@ for currSession in sessions:
                         data["gratingsEt"] <= interval[1]))[0]
                     totalInds.append(inds)
 
-                totalInds = np.vstack(totalInds)
+                totalInds = np.vstack(totalInds)[0]
 
                 # change all possible data
                 data["gratingIntervals"] = chosenIntervals
@@ -185,7 +183,7 @@ for currSession in sessions:
             )
         if (ops["classification"] == "pupil-stationary"):
             tau, decayTime, runPupilTimes, scaledTrace = get_pupil_exponential_decay(data['pupilTs'], data['pupilDiameter'].copy(
-            ), data['wheelTs'], data['wheelVelocity'], runTh=0.1, velTh=1, durTh=2, interTh=5)
+            ), data['wheelTs'], data['wheelVelocity'], runTh=0.1, velTh=1, durTh=2, sepTh=5)
 
             ignoreOn = get_ignored_index(
                 data["gratingsSt"], quietI, runPupilTimes)
