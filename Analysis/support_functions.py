@@ -189,16 +189,19 @@ def get_trial_classification_pupil(
     # whLow = np.sum(whLow[: int(whLow.shape[0] / 2), :, 0], 0) / int(
     #     whLow.shape[0] / 2)
     puLow = np.sum(puLow[: int(puLow.shape[0]/fractionToTest),
-                   :, 0], 0) / int(puLow.shape[0]/fractionToTest)
+                   :, 0], 0) / np.squeeze(np.sum(~np.isnan(pu), 0))/fractionToTest
 
     quietTrials = np.where(puLow >= criterion)[0]
+    quietTrials = np.intersect1d(quietTrials, medianMask)
 
     puHigh = pu > medianDia
 
     puHigh = np.sum(puHigh[: int(puHigh.shape[0]/fractionToTest),
-                    :, 0], 0) / int(puHigh.shape[0]/fractionToTest)
+                    :, 0], 0) / np.squeeze(np.sum(~np.isnan(pu), 0))/fractionToTest
 
     activeTrials = np.where(puHigh > criterion)[0]
+    activeTrials = np.intersect1d(activeTrials, medianMask)
+
     return quietTrials, activeTrials
 
 
@@ -734,7 +737,7 @@ def load_circle_data(directory):
     return data
 
 
-def fit_exponential(ts, puE, goodInds):
+def fit_exponential(ts, puE):
     '''
     get the time points from end of running sup to the future.
     fit a general decay and then the offset for each case
@@ -753,7 +756,7 @@ plt.plot()
 
     '''
 
-    puEScaled = puE[:, goodInds].copy()
+    puEScaled = puE[:, :].copy()
     puEScaled_m = np.nanmean(puEScaled, 1)
 
     puEScaled_m -= np.nanmin(puEScaled_m)
@@ -769,12 +772,15 @@ plt.plot()
     return tau, puEScaled_m
 
 
-def get_pupil_exponential_decay(pupilTs, pupil, wheelTs, velocity, runTh=0.1, velTh=1, durTh=2, interTh=5, decayTh=0.9, plot=False):
+def get_pupil_exponential_decay(pupilTs, pupil, wheelTs, velocity, runTh=0.1, velTh=1, durTh=2, sepTh=5, decayTh=0.9, plot=False):
+
     pupiFreq = int(1/np.nanmedian(np.diff(pupilTs, axis=0)))
     fpupil = sp.interpolate.interp1d(
         pupilTs[:, 0], pupil[:, 0], fill_value='extrapolate')
+    wheelTs = wheelTs[:len(velocity)]
     pupil = fpupil(wheelTs).reshape(-1, 1)
     pupilTs = wheelTs
+    ts = wheelTs
     pupil = sp.signal.medfilt(pupil, (pupiFreq*5+1, 1))
 
     runningStartThreshold = (np.abs(velocity) > runTh).astype(int)
@@ -784,37 +790,106 @@ def get_pupil_exponential_decay(pupilTs, pupil, wheelTs, velocity, runTh=0.1, ve
 
     # make sure that first start is before first end
     # if there is an end before the start at the beginning ignore first end
+    velocity[velocity < 0] = 0
+    runningStartThreshold = (np.abs(velocity) > runTh).astype(int)
+    runDiff = np.diff(runningStartThreshold, axis=0)
+    runStInds = np.where(runDiff == 1)[0]
+    runEtInds = np.where(runDiff == -1)[0]
+
+    # make sure that first start is before first end
+    # if there is an end before the start at the beginning ignore first end
     if (runEtInds[0] < runStInds[0]):
-        runEtInds = runEtInds[1:]
+        runStInds = np.append(np.nan, runStInds)
+        # runEtInds = runEtInds[1:]
 
     if (runEtInds[-1] < runStInds[-1]):
-        runStInds = runStInds[:-1]
+        # runStInds = runStInds[:-1]
+        runEtInds = np.append(runEtInds, np.nan,)
 
-    # remove instances where running was not really fast
+    # make sure the stop and start times are at the non-running time
+    zeroInds = np.where(np.isclose(
+        velocity[:, 0], 0, rtol=10**-3, atol=10**-3))[0]
+
+    for sti, st in enumerate(runStInds):
+        # get closest zero point
+        lastZero = np.where(((st-zeroInds) >= 0) & (zeroInds >= runEtInds[sti-1]) & (
+            zeroInds <= runStInds[min(len(runStInds)-1, sti+1)]))[0]
+        if (len(lastZero) > 0):
+            lastZero = lastZero[-1]
+            runStInds[sti] = zeroInds[lastZero]
+
+    for eti, et in enumerate(runEtInds):
+        # get closest zero point
+        firstZero = np.where(((zeroInds-et) >= 0) & (zeroInds > runStInds[eti]) & (
+            zeroInds < runStInds[min(len(runStInds)-1, eti+1)]))[0]
+        if (len(firstZero) > 0):
+            firstZero = firstZero[0]
+            runEtInds[eti] = zeroInds[firstZero]
+
+    f, ax = plt.subplots(1)
+    ax.plot(ts, velocity, 'k')
+    ax.vlines(ts[runStInds[~np.isnan(runStInds)].astype(int)], 0, 20, 'green')
+    ax.vlines(ts[runEtInds[~np.isnan(runEtInds)].astype(int)], 0, 20, 'red')
+    f.suptitle('first pass finding')
+
+    # remove instances where running was not really running properly
     meanVels = np.zeros_like(runStInds)
     for i, si in enumerate(runStInds):
-        meanVel = np.nanmean(velocity[si:runEtInds[i]])
+        if (np.isnan(si)):
+            si = 0
+        et = runEtInds[i]
+        if (np.isnan(et)):
+            et = len(velocity)-1
+        et = int(et)
+        si = int(si)
+        meanVel = np.nanmax(velocity[si:et, 0])
         meanVels[i] = meanVel
 
-    # make sure running bouts are long enough and there is enough time between them
-
-    runStInds_ = runStInds.copy()
-    runEtInds_ = runEtInds.copy()
     runStInds = runStInds[meanVels > velTh]
     runEtInds = runEtInds[meanVels > velTh]
 
-    runSt = wheelTs[runStInds]
-    runEt = wheelTs[runEtInds]
-    runSt_ = wheelTs[runStInds_]
-    runEt_ = wheelTs[runEtInds_]
+    # concatenate running periods that are very close by
+    seps = ts[runStInds[1:].astype(int)]-ts[runEtInds[:-1].astype(int)]
+    etDel = []
+    stDel = []
+    for si, sep in enumerate(seps):
+        if sep < sepTh:
+            etDel.append(si)
+            stDel.append(si+1)
 
-    runDurs = runEt-runSt
+    runStInds = np.delete(runStInds, stDel)
+    runEtInds = np.delete(runEtInds, etDel)
 
-    runDurThresholdInd = np.where(np.floor(runDurs) > durTh)[0]
-    interboutTimesSt = runSt[1:]-runEt[:-1]
-    interThInd = np.where(np.floor(interboutTimesSt) > interTh)[0]
-    goodIndsS = np.intersect1d(runDurThresholdInd, interThInd+1)
-    goodIndsE = np.intersect1d(runDurThresholdInd, interThInd)
+    f, ax = plt.subplots(1)
+    ax.plot(ts, velocity, 'k')
+    ax.vlines(ts[runStInds[~np.isnan(runStInds)].astype(int)], 0, 20, 'green')
+    ax.vlines(ts[runEtInds[~np.isnan(runEtInds)].astype(int)], 0, 20, 'red')
+    f.suptitle('first pass finding')
+
+    nanInds = ~np.isnan(runStInds)
+
+    if np.isnan(runStInds[0]):
+        runStInds[0] = 0
+    if np.isnan(runEtInds[-1]):
+        runEtInds[-1] = len(velocity)-1
+
+    runSt = ts[runStInds.astype(int)]
+    runEt = ts[runEtInds.astype(int)]
+
+    # remove running periods that are too short
+    durs = (runEt-runSt)[:, 0]
+
+    runSt = runSt[durs > durTh]
+    runEt = runEt[durs > durTh]
+
+    # runStInds = runStInds[nanInds].astype(int)
+    # runEtInds = runEtInds[nanInds].astype(int)
+
+    # runSt = ts[runStInds]
+    # runEt = ts[runEtInds]
+
+    # runStInds_ = runStInds.copy()
+    # runEtInds_ = runEtInds.copy()
 
     whE, wts = align_stim(
         velocity,
@@ -834,7 +909,7 @@ def get_pupil_exponential_decay(pupilTs, pupil, wheelTs, velocity, runTh=0.1, ve
     puEScaled = puE.copy()
     puEScaled /= puEScaled[Ets == 0]
 
-    tau, scaledTrace = fit_exponential(Ets, puE, goodIndsE)
+    tau, scaledTrace = fit_exponential(Ets, puE)
 
     decayTime = -tau*np.log(0.1)
 

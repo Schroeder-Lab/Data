@@ -22,6 +22,8 @@ import skimage.io
 import glob
 import pickle
 import scipy as sp
+import tifffile
+import re
 import warnings
 from Data.TwoP.process_tiff import *
 from Data.TwoP.preprocess_traces import *
@@ -152,6 +154,20 @@ def _process_s2p_singlePlane(
         # mind when wanting to associate a cell with it's location in the FOV
         # as the assumed order would usually be [X,Y].
         cellLocs[i, :] = np.append(s["med"], zPos)
+
+    # Convert the locations to actual distance in microns
+    lastFile = ops['filelist'][-1]
+    tif = tifffile.TiffFile(lastFile)
+    customTifData = tif.pages[0].tags['Artist'].value
+    zoomFactor = int(re.findall('"scanZoomFactor": ([0-9])', customTifData)[0])
+    zooms = [1, 1.5, 2, 4, 8, 16]
+    totalSize = [730, 490, 360, 180, 95, 50]
+    width = tif.pages[0].tags['ImageWidth'].value
+    length = tif.pages[0].tags['ImageLength'].value
+    zoomF = sp.interpolate.interp1d(zooms, totalSize)
+    currentTotalSize = zoomF(zoomFactor)
+    cellLocs[:, 0] = (cellLocs[:, 0]/length) * currentTotalSize
+    cellLocs[:, 1] = (cellLocs[:, 1]/width) * currentTotalSize
 
     # Calculates the corrected neuropil traces and the specific values that
     # were used to determine the correction factor (intercept and slope of
@@ -738,7 +754,7 @@ def process_s2p_directory(
     np.save(os.path.join(saveDirectory, "rois.id.npy"), cellIds)
     np.save(os.path.join(saveDirectory, "rois.xyz.npy"), locs)
     np.save(os.path.join(saveDirectory, "rois.zProfiles.npy"), zProfile.T)
-    np.save(os.path.join(saveDirectory, "calcium.isZCorrected.npy"), isZcorrected)
+    np.save(os.path.join(saveDirectory, "rois.isZCorrected.npy"), isZcorrected)
     np.save(os.path.join(saveDirectory, "planes.zTrace"), zTrace)
     np.save(os.path.join(saveDirectory, "planes.zcorrelation"), zCorrs)
 
@@ -907,6 +923,7 @@ def process_metadata_directory(
                 raise Exception("No Frames")
 
         except:
+            W
             print("Error in frame time extraction in directory: " + di)
             print("\nresorting to giving first and last frame")
             print(traceback.format_exc())

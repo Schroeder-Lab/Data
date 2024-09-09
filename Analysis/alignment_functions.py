@@ -44,8 +44,8 @@ def get_calcium_aligned(signal, time, eventTimes, window, planes, delays, baseli
             run += 1
         else:
             aligned = np.concatenate((aligned, aligned_tmp), axis=2)
-    aligned = np.array(aligned)
     if (baseline_sub):
+        aligned = np.array(aligned)
         aligned -= np.nanmean(aligned[(t < 0) & (t >= -blTime), :, :], 0)
     return np.array(aligned), t
 

@@ -795,10 +795,25 @@ def get_recorded_video_times(di, searchTerms, cleanNames):
             logFramesNi[j, 0] = int(niLog[j])  # niLog[j].split(",")[0]
             logFramesNi[j, 1] = j
 
+    # check if name exists in log if not remove
+    removedNames = []
+    removedInds = []
+    for i in range(len(cleanNames)):
+        if (not cleanNames[i] in log_df.keys()):
+            removedNames.append(cleanNames[i])
+            removedInds.append(i)
+    for i in removedInds:
+        cleanNames.pop(i)
+
     # find the indeces where this movie gave a frame based on the search term
     Inds = []
     for i in range(len(cleanNames)):
-        Inds.append(log_df[cleanNames[i]].index[log_df[cleanNames[i]].notna()])
+        if (cleanNames[i] in log_df.keys()):
+            Inds.append(
+                log_df[cleanNames[i]].index[log_df[cleanNames[i]].notna()])
+        else:
+            Inds.append(
+                log_df[cleanNames[1]].index[log_df[cleanNames[i]].notna()])
 
     #Inds = pd.array(Inds)
 
@@ -854,4 +869,6 @@ def get_recorded_video_times(di, searchTerms, cleanNames):
 
         colNiTimes[cleanNames[i]] = logFrames
     colNiTimes[cleanNames[-1]] = logFramesNi[:, 0]
+    for r in removedNames:
+        colNiTimes[r] = np.ones(len(logTimeValues))*np.nan
     return colNiTimes

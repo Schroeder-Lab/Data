@@ -127,8 +127,8 @@ def create_2p_processing_ops():
         "Npil_f0_window": 60,
         "zcorrect_mode": "Stack",
         "remove_z_extremes": True,
-        "process_suite2p": False,
-        "process_bonsai": True,
+        "process_suite2p": True,
+        "process_bonsai": False,
         "absZero": None,
     }
     return pops
