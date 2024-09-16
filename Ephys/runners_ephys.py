@@ -401,13 +401,13 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
     process = dataEntry.Process
 
     # Joins ephys directory with the name and the date.
-    ephysDirectory = glob.glob(os.path.join(metadataDir, name, date,
-                                            str(name)+'*', str(name)+'*'))[0]
+    ephysDirectory = os.path.join(metadataDir, name, date, f'{name}_{date}_g0',
+                                  f'{name}_{date}_g0_imec0')
 
     # If this path doesn't exist, returns a ValueError.
     if not os.path.isdir(ephysDirectory):
         raise ValueError(
-            "Ephys directory " + ephysDirectory + "was not found."
+            "Ephys directory " + ephysDirectory + " was not found."
         )
   
     # Joins ephys directory with the name and the date.
