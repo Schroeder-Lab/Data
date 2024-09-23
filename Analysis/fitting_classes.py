@@ -1540,8 +1540,8 @@ class Gauss2DTuner(BaseTuner):
                 np.inf,
                 self.maxSpot[1] + 5,  # ,np.nanmax(x[:, 0])
                 self.maxSpot[0] + 5,  # np.nanmax(x[:, 1])
-                maxSd,  # possibleMaxX,
-                maxSd,  # possibleMaxY,
+                np.nanmax([maxSd, self.minR+0.01]),  # possibleMaxX,
+                np.nanmax([maxSd, self.minR+0.01]),  # possibleMaxY,
                 np.pi,
                 np.inf,
             ),

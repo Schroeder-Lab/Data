@@ -923,7 +923,6 @@ def process_metadata_directory(
                 raise Exception("No Frames")
 
         except:
-            W
             print("Error in frame time extraction in directory: " + di)
             print("\nresorting to giving first and last frame")
             print(traceback.format_exc())

@@ -956,8 +956,8 @@ def get_ignored_index(sts, specficTrials, timeWindows):
         biggerThan = st > timeWindows[:, 0]
         smallerThan = st < timeWindows[:, 1]
         inWindow = biggerThan & smallerThan
-        if (np.sum(inWindow) == 0):
-            ignore[i] = False
+        if (np.sum(inWindow) > 0):
+            ignore[i] = True
     return ignore
 
 
@@ -1028,7 +1028,7 @@ def find_osi_dsi(paramsOri, direction):
     dris = np.zeros(paramsOri.shape[0], dtype=complex)
     for i in range(len(paramsOri)):
         prms = paramsOri[i, :]
-        fnc = direction[i]*tuner.func(rng, *prms)
+        fnc = tuner.func(rng, *prms)
         fnc[fnc <= 0] = 0
         dri = np.sum(np.exp(np.deg2rad(rng) * 1j)*(fnc/np.sum(fnc)))
         ori = np.sum(np.exp(np.deg2rad(2*rng) * 1j)*(fnc/np.sum(fnc)))
