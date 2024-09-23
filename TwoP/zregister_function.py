@@ -162,7 +162,7 @@ def z_register_one_file(ops):
         ops = tiff_to_binary(ops)
     else:
         print("Skipping tiff conversion")
-        ops = init_ops(ops)
+        # ops = init_ops(ops)
     if (not regstate["isOnePlaneCreated"]):
 
         # get plane folders
@@ -170,178 +170,210 @@ def z_register_one_file(ops):
             [
                 f.path
                 for f in os.scandir(save_folder)
-                if f.is_dir() and f.name[:5] == "plane"
+                if f.is_dir() and f.name[:5] == "plane" and len(f.name) > 5
             ]
         )
         ops_paths = [os.path.join(f, "ops.npy") for f in plane_folders]
         nplanes = len(ops_paths)
         foundOps = False
         opsI = 0
-        while(not foundOps):
+        while(not foundOps) & (opsI<=len(ops_paths)):
             if (os.path.exists((ops_paths[opsI]))):
-                ops = np.load(ops_paths[opsI], allow_pickle=True).item()
+                opsTemp = np.load(ops_paths[opsI], allow_pickle=True).item()
+                opsTemp["ignore_flyback"] = ops["ignore_flyback"]
+                ops = opsTemp
                 foundOps = True
             else:
                 opsI += 1
         # compute reference image
         refImgs = []
 
+        # check if already did the z-alignment
+        cmaxCount = 0
+        cmaxFinished = False
         for ipl, ops_path in enumerate(ops_paths):
-            if ipl in ops["ignore_flyback"]:
-                print(">>>> skipping flyback PLANE", ipl)
-                continue
-            n_frames, Ly, Lx = ops["nframes"], ops["Ly"], ops["Lx"]
+            opsTemp = np.load(ops_path, allow_pickle=True).item()
+            # make sure to update ignore flyback
+            opsTemp["ignore_flyback"] = ops["ignore_flyback"]
+            np.save(ops_path, opsTemp)
 
-            null = contextlib.nullcontext()
-            twoc = ops["nchannels"] > 1
+            if 'cmax_registration' in opsTemp:
+                cmaxCount += 1
+        if (cmaxCount) >= (len(ops_paths)-len(ops["ignore_flyback"])):
+            cmaxFinished = True
 
-            ops = np.load(ops_path, allow_pickle=True).item()
-            align_by_chan2 = ops["functional_chan"] != ops["align_by_chan"]
-            raw = ops["keep_movie_raw"]
-            reg_file = ops["reg_file"]
-            raw_file = ops.get("raw_file", 0) if raw else reg_file
-            if ops["nchannels"] > 1:
-                reg_file_chan2 = ops["reg_file_chan2"]
-                raw_file_chan2 = (
-                    ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
-                )
-            else:
-                reg_file_chan2 = reg_file
-                raw_file_chan2 = reg_file
+        if (not cmaxFinished):
+            for ipl, ops_path in enumerate(ops_paths):
+                if ipl in ops["ignore_flyback"]:
+                    print(">>>> skipping flyback PLANE", ipl)
+                    continue
+                n_frames, Ly, Lx = ops["nframes"], ops["Ly"], ops["Lx"]
 
-            align_file = reg_file_chan2 if align_by_chan2 else reg_file
-            align_file_raw = raw_file_chan2 if align_by_chan2 else raw_file
-            Ly, Lx = ops["Ly"], ops["Lx"]
+                null = contextlib.nullcontext()
+                twoc = ops["nchannels"] > 1
 
-            # M:this part of the code above just does registration etc (what is done with the GUI usually)
-            # grab frames
-            with BinaryFile(Ly=Ly, Lx=Lx, filename=align_file_raw, n_frames=n_frames) as f_align_in:
-                # n_frames = f_align_in.shape[0]
-                frames = f_align_in[
-                    np.linspace(
-                        0,
-                        n_frames,
-                        1 + np.minimum(ops["nimg_init"], n_frames),
-                        dtype=int,
-                    )[:-1]
-                ]
-
-            # M: this is done to adjust bidirectional shift occuring due to line scanning
-            # compute bidiphase shift
-            if (
-                ops["do_bidiphase"]
-                and ops["bidiphase"] == 0
-                and not ops["bidi_corrected"]
-            ):
-                bidiphase = bidiphase.compute(frames)
-                print(
-                    "NOTE: estimated bidiphase offset from data: %d pixels"
-                    % bidiphase
-                )
-                ops["bidiphase"] = bidiphase
-                # shift frames
-                if bidiphase != 0:
-                    bidiphase.shift(frames, int(ops["bidiphase"]))
-            else:
-                bidiphase = 0
-
-            # compute reference image
-            refImgs.append(register.compute_reference(frames))
-
-        # align reference frames to each other
-        frames = np.array(refImgs).copy()
-        for frame in frames:
-            rmin, rmax = np.int16(np.percentile(frame, 1)), np.int16(
-                np.percentile(frame, 99)
-            )
-            frame[:] = np.clip(frame, rmin, rmax)
-
-        refImg = frames.mean(axis=0)
-        # M: the below section is just the usual xy registration
-        niter = 8
-        for iter in range(0, niter):
-            # rigid registration
-            ymax, xmax, cmax = rigid.phasecorr(
-                data=rigid.apply_masks(
-                    frames,
-                    *rigid.compute_masks(
-                        refImg=refImg,
-                        maskSlope=ops["spatial_taper"]
-                        if ops["1Preg"]
-                        else 3 * ops["smooth_sigma"],
+                ops = np.load(ops_path, allow_pickle=True).item()
+                align_by_chan2 = ops["functional_chan"] != ops["align_by_chan"]
+                raw = ops["keep_movie_raw"]
+                reg_file = ops["reg_file"]
+                raw_file = ops.get("raw_file", 0) if raw else reg_file
+                if ops["nchannels"] > 1:
+                    reg_file_chan2 = ops["reg_file_chan2"]
+                    raw_file_chan2 = (
+                        ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
                     )
-                ),
-                cfRefImg=rigid.phasecorr_reference(
-                    refImg=refImg, smooth_sigma=ops["smooth_sigma"]
-                ),
-                maxregshift=ops["maxregshift"],
-                smooth_sigma_time=ops["smooth_sigma_time"],
-            )
-            dys = np.zeros(len(frames), "int")
-            dxs = np.zeros(len(frames), "int")
-            for i, (frame, dy, dx) in enumerate(zip(frames, ymax, xmax)):
-                frame[:] = rigid.shift_frame(frame=frame, dy=dy, dx=dx)
-                dys[i] = dy
-                dxs[i] = dx
+                else:
+                    reg_file_chan2 = reg_file
+                    raw_file_chan2 = reg_file
 
-        print("shifts of reference images: (y,x) = ", dys, dxs)
+                align_file = reg_file_chan2 if align_by_chan2 else reg_file
+                align_file_raw = raw_file_chan2 if align_by_chan2 else raw_file
+                Ly, Lx = ops["Ly"], ops["Lx"]
 
-        # frames = smooth_reference_stack(frames, ops)
+                # M:this part of the code above just does registration etc (what is done with the GUI usually)
+                # grab frames
+                with BinaryFile(Ly=Ly, Lx=Lx, filename=align_file_raw, n_frames=n_frames) as f_align_in:
+                    # n_frames = f_align_in.shape[0]
+                    frames = f_align_in[
+                        np.linspace(
+                            0,
+                            n_frames,
+                            1 + np.minimum(ops["nimg_init"], n_frames),
+                            dtype=int,
+                        )[:-1]
+                    ]
 
-        refImgs = list(frames)
+                # M: this is done to adjust bidirectional shift occuring due to line scanning
+                # compute bidiphase shift
+                if (
+                    ops["do_bidiphase"]
+                    and ops["bidiphase"] == 0
+                    and not ops["bidi_corrected"]
+                ):
+                    bidiphase = bidiphase.compute(frames)
+                    print(
+                        "NOTE: estimated bidiphase offset from data: %d pixels"
+                        % bidiphase
+                    )
+                    ops["bidiphase"] = bidiphase
+                    # shift frames
+                    if bidiphase != 0:
+                        bidiphase.shift(frames, int(ops["bidiphase"]))
+                else:
+                    bidiphase = 0
 
-        # register and choose the best plane match at each time point,
-        # in accordance with the reference image of each plane
+                # compute reference image
+                refImgs.append(register.compute_reference(frames))
 
-        # imp.reload(utils)
-        # imp.reload(rigid)
-        # imp.reload(register)
-        print("Finding correlation in z direciton")
-        ops["refImg"] = refImgs
-        ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
-        # Get the correlation between the reference images
-        corrs_all = get_reference_correlation(frames, ops)
-        cmaxRegistrations = []
-        zposList = []
-        for ipl, ops_path in enumerate(ops_paths):
-            if ipl in ops["ignore_flyback"]:
-                print(">>>> skipping flyback PLANE", ipl)
-                continue
-            else:
-                print(">>>> registering PLANE", ipl)
-            ops = np.load(ops_path, allow_pickle=True).item()
-            reg_file = ops["reg_file"]
-            raw_file = ops.get("raw_file", 0) if raw else reg_file
-            if ops["nchannels"] > 1:
-                reg_file_chan2 = ops["reg_file_chan2"]
-                raw_file_chan2 = (
-                    ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
+            # align reference frames to each other
+            frames = np.array(refImgs).copy()
+            for frame in frames:
+                rmin, rmax = np.int16(np.percentile(frame, 1)), np.int16(
+                    np.percentile(frame, 99)
                 )
+                frame[:] = np.clip(frame, rmin, rmax)
 
-            null = None
-            with io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file, n_frames=n_frames) \
-                if raw else null as f_raw, \
-                io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file, n_frames=n_frames) as f_reg, \
-                io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file_chan2, n_frames=n_frames) \
-                if raw and twoc else null as f_raw_chan2,\
-                io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file_chan2, n_frames=n_frames) \
-                    if twoc else null as f_reg_chan2:
-                registration_outputs = register.registration_wrapper(
-                    f_reg, f_raw=f_raw, f_reg_chan2=f_reg_chan2, f_raw_chan2=f_raw_chan2,
-                    refImg=refImgs, align_by_chan2=align_by_chan2, ops=ops)
+            refImg = frames.mean(axis=0)
+            # M: the below section is just the usual xy registration
+            niter = 8
+            for iter in range(0, niter):
+                # rigid registration
+                ymax, xmax, cmax = rigid.phasecorr(
+                    data=rigid.apply_masks(
+                        frames,
+                        *rigid.compute_masks(
+                            refImg=refImg,
+                            maskSlope=ops["spatial_taper"]
+                            if ops["1Preg"]
+                            else 3 * ops["smooth_sigma"],
+                        )
+                    ),
+                    cfRefImg=rigid.phasecorr_reference(
+                        refImg=refImg, smooth_sigma=ops["smooth_sigma"]
+                    ),
+                    maxregshift=ops["maxregshift"],
+                    smooth_sigma_time=ops["smooth_sigma_time"],
+                )
+                dys = np.zeros(len(frames), "int")
+                dxs = np.zeros(len(frames), "int")
+                for i, (frame, dy, dx) in enumerate(zip(frames, ymax, xmax)):
+                    frame[:] = rigid.shift_frame(frame=frame, dy=dy, dx=dx)
+                    dys[i] = dy
+                    dxs[i] = dx
 
-                ops = register.save_registration_outputs_to_ops(
-                    registration_outputs, ops)
+            print("shifts of reference images: (y,x) = ", dys, dxs)
 
-                meanImgE = register.compute_enhanced_mean_image(
-                    ops["meanImg"].astype(np.float32), ops)
-                ops["meanImgE"] = meanImgE
-            # ops = register.register_binary(ops, refImg=refImgs)
-            cmaxRegistrations.append(ops["cmax_registration"])
-            zposList.append(ops["zpos_registration"])
-            np.save(ops["ops_path"], ops)
+            # frames = smooth_reference_stack(frames, ops)
+
+            refImgs = list(frames)
+
+            # register and choose the best plane match at each time point,
+            # in accordance with the reference image of each plane
+
+            # imp.reload(utils)
+            # imp.reload(rigid)
+            # imp.reload(register)
+            print("Finding correlation in z direciton")
+            ops["refImg"] = refImgs
+            ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
+            # Get the correlation between the reference images
+            corrs_all = get_reference_correlation(frames, ops)
+            cmaxRegistrations = []
+            zposList = []
+            for ipl, ops_path in enumerate(ops_paths):
+                if ipl in ops["ignore_flyback"]:
+                    print(">>>> skipping flyback PLANE", ipl)
+                    continue
+                else:
+                    print(">>>> registering PLANE", ipl)
+                ops = np.load(ops_path, allow_pickle=True).item()
+                reg_file = ops["reg_file"]
+                raw_file = ops.get("raw_file", 0) if raw else reg_file
+                if ops["nchannels"] > 1:
+                    reg_file_chan2 = ops["reg_file_chan2"]
+                    raw_file_chan2 = (
+                        ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
+                    )
+
+                null = None
+                with io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file, n_frames=n_frames) \
+                    if raw else null as f_raw, \
+                    io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file, n_frames=n_frames) as f_reg, \
+                    io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file_chan2, n_frames=n_frames) \
+                    if raw and twoc else null as f_raw_chan2,\
+                    io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file_chan2, n_frames=n_frames) \
+                        if twoc else null as f_reg_chan2:
+                    registration_outputs = register.registration_wrapper(
+                        f_reg, f_raw=f_raw, f_reg_chan2=f_reg_chan2, f_raw_chan2=f_raw_chan2,
+                        refImg=refImgs, align_by_chan2=align_by_chan2, ops=ops)
+
+                    ops = register.save_registration_outputs_to_ops(
+                        registration_outputs, ops)
+
+                    meanImgE = register.compute_enhanced_mean_image(
+                        ops["meanImg"].astype(np.float32), ops)
+                    ops["meanImgE"] = meanImgE
+                # ops = register.register_binary(ops, refImg=refImgs)
+                cmaxRegistrations.append(ops["cmax_registration"])
+                zposList.append(ops["zpos_registration"])
+                np.save(ops["ops_path"], ops)
+            cmaxs = np.dstack(cmaxRegistrations)
+            smooth_images_by_correlation(ops_paths_clean, corrs_all)
+        else:
+            ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
+            frames = np.array(ops['refImg'])
+            corrs_all = get_reference_correlation(frames, ops)
+            cmaxRegistrations = []
+            zposList = []
+            for ipl, ops_path in enumerate(ops_paths):
+                if ipl in ops["ignore_flyback"]:
+                    print(">>>> skipping flyback PLANE", ipl)
+                    continue
+                opsTemp = np.load(ops_path, allow_pickle=True).item()
+                cmaxRegistrations.append(opsTemp["cmax_registration"])
+                zposList.append(opsTemp["zpos_registration"])
+
         cmaxs = np.dstack(cmaxRegistrations)
-
         # find which plane gives the best median correlation
         maxPlaneCorr = np.nanmax(cmaxs, 2)
         medianCorr = np.nanmean(maxPlaneCorr, axis=0)
@@ -354,7 +386,7 @@ def z_register_one_file(ops):
         maxCorr = cmaxs[:, bestCorrRefPlane, :]
         # planeList = np.nanargmax(maxCorr,1)
         # maxCorrId = zposList[bestCorrRefPlane]
-        smooth_images_by_correlation(ops_paths_clean, corrs_all)
+
         cmax_selected = cmaxs[:, :, bestCorrRefPlane]
         print("Creating new file")
         # At this point the files are registered properly according to where they are
