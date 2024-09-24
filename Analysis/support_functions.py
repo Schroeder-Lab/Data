@@ -681,7 +681,7 @@ def load_grating_data(directory):
     if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
         fileNameDic["gratingsSf"] = "gratings.spatialF.updated.npy"
 
-    if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
+    if os.path.exists(os.path.join(directory, "gratings.ori.updated.npy")):
         fileNameDic["gratingsOri"] = "gratings.direction.updated.npy"
     if os.path.exists(os.path.join(directory, "gratings.contrast.updated.npy")):
         fileNameDic["gratingsContrast"] = "gratings.contrast.updated.npy"
@@ -701,7 +701,38 @@ def load_grating_data(directory):
             continue
     return data
 
-
+def reshape_grating_data(directory):
+    # Check if an update exists and load, reshape, save if necessary
+    if os.path.exists(os.path.join(directory, "gratings.st.updated.npy")):
+        st = np.load(os.path.join(directory, "gratings.st.updated.npy"))
+        st = st.reshape(st.shape[0], 1)  
+        np.save(os.path.join(directory, "gratings.st.updated.npy"), st)
+        print( "st done")
+    if os.path.exists(os.path.join(directory, "gratings.et.updated.npy")):
+        et = np.load(os.path.join(directory, "gratings.et.updated.npy"))
+        et = et.reshape(et.shape[0], 1) 
+        np.save(os.path.join(directory, "gratings.et.updated.npy"), et)
+        
+    if os.path.exists(os.path.join(directory, "gratings.temporalF.updated.npy")):
+        temporalF = np.load(os.path.join(directory, "gratings.temporalF.updated.npy"))
+        temporalF = temporalF.reshape(temporalF.shape[0], 1)  
+        np.save(os.path.join(directory, "gratings.temporalF.updated.npy"), temporalF)
+        print ("tf done")
+    if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
+        spatialF = np.load(os.path.join(directory, "gratings.spatialF.updated.npy"))
+        spatialF = spatialF.reshape(spatialF.shape[0], 1)  
+        np.save(os.path.join(directory, "gratings.spatialF.updated.npy"), spatialF)
+    
+    if os.path.exists(os.path.join(directory, "gratings.ori.updated.npy")):
+        ori = np.load(os.path.join(directory, "gratings.ori.updated.npy"))
+        ori = ori.reshape(ori.shape[0], 1)  
+        np.save(os.path.join(directory, "gratings.ori.updated.npy"), ori)
+    
+    if os.path.exists(os.path.join(directory, "gratings.contrast.updated.npy")):
+        contrast = np.load(os.path.join(directory, "gratings.contrast.updated.npy"))
+        contrast = contrast.reshape(contrast.shape[0], 1) 
+        
+        
 def load_circle_data(directory):
     fileNameDic = {
         "sig": "calcium.dff.npy",
