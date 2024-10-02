@@ -41,6 +41,7 @@ def get_stimulus_info(filePath, props=None):
 
         props = np.loadtxt(dirs[0], delimiter=",", dtype=str)
         props = props[1:]
+    props = np.atleast_1d(props)
     # Gets the log file which contains all the parameters for each stimulus
     # presentation.
     logPath = glob.glob(os.path.join(filePath, "Log*"))

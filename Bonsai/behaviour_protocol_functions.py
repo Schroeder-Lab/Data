@@ -199,7 +199,7 @@ def stimulus_gratings_reward(directory, frameChanges):
 
 
 def stimulus_naturalImages(directory, frameChanges):
-    stimProps = get_stimulus_info(directory)
+    stimProps = get_stimulus_info(directory, 'FileIndex')
 
     # Gets the start times of each stimulus.
     # need to ignore the first stimulus since it's just the small square onset
@@ -207,9 +207,20 @@ def stimulus_naturalImages(directory, frameChanges):
     # Gets the end times  of each stimulus.
     et = frameChanges[2::2].reshape(-1, 1).copy()
 
+    if (len(st) > len(et)):
+        if (st[-1] > et[-1]):
+            st = st[:-1]
+
+    imgList = []
+    imgFile = glob.glob(os.path.join(directory, "imgList*.csv"))
+
+    if (len(imgFile) > 0):
+        imgList = pd.read_csv(imgFile[0], header=None).to_nump()
+
     return {"natural.startTime.npy": st,
             "natural.endTime.npy": et,
             "natural.fileIndex.npy": stimProps.FileIndex.to_numpy().reshape(-1, 1).astype(int).copy(),
+            "natural.imgList": imgList,
             "naturalExp.intervals.npy": [st[0, 0], et[-1, 0]]
             }
 
