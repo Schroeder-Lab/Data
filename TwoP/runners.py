@@ -207,7 +207,7 @@ def _process_s2p_singlePlane(
         try:
             channel = ops["align_by_chan"]
             if (channel == 1):
-                reg_file = None
+                reg_file = ops["reg_file"]
                 # Gets the reference image from Suite2P.
                 refImg = ops["meanImg"]
             else:

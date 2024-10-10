@@ -9,6 +9,7 @@ from Data.Bonsai.log_extraction_functions import get_stimulus_info, get_sparse_n
 import glob
 import os
 import warnings
+import pandas as pd
 
 
 def stimulus_circles(directory, frameChanges):
@@ -215,12 +216,12 @@ def stimulus_naturalImages(directory, frameChanges):
     imgFile = glob.glob(os.path.join(directory, "imgList*.csv"))
 
     if (len(imgFile) > 0):
-        imgList = pd.read_csv(imgFile[0], header=None).to_nump()
+        imgList = pd.read_csv(imgFile[0], header=None).to_numpy()
 
     return {"natural.startTime.npy": st,
             "natural.endTime.npy": et,
             "natural.fileIndex.npy": stimProps.FileIndex.to_numpy().reshape(-1, 1).astype(int).copy(),
-            "natural.imgList": imgList,
+            "naturalExp.imgList.npy": {'imgList': np.array(imgList)},
             "naturalExp.intervals.npy": [st[0, 0], et[-1, 0]]
             }
 

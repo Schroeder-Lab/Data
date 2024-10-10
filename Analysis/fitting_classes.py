@@ -165,8 +165,10 @@ class BaseTuner(ABC):
                 bounds=bounds,
                 xtol=self.xtol,
                 # max_nfev=self.max_nfev,
+                absolute_sigma=False,
                 method="trf",
                 loss="soft_l1",
+                maxfev=1e8
             )
             return props
         except:
@@ -1249,16 +1251,16 @@ class GammaTuner(BaseTuner):
             (
                 minAvg,
                 0,
-                -100,
-                -1,
+                0,
+                0,
                 1,
             ),
             (
                 np.nanmax(avgy),
                 2*maxAvg,
-                100,
+                5,
                 0.5,
-                200,
+                100,
             ),  # np.nanmax(y),  # np.nanmax(y),
         )
         if ((func is None) & (self.func == self.gamma)) | (

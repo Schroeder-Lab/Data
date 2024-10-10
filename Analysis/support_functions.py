@@ -1066,3 +1066,21 @@ def find_osi_dsi(paramsOri, direction):
         oris[i] = ori
         dris[i] = dri
     return oris, dris
+
+def calculate_snr(responses):
+    """
+    calculated the quality index, a measure of SNR
+
+    Parameters
+    ----------
+    responses : TYPEW
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    varTime = np.nanvar(np.nanmean(responses, 1), 0)
+    varTrials = np.nanmean(np.nanvar(responses, 0), 0)
+    return varTime / varTrials
