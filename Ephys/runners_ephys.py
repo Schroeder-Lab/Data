@@ -160,7 +160,10 @@ def process_metadata_directory_ephys(
             indexPhotodiode = detect_photodiode_changes(
                             photodiode, 
                             plot=pops["plot"],
-                            fs=1)
+                            upThreshold=0.1,
+                            downThreshold=0.2,
+                            fs=1,
+                            waitTime=8000)
 
             changesPhotodiode = nt[indexPhotodiode.astype(int)]
         except:
