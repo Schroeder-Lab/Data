@@ -105,6 +105,27 @@ def get_trial_classification_running(
         activeTrials = np.where(whHigh > criterion)[0]
     return quietTrials, activeTrials
 
+def get_trial_average_velocity(
+    wheelVelocity,
+    wheelTs,
+    stimSt,
+    stimEt,    
+):
+    wheelVelocity = np.abs(wheelVelocity)
+
+    stimSt = stimSt.reshape(-1, 1)
+    stimEt = stimEt.reshape(-1, 1)
+
+    wh, ts = align_stim(
+        wheelVelocity,
+        wheelTs,
+        stimSt,
+        np.hstack((stimSt, stimEt)) - stimSt,
+    )
+
+    avgV = np.nanmean(wh,0)
+    return avgV
+
 
 def get_running_distribution(
     wheelVelocity,
@@ -681,7 +702,7 @@ def load_grating_data(directory):
     if os.path.exists(os.path.join(directory, "gratings.spatialF.updated.npy")):
         fileNameDic["gratingsSf"] = "gratings.spatialF.updated.npy"
 
-    if os.path.exists(os.path.join(directory, "gratings.ori.updated.npy")):
+    if os.path.exists(os.path.join(directory, "gratings.direction.updated.npy")):
         fileNameDic["gratingsOri"] = "gratings.direction.updated.npy"
     if os.path.exists(os.path.join(directory, "gratings.contrast.updated.npy")):
         fileNameDic["gratingsContrast"] = "gratings.contrast.updated.npy"

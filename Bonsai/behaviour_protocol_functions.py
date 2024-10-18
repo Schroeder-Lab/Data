@@ -153,6 +153,52 @@ def stimulus_gratings(directory, frameChanges):
             }
 
 
+def stimulus_gratingsLuminance(directory, frameChanges):
+    # Gets the identity of the stimuli (see function for
+    # further details).
+    stimProps = get_stimulus_info(directory)
+    # Gets the start times of each stimulus.
+    st = frameChanges[::2].reshape(-1, 1).copy()
+    # Gets the end times  of each stimulus.
+    et = frameChanges[1::2].reshape(-1, 1).copy()
+
+    # Checks if number of frames and stimuli match (if not, there
+    # could have been an issue with the photodiode, check if there
+    # are irregular frames in the photodiode trace).
+    if len(stimProps) != len(st):
+        # raise ValueError(
+        #     "Number of frames and stimuli do not match. Skpping"
+        # )
+        warnings.warn("Number of frames and stimuli do not match")
+        if (len(et) == len(stimProps)):
+            warnings.warn(
+                "Assuming there was a false photodiode rise in the beginning, but check!")
+            st = frameChanges[0:-1:2].reshape(-1, 1).copy()
+            # Gets the end times  of each stimulus.
+            # et = frameChanges[2::2].reshape(-1, 1).copy()
+    # Adds the start and end times from above to the respective
+    # lists.
+
+    if "Reward" in stimProps.columns:
+        reward = np.array(
+            [x in "True" for x in np.array(stimProps.Reward)]).reshape(-1, 1).astype(bool).copy()
+    else:
+        reward = np.ones_like(st) * np.nan
+
+    return {"gratings.startTime.npy": st,
+            "gratings.endTime.npy": et,
+            "gratings.direction.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+            "gratings.spatialF.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.luminance.npy": stimProps.Lum.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratings.reward.npy": reward,
+            "gratingsExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
+            # TODO: check if this is usefull; should add same line to gratings
+            "gratingsExp.description.npy": "Gratings",
+            }
+
+
 def stimulus_gratings_reward(directory, frameChanges):
 
     # Gets the identity of the stimuli (see function for
@@ -360,4 +406,5 @@ stimulus_prcoessing_dictionary = {
     "Flicker": stimulus_flicker,
     "Oddball": stimulus_oddball,
     "GratingsStep": stimulus_gratingsStep,
+    "GratingsLuminance": stimulus_gratingsLuminance
 }
