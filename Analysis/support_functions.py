@@ -313,7 +313,7 @@ def is_responsive_direction(df, criterion=0.05):
     maxId = groupMeans_enough.idxmax()['avg_corrected']
 
     bestData = dGroups.get_group(maxId)
-
+    bestData = bestData.dropna()
     _, p = sp.stats.ttest_rel(bestData['bl'], bestData['avg'])
 
     if p < (criterion):
