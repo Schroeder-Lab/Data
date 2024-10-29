@@ -1517,7 +1517,7 @@ class Gauss2DTuner(BaseTuner):
         # 1 sd cannot exceed boarders
         maxA = np.max([np.abs(maxX - p0[1]), np.abs(minX - p0[1])])
         maxB = np.max([np.abs(maxY - p0[2]), np.abs(minY - p0[2])])
-        maxSd = np.max([maxA, maxB])
+        maxSd = np.max([maxA, maxB])/2
 
         xu = np.unique(x[:, 0])
         yu = np.unique(x[:, 1])
