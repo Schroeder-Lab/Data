@@ -360,7 +360,9 @@ def stimulus_oddball(directory, frameChanges):
 
 
 def stimulus_gratingsStep(directory, frameChanges):
-
+    '''
+    Step increasing/decreasing TFreq
+    '''
     stimProps = get_stimulus_info(directory)
     # Gets the start times of each stimulus.
     st = frameChanges[::2].reshape(-1, 1).copy()
@@ -375,10 +377,8 @@ def stimulus_gratingsStep(directory, frameChanges):
         warnings.warn("Number of frames and stimuli do not match")
         if (len(et) == len(stimProps)):
             warnings.warn(
-                "Assuming there was a false photodiode rise in the beginning, but check!")
-            st = frameChanges[1::2].reshape(-1, 1).copy()
-            # Gets the end times  of each stimulus.
-            et = frameChanges[2::2].reshape(-1, 1).copy()
+                "Assuming there was a false photodiode rise in the end, but check!")
+            st = frameChanges[0:-1:2].reshape(-1, 1).copy()
 
     # Adds the start and end times from above to the respective
     # lists.
@@ -394,6 +394,77 @@ def stimulus_gratingsStep(directory, frameChanges):
             }
 
 
+def stimulus_gratingsContrastStep(directory, frameChanges):
+
+    stimProps = get_stimulus_info(directory)
+    # Gets the start times of each stimulus.
+    st = frameChanges[::2].reshape(-1, 1).copy()
+    # Gets the end times  of each stimulus.
+    et = frameChanges[1::2].reshape(-1, 1).copy()
+
+    # Checks if number of frames and stimuli match (if not, there
+    # could have been an issue with the photodiode, check if there
+    # are irregular frames in the photodiode trace).
+    if len(stimProps) != len(st):
+
+        warnings.warn("Number of frames and stimuli do not match")
+        if (len(et) == len(stimProps)):
+            warnings.warn(
+                "Assuming there was a false photodiode rise in the end, but check!")
+            st = frameChanges[0:-1:2].reshape(-1, 1).copy()
+
+    # Adds the start and end times from above to the respective
+    # lists.
+
+    return {"gratingsContrastStep.startTime.npy": st,
+            "gratingsContrastStep.endTime.npy": et,
+            "gratingsContrastStep.direction.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+            "gratingsContrastStep.spatialF.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsContrastStep.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsContrastStep.contrastStart.npy": stimProps.Contrast_Start.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsContrastStep.contrastEnd.npy": stimProps.Contrast_End.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsContrastStep.intervals.npy": [st[0], et[-1]],
+            }
+
+
+def stimulus_classificationExtended(directory, frameChanges): # TESTING FASE
+    retinal_et = np.append(
+        frameChanges[1::],
+        frameChanges[-1] + (frameChanges[14] - frameChanges[13]),
+    )
+
+    retinal_st = frameChanges
+
+    retinal_stimType = np.empty(
+        (len(frameChanges), 1), dtype=object
+    )
+    retinal_stimType[18::19] = "Off"
+    retinal_stimType[0::19] = "On"
+    retinal_stimType[1::19] = "Off"
+    retinal_stimType[2::19] = "Grey"
+    retinal_stimType[3::19] = "ChirpF"
+    retinal_stimType[4::19] = "Grey"
+    retinal_stimType[5::19] = "ChirpCIncreasing"
+    retinal_stimType[6::19] = "Grey"
+    retinal_stimType[7::19] = "ChirpCDecreasing"
+    retinal_stimType[8::19] = "Grey"
+    retinal_stimType[9::19] = "ChirpCIncreasing2Hz"
+    retinal_stimType[10::19] = "Grey"
+    retinal_stimType[11::19] = "ChirpCDecreasing2Hz"   
+    retinal_stimType[12::19] = "Grey"
+    retinal_stimType[13::19] = "Off"
+    retinal_stimType[14::19] = "Blue"
+    retinal_stimType[15::19] = "Off"
+    retinal_stimType[16::19] = "Green"
+    retinal_stimType[17::19] = "Off"
+
+    return {'fullFieldExtended.startTime.npy': retinal_st.reshape(-1, 1).copy(),
+            "fullFieldExtended.endTime.npy": retinal_et.reshape(-1, 1).copy(),
+            "fullFieldExtended.stim.npy": retinal_stimType.copy(),
+            "fullFieldExtended.intervals.npy": [retinal_st[0], retinal_et[-1]]
+            }
+    
+
 stimulus_prcoessing_dictionary = {
     "Gratings": stimulus_gratings,
     "GratingsReward": stimulus_gratings_reward,
@@ -406,5 +477,7 @@ stimulus_prcoessing_dictionary = {
     "Flicker": stimulus_flicker,
     "Oddball": stimulus_oddball,
     "GratingsStep": stimulus_gratingsStep,
-    "GratingsLuminance": stimulus_gratingsLuminance
+    "GratingsLuminance": stimulus_gratingsLuminance,
+    "GratingsContrastStep": stimulus_gratingsContrastStep,
+    "RetinalExtended": stimulus_classificationExtended,
 }
