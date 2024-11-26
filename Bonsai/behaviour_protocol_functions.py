@@ -326,19 +326,23 @@ def stimulus_oddball(directory, frameChanges):
     # Checks if number of frames and stimuli match (if not, there
     # could have been an issue with the photodiode, check if there
     # are irregular frames in the photodiode trace).
-    if len(stimProps) != len(st):
+    if (len(stimProps)+1 == len(st)) & (len(stimProps) == len(et)):
         # raise ValueError(
         #     "Number of frames and stimuli do not match. Skpping"
         # )
         warnings.warn("Number of frames and stimuli do not match")
         if (len(et) == len(stimProps)):
             warnings.warn(
-                "Assuming there was a false photodiode rise in the beginning, but check!")
-            st = frameChanges[1::2].reshape(-1, 1).copy()
-            # Gets the end times  of each stimulus.
-            et = frameChanges[2::2].reshape(-1, 1).copy()
-    # Adds the start and end times from above to the respective
-    # lists.
+                "Assuming there was a false photodiode rise in the end, but check!")
+            st = frameChanges[0:-1:2].reshape(-1, 1).copy()
+            et = frameChanges[1:-1:2].reshape(-1, 1).copy()
+    
+    elif (len(stimProps)+1 == len(st)) & (len(stimProps)+1 == len(et)):
+        warnings.warn("Number of frames and stimuli do not match")
+        warnings.warn(
+                "Assuming there was 2 false photodiode rise: beggining and end, but check!")
+        st = frameChanges[1:-1:2].reshape(-1, 1).copy()
+        et = frameChanges[2:-1:2].reshape(-1, 1).copy()
 
     if "Reward" in stimProps.columns:
         reward = np.array(
@@ -427,7 +431,7 @@ def stimulus_gratingsContrastStep(directory, frameChanges):
             }
 
 
-def stimulus_classificationExtended(directory, frameChanges): # TESTING FASE
+def stimulus_classificationExtended(directory, frameChanges): 
     retinal_et = np.append(
         frameChanges[1::],
         frameChanges[-1] + (frameChanges[14] - frameChanges[13]),
