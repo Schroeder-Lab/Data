@@ -993,10 +993,18 @@ class ContrastTuner(BaseTuner):
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - minAvg
         bounds = (
-            (minAvg,
-             0, 0, 1),
-            (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
-             maxAvg+0.2*np.abs(maxAvg), 1, 10),
+            # (minAvg,
+            #  0, 0, 1),
+            # (np.nanmax(avgy)+0.2*np.abs(np.nanmax(avgy)),
+            #  maxAvg+0.2*np.abs(maxAvg), 1, 10),
+            (0,                     # R0 lower bound
+             0,                     # R lower bound
+             0.05,                  # c50 lower bound
+             0.5),                  # n lower bound
+            (0 + + np.finfo(float).eps,                     # R0 upper bound (constant)
+             2 * np.max(avgy),      # R upper bound
+             0.9,                   # c50 upper bound
+             3)                     # n upper bound
         )
         if ((func is None) & (self.func == self.hyperbolic)) | (
             (not (func is None)) & (func == self.hyperbolic)
