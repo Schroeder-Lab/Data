@@ -954,6 +954,10 @@ class ContrastTuner(BaseTuner):
 
         if args[0] == "contrast_split_full":
             self.func = self.hyperbolic_split_full
+        if args[0] == "contrast_modified":
+            self.func = self.hyperbolic_modified
+        if args[0] == "contrast_modified_split":
+            self.func = self.hyperbolic_modified_split
 
     def _make_prelim_guess(self, x, y):
         # get average per ori
@@ -1010,6 +1014,13 @@ class ContrastTuner(BaseTuner):
             (not (func is None)) & (func == self.hyperbolic)
         ):
             return p0, bounds  # just take default params
+        
+        if ((func is None) & (self.func == self.hyperbolic_modified)) | (
+            (not (func is None)) & (func == self.hyperbolic_modified)
+        ):
+            p0 = tuple(np.append(p0,1))
+            bounds = (tuple(np.append(bounds[0],1)),tuple(np.append(bounds[1],3)))
+            return p0, bounds  # just take default params and add the last scaling param
 
         if ((func is None) & (self.func == self.hyperbolic_split)) | (
             (not (func is None)) & (func == self.hyperbolic_split)
@@ -1155,6 +1166,78 @@ class ContrastTuner(BaseTuner):
                         bounds[1][3],
                     ),
                 )
+            return p0, 
+        
+        if ((func is None) & (self.func == self.hyperbolic_modified_split)) | (
+            (not (func is None)) & (func == self.hyperbolic__modified_split)
+        ):
+            try:
+                
+                p01 = self._make_prelim_guess(x[:self.sep], y[:self.sep])
+                p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
+                
+                # add scaling factor at the end
+                p0 = (p01[0], p02[0], p01[1], p02[1],
+                      p01[2], p02[2], p01[3], p02[3],1,1)
+
+                min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
+
+                bounds = (
+                    (
+                        min1-0.2*np.abs(min1),
+                        min2-0.2*np.abs(min2),
+                        bounds[0][1],
+                        bounds[0][1],
+                        0,  # np.nanmax([0, p01[-2]-0.2*p01[-2]]),
+                        0,  # np.nanmax([0, p02[-2]-0.2*p02[-2]]),
+                        bounds[0][3],
+                        bounds[0][3],
+                        1,
+                        1
+                    ),
+                    (
+                        max1+0.2*np.abs(max1),
+                        max2+0.2*np.abs(max2),
+                        (max1-min1)+0.2*np.abs((max1-min1)),
+                        (max2-min2)+0.2*np.abs((max2-min2)),
+                        1,  # np.nanmin([1, p01[-2]+0.2*p01[-2]]),
+                        1,  # np.nanmin([1, p02[-2]+0.2*p02[-2]]),
+                        bounds[1][3],
+                        bounds[1][3],
+                        3,
+                        3
+                    ),
+                )
+            except:
+                p0 = (p0[0], p0[0], p0[1], p0[1],
+                      p0[2], p0[2], p0[3], p0[3],1,1)
+
+                bounds = (
+                    (
+                        bounds[0][0],
+                        bounds[0][0],
+                        bounds[0][1],
+                        bounds[0][1],
+                        bounds[0][2],
+                        bounds[0][2],
+                        bounds[0][3],
+                        bounds[0][3],
+                        1,
+                        1
+                    ),
+                    (
+                        bounds[1][0],
+                        bounds[1][0],
+                        bounds[1][1],
+                        bounds[1][1],
+                        bounds[1][2],
+                        bounds[1][2],
+                        bounds[1][3],
+                        bounds[1][3],
+                        3,
+                        3
+                    ),
+                )
             return p0, bounds
 
     def predict_split(self, x, state):
@@ -1214,7 +1297,32 @@ class ContrastTuner(BaseTuner):
             return np.append(yq, ya)
         else:
             return np.nan
+    
+    ####
+    def hyperbolic_modified(self, c, R0, R, c50, n,s):
+        return R * (c**n / (c50**(s*n) + c**(s*n)) + R0
+                    
+    def hyperbolic_modified_split(self, c, R0q, R0a, Rq, Ra, c50q, c50a, nq, na,sq,sa):
+        sep = self.sep
+        # have one state only to predict
+        if len(np.atleast_1d(c)) == 1:
+            if self.state <= sep:
+                # quiet
+                y = self.hyperbolic_modified(c, R0q, Rq, c50q, nq,sq)
+            else:
+                # active
+                y = self.hyperbolic_modified(c, R0a, Ra, c50a, na,sa)
+            return y
 
+        if not (sep is None):
+            quiet = c[:sep]
+            active = c[sep:]
+            yq = self.hyperbolic_modified(quiet, R0q, Rq, c50q, nq,sq)
+            ya = self.hyperbolic_modified(active, R0a, Ra, c50a, na,sa)
+            return np.append(yq, ya)
+        else:
+            return np.nan
+    
 
 class GammaTuner(BaseTuner):
     def __init__(self, funcName, prelim=None, sep=None):
