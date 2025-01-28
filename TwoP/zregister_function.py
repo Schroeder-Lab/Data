@@ -380,7 +380,10 @@ def z_register_one_file(ops):
                 opsTemp = np.load(ops_path, allow_pickle=True).item()
                 cmaxRegistrations.append(opsTemp["cmax_registration"])
                 zposList.append(opsTemp["zpos_registration"])
-
+         # check that data is intact
+        uniqueLengths = np.unique([len(l) for l in cmaxRegistrations])
+        if len(uniqueLengths)>1:
+            raise ValueError ("Not all planes have the same number of frames. Consider adding an extra frame")
         cmaxs = np.dstack(cmaxRegistrations)
         # find which plane gives the best median correlation
         maxPlaneCorr = np.nanmax(cmaxs, 2)
