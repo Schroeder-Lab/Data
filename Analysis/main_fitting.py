@@ -126,7 +126,7 @@ for d in range(len(ops["fitting_list"])):
                 if not os.path.isdir(saveDir):
                     os.makedirs(saveDir)
                 # if type(currSession['SpecificTrials']) is str:
-                specificTrials = eval(currSession['SpecificTrials'])
+                specificTrials = eval(currSession['SpecificTrials'].replace(';', ','))
                 gratingsIntervals = data["gratingIntervals"]
     
                 if gratingsIntervals.shape[1] == 1:
