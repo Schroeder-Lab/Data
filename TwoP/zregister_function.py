@@ -315,7 +315,9 @@ def z_register_one_file(ops):
             # imp.reload(register)
             print("Finding correlation in z direciton")
             ops["refImg"] = refImgs
-            ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
+            ops_paths_clean = ops_paths
+            if ((len(ops["ignore_flyback"])>0) and ops["ignore_flyback"]!=[-1]):
+               ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
             # Get the correlation between the reference images
             corrs_all = get_reference_correlation(frames, ops)
             cmaxRegistrations = []
@@ -335,7 +337,7 @@ def z_register_one_file(ops):
                         ops.get("raw_file_chan2", 0) if raw else reg_file_chan2
                     )
 
-                null = None
+                null = contextlib.nullcontext()
                 with io.BinaryFile(Ly=Ly, Lx=Lx, filename=raw_file, n_frames=n_frames) \
                     if raw else null as f_raw, \
                     io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file, n_frames=n_frames) as f_reg, \
@@ -343,6 +345,10 @@ def z_register_one_file(ops):
                     if raw and twoc else null as f_raw_chan2,\
                     io.BinaryFile(Ly=Ly, Lx=Lx, filename=reg_file_chan2, n_frames=n_frames) \
                         if twoc else null as f_reg_chan2:
+                    if (f_reg_chan2 == null):
+                        f_reg_chan2 = None
+                    if (f_raw_chan2 == null):
+                        f_raw_chan2 = None
                     registration_outputs = register.registration_wrapper(
                         f_reg, f_raw=f_raw, f_reg_chan2=f_reg_chan2, f_raw_chan2=f_raw_chan2,
                         refImg=refImgs, align_by_chan2=align_by_chan2, ops=ops)
@@ -360,7 +366,9 @@ def z_register_one_file(ops):
             cmaxs = np.dstack(cmaxRegistrations)
             smooth_images_by_correlation(ops_paths_clean, corrs_all)
         else:
-            ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])
+            ops_paths_clean = ops_paths
+            if ((len(ops["ignore_flyback"])>0) and ops["ignore_flyback"]!=[-1]):
+               ops_paths_clean = np.delete(ops_paths, ops["ignore_flyback"])            
             frames = np.array(ops['refImg'])
             corrs_all = get_reference_correlation(frames, ops)
             cmaxRegistrations = []
@@ -372,7 +380,10 @@ def z_register_one_file(ops):
                 opsTemp = np.load(ops_path, allow_pickle=True).item()
                 cmaxRegistrations.append(opsTemp["cmax_registration"])
                 zposList.append(opsTemp["zpos_registration"])
-
+         # check that data is intact
+        uniqueLengths = np.unique([len(l) for l in cmaxRegistrations])
+        if len(uniqueLengths)>1:
+            raise ValueError ("Not all planes have the same number of frames. Consider adding an extra frame")
         cmaxs = np.dstack(cmaxRegistrations)
         # find which plane gives the best median correlation
         maxPlaneCorr = np.nanmax(cmaxs, 2)
@@ -474,7 +485,7 @@ def create_new_plane_file(ops_paths, selected_plane, cmaxs, delete_extra=False, 
                 ) as planeFile:
                     newFile[pi: pi + 1] = planeFile[pi: pi + 1]
 
-    null = None
+    null = contextlib.nullcontext()
     twoc = (n_chan == 2)
     align_by_chan2 = align_chan == 2
     Lx = newOps["Lx"]
