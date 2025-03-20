@@ -425,8 +425,8 @@ def stimulus_gratingsContrastStep(directory, frameChanges):
             "gratingsContrastStep.direction.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
             "gratingsContrastStep.spatialF.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratingsContrastStep.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-            "gratingsContrastStep.contrastStart.npy": stimProps.Contrast_Start.to_numpy().reshape(-1, 1).astype(float).copy(),
-            "gratingsContrastStep.contrastEnd.npy": stimProps.Contrast_End.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsContrastStep.contrastStart.npy": stimProps.ContrastStart.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "gratingsContrastStep.contrastEnd.npy": stimProps.ContrastEnd.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratingsContrastStep.intervals.npy": [st[0], et[-1]],
             }
 
