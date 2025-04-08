@@ -26,12 +26,12 @@ from os import path
 import os
 import shutil
 
-from Data.user_defs_with_neurons import *
-from Data.user_defs_with_neurons import directories_to_register_neurons
+from Data.user_defs import *
+
 import pandas as pd
 
 
-dataEntries = directories_to_register_neurons()
+dataEntries = directories_to_register()
 for i in range(len(dataEntries)):
     defs = define_directories()
     s2pDir = defs["metadataDir"]

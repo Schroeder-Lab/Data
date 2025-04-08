@@ -67,7 +67,7 @@ def define_directories():
         # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
         # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
         # "D:\\preprocess.csv",  # "D:\\preprocessZCorrTest.csv",
-        "dataDefFile": "D:\\preprocess.csv",  # "D:\\fitting_all.csv",
+        "dataDefFile": "D:\\preprocess_Z.csv",  # "D:\\fitting_all.csv",
         # "Z:\\ProcessedData\\",  # "D:\\Test\\",
         # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
         # "Z:\\ProcessedData\\",
@@ -198,6 +198,56 @@ def create_ops_boutton_registration(filePath, saveDir=None):
 
     return ops
 
+def create_ops_neuron_registration(filePath, saveDir=None):
+    ops = default_ops()
+    ops["data_path"] = filePath[1:]
+
+    ops["look_one_level_down"] = False
+    ops["ignore_flyback"] = [0]
+    ops["nchannels"] = 2
+    ops["nplanes"] = 4
+    ops["functional_chan"] = 1
+
+    # registration ops
+    ops["keep_movie_raw"] = False
+    ops["align_by_chan"] = 2
+
+    # ops["block_size"] = [64, 128]
+    ops["block_size"] = [128, 256]
+    ops["nonrigid"] = True
+    # run for only X number frames
+    # ops['frames_include'] = 1000
+
+    ops["reg_tif"] = False
+    ops["reg_tif_chan2"] = False
+
+    # set save folder
+    if (saveDir is None):
+        ops["save_path0"] = filePath[0]
+    else:
+        # get rid of first path
+        p = pathlib.Path(filePath[0])
+        ops["save_path0"] = os.path.join(saveDir, *p.parts[-2:])
+
+    ops["fast_disk"] = ops["save_path0"]
+    # localised optioed
+    ops["delete_extra_frames"] = False
+    ops["run_registration"] = True
+    ops["run_detection"] = True
+    ops["diameter"] = 5
+
+    # detection settings - do not change
+    ops["allow_overlap"] = True
+    ops["max_overlap"] = 0.75
+    ops["max_iterations"] = 100
+    ops["spatial_scale"] = 1
+    ops["threshold_scaling"] = 1.5
+    ops["high_pass"] = 50
+    
+    ops["fs"] = 7.4925
+    ops["spikedetect"] = 0
+
+    return ops
 
 def create_sparse_registration(filePath, saveDir=None):
     ops = default_ops()
@@ -251,18 +301,18 @@ def create_fitting_ops():
         "quiet_velocity": 0.5,
         "fraction_to_test": 1,
         "criterion": 0.9,
-        "save_dir": r"D:\\fittingPupilTest\\",
-        "processed files": "Z:\\ProcessedData",
-        "fitting_list": "D:\\fitting_all.csv",
+        "save_dir": r"C:\\OneDrive\\OneDrive - University of Sussex\\PreprocessedData\\fitting1\\fitting_new\\",
+        "processed files": "Z:\\ProcessedData\\",
+        "fitting_list": [r"E:\\fitting_all_neurons.csv"],
 
 
         # how to classify trials can be: "running"/"pupil"/"pupil-stationary"
-        "classification": "pupil-stationary",
+        "classification": "running",
 
         "fitOri": True,
         "fitTf": True,
         "fitSf": True,
-        "fitContrast": True,
+        "fitContrast": False,
 
         "runOn": True,
         "runOff": True,
