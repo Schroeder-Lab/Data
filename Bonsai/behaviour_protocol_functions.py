@@ -198,6 +198,44 @@ def stimulus_gratingsLuminance(directory, frameChanges):
             "gratingsExp.description.npy": "Gratings",
             }
 
+def stimulus_Luminance(directory, frameChanges):
+    # Gets the identity of the stimuli (see function for
+    # further details).
+    stimProps = get_stimulus_info(directory,['Lum'])
+    # Gets the start times of each stimulus.
+    st = np.append(
+        frameChanges[1::],
+        frameChanges[-1] + np.median(np.diff(frameChanges)),
+    )
+
+    et = frameChanges
+
+    # Checks if number of frames and stimuli match (if not, there
+    # could have been an issue with the photodiode, check if there
+    # are irregular frames in the photodiode trace).
+    if len(stimProps) != len(st):
+        # raise ValueError(
+        #     "Number of frames and stimuli do not match. Skpping"
+        # )
+        warnings.warn("Number of frames and stimuli do not match")
+        if (len(et) == len(stimProps)):
+            warnings.warn(
+                "Assuming there was a false photodiode rise in the beginning, but check!")
+            st = frameChanges[0:-1:2].reshape(-1, 1).copy()
+            # Gets the end times  of each stimulus.
+            # et = frameChanges[2::2].reshape(-1, 1).copy()
+    # Adds the start and end times from above to the respective
+    # lists.
+
+    
+
+    return {"Luminance.startTime.npy": st.reshape(-1, 1).copy(),
+            "Luminance.endTime.npy": et.reshape(-1, 1).copy(),
+            "Luminance.luminance.npy": stimProps.Lum.to_numpy().reshape(-1, 1).astype(float).copy(),
+            "LuminanceExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
+            # TODO: check if this is usefull; should add same line to gratings
+            "LuminanceExp.description.npy": "Luminance",
+            }
 
 def stimulus_gratings_reward(directory, frameChanges):
 
@@ -482,6 +520,8 @@ stimulus_prcoessing_dictionary = {
     "Oddball": stimulus_oddball,
     "GratingsStep": stimulus_gratingsStep,
     "GratingsLuminance": stimulus_gratingsLuminance,
+    "Luminance": stimulus_Luminance,
     "GratingsContrastStep": stimulus_gratingsContrastStep,
     "RetinalExtended": stimulus_classificationExtended,
+    
 }

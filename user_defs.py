@@ -67,7 +67,11 @@ def define_directories():
         # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
         # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
         # "D:\\preprocess.csv",  # "D:\\preprocessZCorrTest.csv",
+<<<<<<< Updated upstream
         "dataDefFile": "D:\\preprocess_Z.csv",  # "D:\\fitting_all.csv",
+=======
+        "dataDefFile":  "D:\\preprocessTmp.csv",#"D:\\preprocessZCorrTest.csv",  # "D:\\fitting_all.csv",
+>>>>>>> Stashed changes
         # "Z:\\ProcessedData\\",  # "D:\\Test\\",
         # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
         # "Z:\\ProcessedData\\",
@@ -75,9 +79,9 @@ def define_directories():
         # "Z:\\ProcessedData\\",
         # "preprocessedDataDir": r"D:\LongitudinalTest",  # "Z:\\ProcessedData\\",
         # "D:\\ZcorrectionTest\\NeuronsRed\\",
-        "preprocessedDataDir": "Z:\\ProcessedData\\",
+        "preprocessedDataDir":"Z:\\ProcessedData\\", #"D:\ZcorrectionTest\\Neurons",
         "zstackDir": "Z:\\RawData\\",
-        "metadataDir":   "Z:\\RawData\\"  # "Z:\\RawData\\"  # "D:\\Test\\" #", # "D:\\"
+        "metadataDir":   "Z:\\RawData\\"  #   # "D:\\Test\\" #", # "D:\\"
     }
     return (
         directoryDb  # dataDefFile, preprocessedDataDir, zstackDir, metadataDir
@@ -121,7 +125,7 @@ def create_2p_processing_ops():
     """
     pops = {
         "debug": True,
-        "plot": True,
+        "plot": False,
         "f0_percentile": 8,
         "f0_window": 300,
         "Npil_f0_window": 60,
@@ -160,16 +164,16 @@ def create_ops_boutton_registration(filePath, saveDir=None):
     ops["look_one_level_down"] = False
     ops["ignore_flyback"] = [-1]
     ops["nchannels"] = 2
-    ops["nplanes"] = 1
+    ops["nplanes"] = 8
     ops["functional_chan"] = 1
 
     ops["spikedetect"] = 0
 
     # registration ops
     ops["keep_movie_raw"] = True
-    ops["align_by_chan"] = 2
+    ops["align_by_chan"] = 1
 
-    ops["block_size"] = [128, 256]
+    ops["block_size"] = [32, 256]
     ops["nonrigid"] = False
     # run for only X number frames
     # ops['frames_include'] = 1000
@@ -301,9 +305,15 @@ def create_fitting_ops():
         "quiet_velocity": 0.5,
         "fraction_to_test": 1,
         "criterion": 0.9,
+<<<<<<< Updated upstream
         "save_dir": r"C:\\OneDrive\\OneDrive - University of Sussex\\PreprocessedData\\fitting1\\fitting_new\\",
         "processed files": "Z:\\ProcessedData\\",
         "fitting_list": [r"E:\\fitting_all_neurons.csv"],
+=======
+        "save_dir": "D:\\fitting_test_Contrast\\Modified",#"D:\\fittingPupilTest\\",#r"D:\\fitting_test_Contrast\\Modified",#,#r,r"D:\\fittingNE"
+        "processed files": "Z:\\ProcessedData",
+        "fitting_list":["D:\\fitting_all.csv"],#, ["D:\\fittingNE.csv"]
+>>>>>>> Stashed changes
 
 
         # how to classify trials can be: "running"/"pupil"/"pupil-stationary"
@@ -312,7 +322,13 @@ def create_fitting_ops():
         "fitOri": True,
         "fitTf": True,
         "fitSf": True,
+<<<<<<< Updated upstream
         "fitContrast": False,
+=======
+        "fitContrast": True,
+        #regular or modified
+        "contrastType": 'modified',
+>>>>>>> Stashed changes
 
         "runOn": True,
         "runOff": True,
@@ -484,15 +500,15 @@ def directories_to_register():
 
 
 
-        {
-            "Name": "Memphis",
-            "Date": "2023-10-05",
-            "Experiments": [1, 2, 3, 4, 5, 6, 7],
-        },
+        # {
+        #     "Name": "Memphis",
+        #     "Date": "2023-10-05",
+        #     "Experiments": [2, 3, 4, 5, 6, 7],
+        # },
         # {
         #     "Name": "Memphis",
         #     "Date": "2023-10-18",
-        #     "Experiments": [1, 2, 3, 4],
+        #     "Experiments": [2, 3, 4, 5],
         # },
         # {
         #     "Name": "Memphis",
@@ -583,20 +599,115 @@ def directories_to_register():
         #     "Date": "2024-02-28",
         #     "Experiments": [2, 3, 4, 5],
         # },
+        # {
+        #     "Name": "Vesta",
+        #     "Date": "2024-05-08",
+        #     "Experiments": [2, 3, 4, 5, 6, 7],
+        # },
+        # {
+        #     "Name": "Vesta",
+        #     "Date": "2024-05-14",
+        #     "Experiments": [2, 3, 4, 5],
+        # },
+        # {
+        #     "Name": "Vesta",
+        #     "Date": "2024-05-15",
+        #     "Experiments": [2, 3, 4, 5, 6],
+        # },
+        {
+            "Name": "Vesta",
+            "Date": "2024-05-17",
+            "Experiments": [2, 3, 4, 5],
+        },
+        # {
+        #     "Name": "Vesta",
+        #     "Date": "2024-06-05",
+        #     "Experiments": [2, 3, 4, 5, 6, 7, 8],
+        # },
+        {
+            "Name": "SS123",
+            "Date": "2024-07-31",
+            "Experiments": [2, 3, 4],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-08-07",
+            "Experiments": [2, 3, 4, 5],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-08-22",
+            "Experiments": [1,2,3],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-08-28",
+            "Experiments": [2,3],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-09-05",
+            "Experiments": [2,3],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-09-12",
+            "Experiments": [2,3,4],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-09-13",
+            "Experiments": [1,2,3],
+        },
+        {
+            "Name": "SS123",
+            "Date": "2024-09-19",
+            "Experiments": [2,3,4],
+        },
 
     ]
+    dirDefs = [
+         {
+             "Name": "SS131",
+             "Date": "2025-02-04 A",
+             "Experiments": [2],
+         },
+         
+         ##DONE
+          {
+              "Name": "SS131",
+              "Date": "2025-02-04 B",
+              "Experiments": [4],
+          },
+          {
+              "Name": "SS131",
+              "Date": "2025-02-04 C",
+              "Experiments": [6],
+          },
+          {
+              "Name": "SS131",
+              "Date": "2025-02-04 D",
+              "Experiments": [8],
+          },
+          {
+              "Name": "SS131",
+              "Date": "2025-02-04 E",
+              "Experiments": [10],
+          },
+          {
+              "Name": "SS131",
+              "Date": "2025-02-05 A",
+              "Experiments": [1,2,3,4],
+          },
+          {
+              "Name": "SS131",
+              "Date": "2025-02-05 B",
+              "Experiments": [6,7,8],
+          },         
+         
+         
+         ]
 
-    # dirDefs = [{
-    #     "Name": "Oephelia",
-    #     "Date": "2023-07-26",
-    #     "Experiments": [1],
-    # }]
-
-    # dirDefs = [{
-    #     "Name": "Stereopes",
-    #     "Date": "2024-01-29",
-    #     "Experiments": [2, 3],
-    # }]
     return pd.DataFrame(dirDefs)
 
 

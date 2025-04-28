@@ -2,7 +2,7 @@
 """
 Created on Wed Jun  8 17:05:10 2022
 
-@author: maria
+@author: Liad
 """
 """
 From Carsen's email to Sylvia:
@@ -208,7 +208,9 @@ def z_register_one_file(ops):
                     print(">>>> skipping flyback PLANE", ipl)
                     continue
                 n_frames, Ly, Lx = ops["nframes"], ops["Ly"], ops["Lx"]
-
+                        
+                
+                
                 null = contextlib.nullcontext()
                 twoc = ops["nchannels"] > 1
 

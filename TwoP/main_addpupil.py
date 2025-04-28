@@ -27,6 +27,7 @@ from Data.user_defs import *
 # %%
 dirs = define_directories()
 csvDir = dirs["dataDefFile"]
+# csvDir = 'D:\\fitting_all.csv'
 preprocessDir = dirs["preprocessedDataDir"]
 # %%
 database = pd.read_csv(
@@ -37,7 +38,8 @@ database = pd.read_csv(
         "Process": bool,
     },
 )
-
+# database = pd.DataFrame(
+#     {'Name': ['Dublin'], 'Date': ['2024-04-10'], 'Process': [True]})
 # %%
 errorList = []
 for i in range(len(database)):

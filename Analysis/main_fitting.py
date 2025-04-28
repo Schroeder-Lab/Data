@@ -75,6 +75,8 @@ from ast import literal_eval
 
 ops = create_fitting_ops()
 
+#%%
+
 for d in range(len(ops["fitting_list"])):
     
     csvDir = ops["fitting_list"][d]
@@ -84,9 +86,12 @@ for d in range(len(ops["fitting_list"])):
     sessions = pd.read_csv(csvDir)
     
     
+    
     keys = sessions.keys()
 
-    sessions = sessions.to_dict('records')    
+    sessions = sessions.to_dict('records')            
+    
+    sessions = sessions[78:]
     
     # did the user specify only specific trials to take
     isSpecificTrials = 'SpecificTrials' in keys
@@ -303,7 +308,7 @@ for d in range(len(ops["fitting_list"])):
         varSpecificCon = np.zeros((gratingRes.shape[-1], 4)) * np.nan
         pvalCon = np.zeros(gratingRes.shape[-1]) * np.nan
         TunersCon = np.empty((gratingRes.shape[-1], 2), dtype=object)
-        paramsDistCon = np.zeros((gratingRes.shape[-1], 4, 2, 500)) * np.nan
+        paramsDistCon = np.zeros((gratingRes.shape[-1], 4, 2, 1000)) * np.nan ######500
     
         ################################### OFF   ############################################
         respPOff = np.zeros(gratingRes.shape[-1]) * np.nan
@@ -347,11 +352,12 @@ for d in range(len(ops["fitting_list"])):
         varSpecificConOff = np.zeros((gratingRes.shape[-1], 4)) * np.nan
         pvalConOff = np.zeros(gratingRes.shape[-1]) * np.nan
         TunersConOff = np.empty((gratingRes.shape[-1], 2), dtype=object)
-        paramsDistConOff = np.zeros((gratingRes.shape[-1], 4, 2, 500)) * np.nan
+        paramsDistConOff = np.zeros((gratingRes.shape[-1], 4, 2, 1000)) * np.nan
     
         ##############################################################################
     
         fittingRange = range(0, gratingRes.shape[-1])
+                
         # check if want to run only some neurons
         # currSession['SpecificNeurons'] = str(currSession['SpecificNeurons'])
         # if type(currSession['SpecificNeurons']) is str:
@@ -443,15 +449,17 @@ for d in range(len(ops["fitting_list"])):
                 continue
     
         blinkTrials = remove_blinking_trials(data)
-    
+        
+        
         for n in fittingRange:
             print(f"Neuron {n}/ {gratingRes.shape[2]} ")
             #######################ON#####################################
+            print("On Responses")
             if (ops["runOn"]):
                 try:
                     sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
                         gratingRes, data, ts, quietI, activeI, blinkTrials | ignoreOn, n, ops[
-                            "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"]
+                            "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"], contrastType= ops['contrastType']
                     )
     
                     respP[n] = sig[0]
@@ -518,8 +526,8 @@ for d in range(len(ops["fitting_list"])):
                     varConConst[n] = res_con[2]
                     varConOne[n] = res_con[3]
                     varConSplit[n] = res_con[4]
-                    varSpecificCon[n] = res_con[-1] if (
-                        not np.any(np.isnan(res_con[-1]))) else np.ones(4) * np.nan
+                    varSpecificCon[n] = res_con[-1] #if (
+                        #not np.any(np.isnan(res_con[-1]))) else np.ones(4) * np.nan
                     pvalCon[n] = res_con[6]
                     paramsDistCon[n, :, 0, :] = res_con[7][:, [0, 2, 4, 6]].T if (
                         not np.any(np.isnan(res_con[7]))) else np.nan
@@ -533,10 +541,11 @@ for d in range(len(ops["fitting_list"])):
     
         #########################OFF############################################
             if (ops["runOff"]):
+                print("Off Responses")
                 try:
                     sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
                         gratingResOff, data, tsOff, quietIOff, activeIOff, blinkTrials | ignoreOff, n, ops[
-                            "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"]
+                            "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"], contrastType= ops['contrastType']
                     )
     
                     respPOff[n] = sig[0]
@@ -603,8 +612,8 @@ for d in range(len(ops["fitting_list"])):
                     varConConstOff[n] = res_con[2]
                     varConOneOff[n] = res_con[3]
                     varConSplitOff[n] = res_con[4]
-                    varSpecificConOff[n] = res_con[-1] if (
-                        not np.any(np.isnan(res_con[-1]))) else np.ones(4) * np.nan
+                    varSpecificConOff[n] = res_con[-1] #if (
+                       # not np.any(np.isnan(res_con[-1]))) else np.ones(4) * np.nan
                     pvalConOff[n] = res_con[6]
                     paramsDistConOff[n, :, 0, :] = res_con[7][:, [0, 2, 4, 6]].T if (
                         not np.any(np.isnan(res_con[7]))) else np.nan
@@ -1089,14 +1098,14 @@ for d in range(len(ops["fitting_list"])):
                     print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
                                        paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, varSpecificOri, pvalOri, paramsTf, paramsTfSplit, np.vstack(
                                            (varTfConst, varTfOne, varTfSplit)).T, varSpecificTf,
-                                       pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, respDirection[n], None, saveDir, subDir=ops['classification'])
+                                       pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, blinkTrials |ignoreOn,respDirection[n], None, saveDir, subDir=ops['classification'],conType = ops['contrastType'])
     
                     print_fitting_data(gratingResOff, tsOff, quietIOff, activeIOff, data, paramsOriOff,
                                         paramsOriSplitOff, np.vstack((varOriConstOff, varOriOneOff, varOriSplitOff)).T, varSpecificOriOff, pvalOriOff, paramsTfOff, paramsTfSplitOff, np.vstack(
                                             (varTfConstOff, varTfOneOff, varTfSplitOff)).T, varSpecificTfOff,
                                         pvalTfOff, paramsSfOff, paramsSfSplitOff, np.vstack(
                                             (varSfConstOff, varSfOneOff, varSfSplitOff)).T, varSpecificSfOff, pvalSfOff,
-                                        paramsConOff, paramsConSplitOff, np.vstack((varConConstOff, varConOneOff, varConSplitOff)).T, varSpecificConOff, pvalConOff, n, respPOff, respDirectionOff[n], None, saveDir, subDir=ops['classification'], onOff='Off')
+                                        paramsConOff, paramsConSplitOff, np.vstack((varConConstOff, varConOneOff, varConSplitOff)).T, varSpecificConOff, pvalConOff, n, respPOff, blinkTrials |ignoreOff,respDirectionOff[n], None, saveDir, subDir=ops['classification'], onOff='Off',conType = ops['contrastType'])
     
                 except Exception:
                     print("fail " + str(n))
@@ -1117,5 +1126,38 @@ for d in range(len(ops["fitting_list"])):
     #     print(traceback.format_exc())
     # plt.close('all')
     
-    # %%
+   for n in fittingRange:
+       try:
+           print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
+                              paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, varSpecificOri, pvalOri, paramsTf, paramsTfSplit, np.vstack(
+                                  (varTfConst, varTfOne, varTfSplit)).T, varSpecificTf,
+                              pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, respDirection[n],ignoreOn, None, saveDir, subDir=ops['classification'],conType = ops['contrastType'])
 
+           print_fitting_data(gratingResOff, tsOff, quietIOff, activeIOff, data, paramsOriOff,
+                               paramsOriSplitOff, np.vstack((varOriConstOff, varOriOneOff, varOriSplitOff)).T, varSpecificOriOff, pvalOriOff, paramsTfOff, paramsTfSplitOff, np.vstack(
+                                   (varTfConstOff, varTfOneOff, varTfSplitOff)).T, varSpecificTfOff,
+                               pvalTfOff, paramsSfOff, paramsSfSplitOff, np.vstack(
+                                   (varSfConstOff, varSfOneOff, varSfSplitOff)).T, varSpecificSfOff, pvalSfOff,
+                               paramsConOff, paramsConSplitOff, np.vstack((varConConstOff, varConOneOff, varConSplitOff)).T, varSpecificConOff, pvalConOff, n, respPOff, respDirectionOff[n],ignoreOff, None, saveDir, subDir=ops['classification'], onOff='Off',conType = ops['contrastType'])
+
+       except Exception:
+           print("fail " + str(n))
+           print(traceback.format_exc())
+   plt.close('all')
+
+#%%
+print_fitting_data(gratingRes, ts, quietI, activeI, data, paramsOri,
+                   paramsOriSplit, np.vstack((varOriConst, varOriOne, varOriSplit)).T, varSpecificOri, pvalOri, paramsTf, paramsTfSplit, np.vstack(
+                       (varTfConst, varTfOne, varTfSplit)).T, varSpecificTf,
+                   pvalTf, paramsSf, paramsSfSplit, np.vstack((varSfConst, varSfOne, varSfSplit)).T, varSpecificSf, pvalSf, paramsCon, paramsConSplit, np.vstack((varConConst, varConOne, varConSplit)).T, varSpecificCon, pvalCon, n, respP, ignoreOn,respDirection[n], None, saveDir, subDir=ops['classification'],conType = ops['contrastType'])
+#%%
+# n=0
+# sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
+#     gratingRes, data, ts, quietI, activeI, blinkTrials | ignoreOn, n, ops[
+#         "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"]
+# )
+
+sig, res_ori, res_freq, res_spatial, res_con = run_complete_analysis(
+    gratingRes, data, ts, quietI, activeI, blinkTrials | ignoreOn, n, ops[
+        "fitOri"], ops["fitTf"], ops["fitSf"], ops["fitContrast"], contrastType= ops['contrastType']
+)

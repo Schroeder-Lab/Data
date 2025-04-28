@@ -352,6 +352,11 @@ def run_tests(
     y_name,
     split_test_inds,
     direction=1,
+    shuffleBasedFunc = None,
+    xtol = None,
+    ftol = None,
+    Nshuffle = 500,
+    
 
 ):
     props_reg = np.nan
@@ -363,8 +368,13 @@ def run_tests(
     p_split = np.nan
     score_split_specific = np.nan
     propsDist = np.nan
-
-    tunerBase = tunerClass(base_name)
+    
+    if (xtol is None) and (ftol is None):
+        tunerBase = tunerClass(base_name)
+    elif (xtol is None):
+        tunerBase = tunerClass(base_name,ftol=ftol)
+    else:
+        tunerBase = tunerClass(base_name,ftol=ftol,xtol=xtol)
 
     # Remove all Nans and Inf
     goodInds = np.where(np.isfinite(df[y_name]))[0]
@@ -396,7 +406,13 @@ def run_tests(
     # test for split only if function predicts better
     tunerSplit = np.nan
     if score_reg > score_constant:
-        tunerSplit = tunerClass(split_name, len(df[df[splitter_name] == 0]))
+        
+        if (xtol is None) and (ftol is None):
+            tunerSplit = tunerClass(split_name, len(df[df[splitter_name] == 0]))
+        elif (xtol is None):
+            tunerSplit = tunerClass(split_name, len(df[df[splitter_name] == 0]),ftol=ftol)
+        else:
+            tunerSplit = tunerClass(split_name, len(df[df[splitter_name] == 0]),ftol=ftol,xtol=xtol)
 
         dfq = df[df[splitter_name] == 0]
         dfa = df[df[splitter_name] == 1]
@@ -452,7 +468,7 @@ def run_tests(
         )
         if score_split > score_reg:
             dist, propsDist = tunerSplit.shuffle_split(
-                x_sorted, y_sorted, returnNull=True)
+                x_sorted, y_sorted, returnNull=True,nshuff=Nshuffle)
             p_split = sp.stats.percentileofscore(
                 dist, tunerSplit.auc_diff(df[x_name].to_numpy())
             )
@@ -460,27 +476,33 @@ def run_tests(
             p_split = 100 - p_split
             p_split = p_split / 100
 
+
             if (p_split <= 0.05):
                 fixedProps = props_reg[split_test_inds.astype(int)]
-                score_split_specific, propsList = tunerSplit.loo_fix_variables(
-                    x_sorted, y_sorted, fixedProps)
-
-                # ignore cases were the fixed case could not actually fit well
-                score_split_specific_ = score_split_specific[~np.any(
-                    np.isnan(propsList), axis=1)]
-                propsList_ = propsList[~np.any(np.isnan(propsList), axis=1)]
-
-                score_split_specific[np.any(
-                    np.isnan(propsList), axis=1)] = np.nan
-                propsList[np.any(np.isnan(propsList), axis=1)] = np.nan
-
-                if (len(propsList_) > 0):
-                    maxFixedScore = np.max(score_split_specific_)
-                    if (maxFixedScore > score_split):
-                        props_split = propsList_[
-                            np.argmax(score_split_specific_), :]
+                if ( shuffleBasedFunc is None):
+                    score_split_specific, propsList = tunerSplit.loo_fix_variables(
+                        x_sorted, y_sorted, fixedProps,startValues=props_reg)
+    
+                    # ignore cases were the fixed case could not actually fit well
+                    score_split_specific_ = score_split_specific[~np.any(
+                        np.isnan(propsList), axis=1)]
+                    propsList_ = propsList[~np.any(np.isnan(propsList), axis=1)]
+    
+                    score_split_specific[np.any(
+                        np.isnan(propsList), axis=1)] = np.nan
+                    propsList[np.any(np.isnan(propsList), axis=1)] = np.nan
+    
+                    if (len(propsList_) > 0):
+                        maxFixedScore = np.max(score_split_specific_)
+                        if (maxFixedScore > score_split):
+                            props_split = propsList_[
+                                np.argmax(score_split_specific_), :]
+                else:
+                    score_split_specific = shuffleBasedFunc(propsDist,props_split)
             else:
                 score_split_specific = np.ones(len(split_test_inds))*np.nan
+        
+                    
 
         else:
             p_split = np.nan
@@ -497,6 +519,60 @@ def run_tests(
 
     )
 
+def get_contrast_params(p):
+    tuner = ContrastTuner('contrast_modified')
+    crange = np.arange(0,1.01,0.01)
+    curve = tuner.func(crange,*p)
+    Rc = np.nanmax(curve)
+    cMax = crange[np.argmax(curve)]
+    cMin = crange[np.argmin(curve)]
+    c50c = crange[crange<cMax][np.argmin(np.abs(curve[crange<cMax]-Rc/2))]
+    
+    curveDiff = np.diff(curve,prepend=True,axis=0)/0.1
+    c50s = curveDiff[crange==c50c][0]
+    
+    return Rc,cMax,cMin,c50c,c50s
+
+
+def contrast_shuffle_test(propsDist,propsReal):
+    Rc1,cMax1,cMin1,c50c1,c50s1 = get_contrast_params(propsReal[::2])
+    Rc2,cMax2,cMin2,c50c2,c50s2 = get_contrast_params(propsReal[1::2])
+    
+    Rcd = np.zeros(len(propsDist))
+    cMaxd = np.zeros(len(propsDist))
+    c50cd = np.zeros(len(propsDist))
+    c50sd = np.zeros(len(propsDist))
+    for i in range(len(propsDist)):
+        Rct1,cMaxt1,cMint1,c50ct1,c50st1 = get_contrast_params(propsDist[i,::2])
+        Rct2,cMaxt2,cMint2,c50ct2,c50st2 = get_contrast_params(propsDist[i,1::2])
+        Rcd[i] = Rct1-Rct2
+        cMaxd[i] = cMaxt1-cMaxt2
+        c50cd[i] = c50ct1-c50ct2
+        c50sd[i] = c50st1-c50st2
+        
+    Rscore = sp.stats.percentileofscore(Rcd,Rc1-Rc2)/100
+    cmaxScore = sp.stats.percentileofscore(cMaxd,cMax1-cMax2)/100
+    c50Score = sp.stats.percentileofscore(c50cd,c50c1-c50c2)/100
+    c50sScore = sp.stats.percentileofscore(c50sd,c50s1-c50s2)/100
+    
+    # create two sided score
+    Rscore = 1-Rscore if Rscore>0.5 else Rscore
+    cmaxScore = 1-cmaxScore if cmaxScore>0.5 else cmaxScore
+    c50Score = 1-c50Score if c50Score>0.5 else c50Score
+    c50sScore = 1-c50sScore if c50sScore>0.5 else c50sScore
+    
+     # two sided score
+    Rscore *=2
+    cmaxScore *=2
+    c50Score *=2
+    c50sScore*=2
+    
+    return Rscore,cmaxScore,c50Score,c50sScore
+        
+        
+        
+        
+    
 
 def make_empty_results(resType, *args):
     if str.lower(resType) == "ori":
@@ -570,6 +646,7 @@ def run_complete_analysis(
     runTf=True,
     runSf=True,
     runContrast=True,
+    contrastType= 'regular'
 ):
     dfAll = make_neuron_db(
         gratingRes,
@@ -599,6 +676,7 @@ def run_complete_analysis(
 
     # data tests ORI
     if runOri:
+        print ('direction analysis')
         df = dfAll[
             (dfAll.sf == 0.08) & (dfAll.tf == 2) & (dfAll.contrast == 1)
         ]
@@ -611,6 +689,7 @@ def run_complete_analysis(
         res_ori = make_empty_results("Ori")
     # run Tf
     if runTf:
+        print ('temporal freq analysis')
         # Temporal Frequency tests
         df = dfAll[
             (dfAll.sf == 0.08)
@@ -628,6 +707,7 @@ def run_complete_analysis(
         res_freq = make_empty_results("Tf")
     # spatial frequency test
     if runSf:
+        print ('spatial freq analysis')
         df = dfAll[
             (dfAll.tf == 2)
             & (dfAll.contrast == 1)
@@ -641,19 +721,30 @@ def run_complete_analysis(
     else:
         res_spatial = make_empty_results("Sf")
     if runContrast:
+        if contrastType =='regular':
+            conFun = 'contrast'
+            conSplitFun = 'contrast_split_full'
+        else:
+            conFun = 'contrast_modified'
+            conSplitFun = 'contrast_modified_split'
+            
+        print ('contrast analysis')
         df = dfAll[(dfAll.tf == 2) & (dfAll.sf == 0.08)]
         df = filter_nonsig_orientations(df, resp_direction, criterion=0.05)
         res_contrast = run_tests(
             ContrastTuner,
-            "contrast",
-            "contrast_split_full",
+            conFun,#"contrast_modified",
+            conSplitFun,#"contrast_modified_split",
             df,
             "movement",
             "contrast",
             "avg",
             np.array([
                 0, 1, 2, 3]),
-            resp_direction
+            resp_direction,
+            #xtol = 10**-10,
+            ftol = 10**-7, 
+            shuffleBasedFunc = contrast_shuffle_test,Nshuffle=1000
         )
     else:
         res_contrast = make_empty_results("contrast")
@@ -666,6 +757,23 @@ def run_complete_analysis(
         res_contrast,
     )
 
+def load_stimulus_data(directory,dataDict):
+    data = {}
+    for key in dataDict.keys():
+        if (key == "planes"):
+            if not (os.path.exists(os.path.join(directory, dataDict[key]))):
+                if(os.path.exists(os.path.join(directory, "calcium.planes.npy"))):
+                    os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
+                        os.path.join(directory, dataDict[key])))
+        if (os.path.exists(os.path.join(directory, dataDict[key]))):
+            data[key] = np.load(os.path.join(
+                directory, dataDict[key]))
+        else:
+            Warning(
+                f"The file {os.path.join(directory, dataDict[key])} does not exist")
+            continue
+    return data
+    
 
 def load_grating_data(directory):
     fileNameDic = {
@@ -706,20 +814,28 @@ def load_grating_data(directory):
         fileNameDic["gratingsOri"] = "gratings.direction.updated.npy"
     if os.path.exists(os.path.join(directory, "gratings.contrast.updated.npy")):
         fileNameDic["gratingsContrast"] = "gratings.contrast.updated.npy"
-    data = {}
-    for key in fileNameDic.keys():
-        if (key == "planes"):
-            if not (os.path.exists(os.path.join(directory, fileNameDic[key]))):
-                if(os.path.exists(os.path.join(directory, "calcium.planes.npy"))):
-                    os.rename(os.path.join(directory, "calcium.planes.npy"), os.path.exists(
-                        os.path.join(directory, fileNameDic[key])))
-        if (os.path.exists(os.path.join(directory, fileNameDic[key]))):
-            data[key] = np.load(os.path.join(
-                directory, fileNameDic[key]))
-        else:
-            Warning(
-                f"The file {os.path.join(directory, fileNameDic[key])} does not exist")
-            continue
+    data = load_stimulus_data(directory,fileNameDic)
+    return data
+
+def load_luminance_data(directory):
+    fileNameDic = {
+        "sig": "calcium.dff.npy",
+        "planes": "rois.planes.npy",
+        "planeDelays": "planes.delay.npy",
+        "calTs": "calcium.timestamps.npy",
+        "faceTs": "eye.timestamps.npy",
+        "Luminance": "Luminance.luminance.npy",        
+        "LuminanceEt": "Luminance.endTime.npy",
+        "LuminanceSt": "Luminance.startTime.npy",
+        "wheelTs": "wheel.timestamps.npy",
+        "wheelVelocity": "wheel.velocity.npy",
+        "pupilDiameter": "eye.diameter.npy",
+        "pupilTs": "eye.timestamps.npy",
+        "gratingIntervals": "luminanceExp.intervals.npy",
+        "RoiId": "rois.id.npy",
+    }
+
+    data = load_stimulus_data(directory,fileNameDic)
     return data
 
 def reshape_grating_data(directory):
@@ -1075,18 +1191,112 @@ def make_sure_dimensionality(data):
 
 def find_osi_dsi(paramsOri, direction):
     tuner = OriTuner('gauss')
-    rng = np.arange(0, 360, 30)
+    rng = np.arange(0, 360, 15)
     oris = np.zeros(paramsOri.shape[0], dtype=complex)
     dris = np.zeros(paramsOri.shape[0], dtype=complex)
     for i in range(len(paramsOri)):
         prms = paramsOri[i, :]
-        fnc = tuner.func(rng, *prms)
+        fnc = direction[i]*tuner.func(rng, *prms).astype(np.float64)
         fnc[fnc <= 0] = 0
+        fnc/=np.nanmax(fnc)
         dri = np.sum(np.exp(np.deg2rad(rng) * 1j)*(fnc/np.sum(fnc)))
         ori = np.sum(np.exp(np.deg2rad(2*rng) * 1j)*(fnc/np.sum(fnc)))
         oris[i] = ori
         dris[i] = dri
     return oris, dris
+
+
+def load_grating_fitting_data(saveDir,sessionCsv):
+    sessions = pd.read_csv(sessionCsv)
+
+    sessions = sessions.to_dict('records')
+    
+    analysisList = {"respP": "gratingResp.pVal.npy", "respDirection": "gratingResp.direction.npy",'paramsOri': 'gratingOriTuning.params.npy', 'paramsOriSplit': "gratingOriTuning.paramsRunning.npy", "varOriC": "gratingOriTuning.expVar.constant.npy", "varOriS": "gratingOriTuning.expVar.runningSplit.npy", "varOriN": "gratingOriTuning.expVar.noSplit.npy", "pvalOri": "gratingOriTuning.pVal.runningSplit.npy", "varOriSpecific": "gratingOriTuning.expVar.runningSplitSpecific.npy", "nullOri": "gratingOriTuning.pVal.paramsRunningNullDist.npy","permOri": "gratingOriTuning.pVal.permutationTest.npy",
+                    'paramsTf': 'gratingTfTuning.params.npy', 'paramsTfSplit': "gratingTfTuning.paramsRunning.npy", "varTfC": "gratingTfTuning.expVar.constant.npy", "varTfS": "gratingTfTuning.expVar.runningSplit.npy", "varTfN": "gratingTfTuning.expVar.noSplit.npy", "pvalTf": "gratingTfTuning.pVal.runningSplit.npy", "varTfSpecific": "gratingTfTuning.expVar.runningSplitSpecific.npy","permTf": "gratingTfTuning.pVal.permutationTest.npy",  "nullTf": "gratingTfTuning.pVal.paramsRunningNullDist.npy",
+                    'paramsSf': 'gratingSfTuning.params.npy', 'paramsSfSplit': "gratingSfTuning.paramsRunning.npy", "varSfC": "gratingSfTuning.expVar.constant.npy", "varSfS": "gratingSfTuning.expVar.runningSplit.npy", "varSfN": "gratingSfTuning.expVar.noSplit.npy", "pvalSf": "gratingSfTuning.pVal.runningSplit.npy", "varSfSpecific": "gratingSfTuning.expVar.runningSplitSpecific.npy","permSf": "gratingSfTuning.pVal.permutationTest.npy","nullSf": "gratingSfTuning.pVal.paramsRunningNullDist.npy",
+                    'paramsContrast': 'gratingContrastTuning.params.npy', 'paramsContrastSplit': "gratingContrastTuning.paramsRunning.npy", "varContrastC": "gratingContrastTuning.expVar.constant.npy", "varContrastS": "gratingContrastTuning.expVar.runningSplit.npy", "varContrastN": "gratingContrastTuning.expVar.noSplit.npy", "pvalContrast": "gratingContrastTuning.pVal.runningSplit.npy", "varContrastSpecific": "gratingContrastTuning.expVar.runningSplitSpecific.npy","permContrast": "gratingContrastTuning.pVal.permutationTest.npy","nullContrast": "gratingContrastTuning.pVal.paramsRunningNullDist.npy",
+                    }
+
+    defaultShapes = {"respP": (1,), "respDirection": (1,),
+                     'paramsOri': (5,), 'paramsOriSplit': (5,2,), "varOriC": (1,), "varOriS": (1,), "varOriN": (1,), "pvalOri": (1,), "varOriSpecific": (2,), "nullOri": (5,2,500,),"permOri": (5,),
+                    'paramsTf': (4,), 'paramsTfSplit': (4,2,), "varTfC":(1,), "varTfS": (1,), "varTfN": (1,), "pvalTf": (1,), "varTfSpecific": (4,),"permTf": (4,),  "nullTf": (4,2,500,),
+                    'paramsSf': (4,), 'paramsSfSplit': (4,2,), "varSfC": (1,), "varSfS": (1,), "varSfN": (1,), "pvalSf": (1,), "varSfSpecific": (4,),"permSf": (4,),"nullSf": (4,2,500,),
+                    'paramsContrast': (4,), 'paramsContrastSplit': (4,2,), "varContrastC": (1,), "varContrastS": (1,), "varContrastN": (1,), "pvalContrast": (1,), "varContrastSpecific": (4,),"permContrast": (4,),"nullContrast": (4,2,1000,),
+                        }
+    analysisData = []
+    for si, s in enumerate(sessions):
+        
+        # if (s['Name']!='Uma') | (s['Date']!='2023-12-18'):
+        #     continue
+        datum = {}
+        fullPath = os.path.join(saveDir, s['Name'], s['Date'])
+        if (os.path.exists(fullPath)):
+            for key in analysisList.keys():
+                
+                requiredFile = os.path.join(fullPath, analysisList[key])
+                try:
+                    if os.path.exists(requiredFile):
+                        datum[key] = np.load(requiredFile)
+                    else:
+                        
+                        if ('respP' in datum.keys()):
+                            datum[key] = np.squeeze(np.ones((len(datum['respP']),*defaultShapes[key]))*np.nan)
+                            
+                        print(
+                            f"for path {s}\n the file {analysisList[key]} did not exist")
+                except:
+                    print(
+                        f"for path {s}\n could not load the file {analysisList[key]} ")
+        if len(datum) > 0:
+            datum['Id'] = np.repeat(s['Name'], len(datum["respP"]))
+            datum['Date'] = np.repeat(s['Date'], len(datum["respP"]))
+            datum['Nid'] = np.arange(len(datum["respP"]))
+        
+        
+                        
+        analysisData.append(datum)
+    analysisData = pd.DataFrame(analysisData)
+    
+    return analysisData
+
+def load_circle_analysis_data(saveDir,sessionCsv):
+    # "D:\\Datadump\\Circles - Copy"
+    
+    sessions = pd.read_csv(sessionCsv)
+
+    sessions = sessions.to_dict('records')
+    
+    
+    circleAnalysisList = {'fitTimes': "circlesResp.bestTime.npy", 'responseValue':'circlesResp.max.npy','responsePval': "circlesResp.pVal.npy", 'sizeEv': "circlesSizeTuning.expVar.gamma.npy", 'sizeEvConst': "circlesSizeTuning.expVar.constant.npy",
+                          'sizeProps': "circlesSizeTuning.params.npy", 'sizePrefSize': "circlesSizeTuning.prefSize.npy", 'sizeWidth': "circlesSizeTuning.width.npy", 'gaussCorr': "circlesRF.corr.npy",
+                          'gaussPval': "circlesRF.pVal.npy", 'gaussEv': "circlesRF.expVar.gauss.npy", 'gaussEvConst': "circlesRF.expVar.constant.npy", 'gaussProps': "circlesRF.params.npy", "diameterMaps": "circlesRF.mapsDiameters.npy"
+                          }
+    
+    circleAnalysisData = []
+    
+    for si, s in enumerate(sessions):
+        datum = {}
+        save = True
+        fullPath = os.path.join(saveDir, s['Name'], s['Date'])
+        if (os.path.exists(fullPath)):
+            for key in circleAnalysisList.keys():
+                requiredFile = os.path.join(fullPath, circleAnalysisList[key])
+                if os.path.exists(requiredFile):
+                    datum[key] = np.load(requiredFile)
+                else:
+                    print(
+                        f"for path {s}\n the file {circleAnalysisList[key]} did not exist")
+                    save = False
+        if len(datum) > 0:
+            datum['Id'] = np.repeat(s['Name'], len(datum["responsePval"]))
+            datum['Date'] = np.repeat(s['Date'], len(datum["responsePval"]))
+            datum['Nid'] = np.arange(len(datum["responsePval"]))
+    
+        circleAnalysisData.append(datum)
+        
+    circleAnalysisData = pd.DataFrame(circleAnalysisData)
+    
+    return circleAnalysisData
 
 def calculate_snr(responses):
     """
@@ -1105,3 +1315,176 @@ def calculate_snr(responses):
     varTime = np.nanvar(np.nanmean(responses, 1), 0)
     varTrials = np.nanmean(np.nanvar(responses, 0), 0)
     return varTime / varTrials
+
+def create_criteria_shuffle(nullDist,paramsSplit,paramType='frequency'):
+    if (paramType == 'frequency'):
+        
+        MInull = ((nullDist[:,0,1,:]+nullDist[:,1,1,:])-(nullDist[:,0,0,:]+nullDist[:,1,0,:]))/(0.5*(nullDist[:,0,1,:]+nullDist[:,1,1,:])+(nullDist[:,0,0,:]+nullDist[:,1,0,:]))
+        dfNull = np.log2(nullDist[:, 2, 1,:])-np.log2(nullDist[:, 2, 0,:])
+        sigNull = nullDist[:, 3, 1,:]-nullDist[:, 3, 0,:]
+    
+        aAmp = np.abs(np.sum(paramsSplit[:, [0, 1], 1], 1))
+        qAmp = np.abs(np.sum(paramsSplit[:, [0, 1], 0], 1))
+    
+    
+        dgainTf = (aAmp - qAmp)/(0.5*(aAmp + qAmp))
+    
+        fa = np.log2(paramsSplit[:, 2, 1])
+        fq = np.log2(paramsSplit[:, 2, 0])
+    
+        df = fa-fq
+    
+        sigRatio = paramsSplit[:, 3, 1]-paramsSplit[:, 3, 0]
+    
+        pvalsMI = np.zeros(len(dgainTf))
+        pvalsFreq = np.zeros(len(dgainTf))
+        pvalsSig = np.zeros(len(dgainTf))
+    
+        for i in range(len(dgainTf)):
+            score = sp.stats.percentileofscore(MInull[i,:], dgainTf[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalsMI[i] = score
+            
+            score = sp.stats.percentileofscore(dfNull[i,:], df[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalsFreq[i] = score
+            
+            score = sp.stats.percentileofscore(sigNull[i,:], sigRatio[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalsSig[i] = score
+        
+        MIVarPass = pvalsMI<0.05
+        FreqVarPass = pvalsFreq<0.05
+        SigmaVarPass = pvalsSig<0.05
+        return MIVarPass, FreqVarPass, SigmaVarPass
+    if (paramType == 'contrast'):        
+        MInull = (nullDist[:,0,1,:]-nullDist[:,0,0,:])/(0.5*(nullDist[:,0,1,:]+nullDist[:,0,0,:]))
+        c50Null = np.log2(nullDist[:, 1, 1,:])-np.log2(nullDist[:, 1, 0,:])
+        cmaxNull = np.log2(nullDist[:, 2, 1,:])-np.log2(nullDist[:, 2, 0,:])
+        csNull = np.log2(nullDist[:, 3, 1,:])-np.log2(nullDist[:, 3, 0,:])
+       
+        
+        pvalsMI = np.zeros(len(paramsSplit))
+        pvalsc50 = np.zeros(len(paramsSplit))
+        pvalscmax = np.zeros(len(paramsSplit))
+        pvalscs = np.zeros(len(paramsSplit))
+        
+        mi = (paramsSplit[:,0,1]-paramsSplit[:,0,0])/(0.5*(paramsSplit[:,0,1]+paramsSplit[:,0,0]))    
+        c50 = np.log2(paramsSplit[:, 1, 1])-np.log2(paramsSplit[:, 1, 0])
+        cmax = np.log2(paramsSplit[:, 2, 1])-np.log2(paramsSplit[:, 2, 0])
+        cs = np.log2(paramsSplit[:, 3, 1])-np.log2(paramsSplit[:, 3, 0])
+        for i in range(len(paramsSplit)):
+            
+            score = sp.stats.percentileofscore(MInull[i,:], mi[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalsMI[i] = score
+            
+            score = sp.stats.percentileofscore(c50Null[i,:], c50[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalsc50[i] = score
+            
+            score = sp.stats.percentileofscore(cmaxNull[i,:], cmax[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalscmax[i] = score
+            
+            score = sp.stats.percentileofscore(csNull[i,:], cs[i])
+            score = 100-score if score>50 else score
+            score/=100
+            score*=2
+            pvalscs[i] = score
+            
+        MIVarPass = pvalsMI<0.05
+        c50VarPass = pvalsc50<0.05
+        cmaxVarPass = pvalscmax<0.05
+        csVarPass = pvalscs<0.05
+        return MIVarPass, c50VarPass, cmaxVarPass,csVarPass
+        
+            
+        
+        
+        
+
+
+def get_contrast_params(p):  
+    '''
+    
+    Parameters
+    ----------
+    p : parameters (must be of the format [4] or [NX4] or [NX4X2] or [NX4X2XShuffleN]
+    
+    Returns
+    -------
+    None.
+    
+    '''
+    params = np.zeros_like(p)*np.nan
+    
+    # non-split parameter list 
+    if (p.ndim==2):        
+        noNanInd  = np.where(~np.all(np.isnan(p),axis=(1)))[0]
+        for i in range(p.shape[0]):            
+            params[i,:] = get_contrast_params(p[i,:])
+        return params
+    
+    # split parameter list 
+    if (p.ndim==3):
+        noNanInd  = np.where(~np.all(np.isnan(p),axis=(1,2)))[0]
+        for i in range(p.shape[0]):
+            for j in range(p.shape[2]):
+                params[i,:,j] = get_contrast_params(p[i,:,j])
+        return params
+    
+    # split shuffle
+    if (p.ndim==4):
+        # save time by iterating only through valid neurons (not nans)
+        noNanInd  = np.where(~np.all(np.isnan(p),axis=(1,2,3)))[0]
+        for i in noNanInd:            
+            for j in range(p.shape[2]):
+                for k in range(p.shape[-1]):
+                    params[i,:,j,k] = get_contrast_params(p[i,:,j,k])
+        return params
+        
+    
+    if (np.all(np.isnan(p))):
+        return np.nan,np.nan,np.nan,np.nan
+    
+    
+    
+    tuner = ContrastTuner('contrast_modified')
+    crange = np.arange(0,1.01,0.01)
+    curve = tuner.func(crange,*p)
+    
+    # ignore flat curves
+    if (np.nanmax(curve)==np.nanmin(curve)):
+        return np.nan,np.nan,np.nan,np.nan
+    
+    
+    if (p[0]<0):
+        curve = -curve
+    
+    
+    Rc = np.nanmax(curve)
+    cMax = crange[np.argmax(curve)]    
+    c50c = crange[crange<cMax][np.argmin(np.abs(curve[crange<cMax]-Rc/2))]
+    
+    # normalise to get a standardized slop
+    curve_ = curve-np.nanmin(curve)
+    curve_ = curve_/np.nanmax(curve_)
+    curveDiff = np.diff(curve,prepend=True,axis=0)/0.01    
+    c50s = ((curveDiff[crange==c50c][0]))
+    
+    params = np.array([Rc,c50c,cMax,c50s])
+    return params
+        

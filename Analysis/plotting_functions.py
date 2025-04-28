@@ -120,6 +120,7 @@ def plot_summary_plot(
             hue=hue,
             ax=ax,
             err_style="bars",
+            errorbar= 'se',
             linestyle="none",
             marker="o",
             palette=palette,
@@ -161,11 +162,12 @@ def print_fitting_data(
     varsCon,
     varSpecificCon,
     pvalCon,
-    n, respP, direction=1,
+    n, respP, ignoreTrials,direction=1, 
     sessionData=None,
     saveDir=None,
     subDir=None,
-    onOff='On'
+    onOff='On',
+    conType = 'regular'
 ):
     # change structure to fit new data structure
 
@@ -217,6 +219,9 @@ def print_fitting_data(
         data,
         n,
     )
+    
+    
+    dfAll = dfAll.iloc[~ignoreTrials]
     # ORI
 
     tunerBase = OriTuner("gauss")
@@ -227,14 +232,14 @@ def print_fitting_data(
     if (canPrint):
         df = dfAll[(dfAll.sf == 0.08) & (
             dfAll.tf == 2) & (dfAll.contrast == 1)]
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(f"Ori Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
         ax[0].set_title(
-            f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}"
+            f"One fit, VE flat: {np.round(varsOri[n,0],3)}, VE model: {np.round(varsOri[n,1],3)}\n params: {np.round(paramsOri[n, :],2)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, , \nSpecific Vars:{str(varSpecificOri[n,:])} , \n pVal dAUC: {np.round(pvalOri[n],3)}"
+            f"Separate fit, VE model: {np.round(varsOri[n,2],3)}, , \nSpecific Vars:{str(varSpecificOri[n,:])} , \n pVal dAUC: {np.round(pvalOri[n],3)} \n  params Split: {np.round(paramsOriSplit[n, :],3)} "
         )
         sns.lineplot(
             x=np.arange(0, 360, 0.01),
@@ -304,15 +309,15 @@ def print_fitting_data(
 
         fittingRange = np.arange(df[df.tf > 0].tf.min(), df.tf.max(), 0.01)
 
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(
             f"Temporal frequency Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
         ax[0].set_title(
-            f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}"
+            f"One fit, VE flat: {np.round(varsTf[n,0],3)}, VE model: {np.round(varsTf[n,1],3)}  \n params: {np.round(paramsTf[n, :],2)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, \nSpecific Vars:{str(varSpecificTf[n,:])} ,\n pVal dAUC: {np.round(pvalTf[n],3)}"
+            f"Separate fit, VE model: {np.round(varsTf[n,2],3)}, \nSpecific Vars:{str(varSpecificTf[n,:])} ,\n pVal dAUC: {np.round(pvalTf[n],3)} \nparams Split: {np.round(paramsTfSplit[n, :],2)}"
         )
         sns.lineplot(
             x=fittingRange,
@@ -375,14 +380,14 @@ def print_fitting_data(
         ]
 
         df = filter_nonsig_orientations(df, direction, criterion=0.05)
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(f"Spatial frequency Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
         ax[0].set_title(
-            f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)}"
+            f"One fit, VE flat: {np.round(varsSf[n,0],3)}, VE model: {np.round(varsSf[n,1],3)} \n params: {np.round(paramsSf[n, :],2)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, \nSpecific Vars:{str(varSpecificSf[n,:])} ,\npVal dAUC: {np.round(pvalSf[n],3)}"
+            f"Separate fit, VE model: {np.round(varsSf[n,2],3)}, \nSpecific Vars:{str(varSpecificSf[n,:])} ,\npVal dAUC: {np.round(pvalSf[n],3)} \nparams Split: {np.round(paramsSfSplit[n, :],2)}"
         )
         fittingRange = np.arange(df.sf.min(), df.sf.max(), 0.01)
         sns.lineplot(
@@ -433,11 +438,13 @@ def print_fitting_data(
             plt.close(f)
 
     # contrast
-    tunerBase = ContrastTuner("contrast")
+    tunerBase = ContrastTuner("contrast") if conType == 'regular' else ContrastTuner("contrast_modified")  #"contrast"  "contrast_modified"
     tunerBase.props = paramsCon[n, :]
-    tunerSplit = ContrastTuner("contrast_split_full")
+    tunerSplit = ContrastTuner("contrast_split_full") if conType == 'regular' else ContrastTuner("contrast_modified_split") #"contrast_split_full"    "contrast_modified_split"
     tunerSplit.props = paramsConSplit[n, :]
     canPrint = not np.all(np.isnan(paramsCon[n, :]))
+    paramList = 'R0, R, C50, N' if conType=='regular' else 'R, C50, N, S'
+    paramListSplit = 'R0q, R0a, Rq, Ra, C50q, C50a, Nq, Na' if conType=='regular' else 'Rq, Ra,  C50q, C50a, Nq, Na, Sq, Sa'
     if (canPrint):
 
         df = dfAll[
@@ -446,14 +453,14 @@ def print_fitting_data(
         ]
 
         df = filter_nonsig_orientations(df, direction, criterion=0.05)
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(1,2,figsize=(15,15))
         f.suptitle(f"Contrast Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
         ax[0].set_title(
-            f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)}"
+            f"One fit, VE flat: {np.round(varsCon[n,0],3)}, VE model: {np.round(varsCon[n,1],3)} \n params ({paramList}): : {np.round(paramsCon[n, :],2)}"
         )
         ax[1].set_title(
-            f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, \nSpecific Vars:{str(varSpecificCon[n,:])} ,\npVal dAUC: {np.round(pvalCon[n],3)}"
+            f"Separate fit, VE model: {np.round(varsCon[n,2],3)}, \nVariable Scores (Rmax,Cmax,C50,C50Slope):\n{str(np.round(varSpecificCon[n,:],3))} ,\npVal dAUC: {np.round(pvalCon[n],3)} \nparams Split ({paramListSplit}):\n {np.round(paramsConSplit[n, :],3)}"
         )
         fittingRange = np.arange(0, 1, 0.01)
         sns.lineplot(
@@ -529,7 +536,7 @@ def print_fitting_combined(
     varsCon,
     varSpecificCon,
     pvalCon,
-    n, respP, direction=1,
+    n, respP, ignoreTrials,direction=1,
     sessionData=None,
     saveDir=None,
     split=True
@@ -568,7 +575,9 @@ def print_fitting_combined(
         data,
         n,
     )
-
+    
+    dfAll = dfAll.iloc[~ignoreTrials]
+    
     f, axes = plt.subplots(2, 2)
     # ORI
     tunerBase = OriTuner("gauss")
@@ -583,7 +592,7 @@ def print_fitting_combined(
     ax.set_title('Ori')
     if (canPrint) & ~split:
 
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(f"Ori Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
 
@@ -655,7 +664,7 @@ def print_fitting_combined(
     ax.set_title('Tf')
     if (canPrint) & ~split:
 
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(
             f"Temporal frequency Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
@@ -715,14 +724,14 @@ def print_fitting_combined(
         (dfAll.tf == 2)
         & (dfAll.contrast == 1)
         & (np.isin(dfAll.ori, [0, 90, 180, 270]))
-    ]
+]
     df = filter_nonsig_orientations(df, direction, criterion=0.05)
     ax = axes[1, 1]
     ax.set_title('Sf')
     fittingRange = np.arange(df.sf.min(), df.sf.max(), 0.01)
     if (canPrint) & ~split:
 
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(f"Spatial frequency Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
         # ax[0].set_title(
@@ -787,7 +796,7 @@ def print_fitting_combined(
     ax.set_title('Contrast')
     if (canPrint) & ~split:
 
-        f, ax = plt.subplots(2)
+        f, ax = plt.subplots(2,figsize=(15,15))
         f.suptitle(f"Contrast Tuning, Resp p: {np.round(respP[n],3)}")
         f.subplots_adjust(hspace=2)
         # ax[0].set_title(

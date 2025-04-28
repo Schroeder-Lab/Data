@@ -35,6 +35,7 @@ from sklearn.linear_model import Lasso
 from sklearn.model_selection import train_test_split
 from sklearn import linear_model
 from sklearn.metrics import r2_score
+from sklearn.model_selection import StratifiedKFold
 
 import os
 import glob
@@ -67,7 +68,7 @@ class BaseTuner(ABC):
     state = 0
     fitScore = 0
 
-    def __init__(self, sep=None, xtol=10**-10, max_nfev=5000):
+    def __init__(self, sep=None, xtol=10**-10, ftol = 1e-8, max_nfev=5000,split=0.1):
         """
         Initialising the class
 
@@ -88,8 +89,9 @@ class BaseTuner(ABC):
         self.sep = sep
         self.removed = 0
         self.xtol = xtol
-        self.xtol = xtol
+        self.ftol = ftol
         self.max_nfev = max_nfev
+        self.split = split
         pass
 
     @abstractmethod
@@ -154,7 +156,7 @@ class BaseTuner(ABC):
         return self.func(x, *self.props)
 
     # @jit(target_backend="cuda")
-    def fit_(self, x, y, func, p0, bounds):
+    def fit_(self, x, y, func, p0, bounds,xtol=None,ftol = None):
         try:
             props = np.nan
             props, _ = sp.optimize.curve_fit(
@@ -163,12 +165,13 @@ class BaseTuner(ABC):
                 y,
                 p0=p0,
                 bounds=bounds,
-                xtol=self.xtol,
+                xtol=self.xtol if xtol is None else xtol,
                 # max_nfev=self.max_nfev,
                 absolute_sigma=False,
                 method="trf",
                 loss="soft_l1",
-                maxfev=1e8
+                maxfev=5e3,     
+                ftol = self.ftol if ftol is None else ftol
             )
             return props
         except:
@@ -183,7 +186,7 @@ class BaseTuner(ABC):
             if bounds[0, pi] > p:
                 bounds[0, pi] = p
             if bounds[1, pi] < p:
-                bounds[0, pi] = p
+                bounds[1, pi] = p
         return tuple(p0), (tuple(bounds[0, :]), tuple(bounds[1, :]))
 
     def fit(self, x, y, save=True):
@@ -233,13 +236,15 @@ class BaseTuner(ABC):
         N = len(x)
         p0, bounds = self.set_bounds_p0(x, y)
         X_train, X_test, y_train, y_test = train_test_split(
-            x, y, test_size=split
+            x, y, test_size=split,stratify=x
         )
         props = self.fit_(X_train, y_train, self.func, p0, bounds)
         R2 = np.nan
         if not np.any(np.isnan(props)):
             preds = self.func(X_test, *props)
-        R2 = self.score(preds, y_test)
+            R2 = self.score(preds, y_test)
+        else:
+            R2 = 0
         return R2
 
     def split_cv_constant(self, x, y, split=0.1):
@@ -287,13 +292,27 @@ class BaseTuner(ABC):
     def parameter_number(self):
         return (len(inspect.getfullargspec(self.func)[0])-2)
 
-    def loo_fix_variables(self, x, y, fixedValues, fixedInds=None):
+    def loo_fix_variables(self, x, y, fixedValues, startValues = None, fixedInds=None):
         N = len(x)
         R2s = np.ones_like(fixedValues)*np.nan
         propss = []
+        
+              
+        if not (startValues is None):
+            # get initial values
+            p0s, _ = self.set_bounds_p0(x, y)              
+            p0s = np.array(p0s)
+            for vi, v in enumerate(startValues):
+                p0s[2*vi] = startValues[vi]
+                p0s[2*vi+1] = startValues[vi]
+            p0s = tuple(p0s)
+            
         for vi, v in enumerate(fixedValues):
             preds = np.ones_like(y) * np.nan
             p0, bounds = self.set_bounds_p0(x, y)
+            p0 = p0s
+            p0, bounds = self.check_bounds(p0, bounds)
+            p0 = np.array(p0)            
             if fixedInds is None:
                 fixedInds = np.arange(0, len(fixedValues)*2, 2, dtype=int)
             saveFunc = self.dynamic_variable_clamp(vi)
@@ -316,7 +335,7 @@ class BaseTuner(ABC):
                         y[np.setdiff1d(range(y.shape[0]), i)],
                         self.func,
                         p0,
-                        bounds,
+                        bounds,                        
                     )
 
                     if not (self.sep is None):
@@ -334,7 +353,7 @@ class BaseTuner(ABC):
                 y,
                 self.func,
                 p0,
-                bounds,
+                bounds,                
             )
             if not np.any(np.isnan(props)):
                 props[2*vi] = props[2*vi+1]
@@ -348,7 +367,77 @@ class BaseTuner(ABC):
 
         propss = np.vstack(propss)
         return R2s, propss
+    
+    
+    
+    def kfold(self,x,y,n=10):
+        N = len(x)
+        preds = np.ones_like(y) * np.nan
+        p0, bounds = self.set_bounds_p0(x, y)
+        
+        
+        
+        
+        tdf = pd.DataFrame(x.astype(np.float32),columns=['x','y'])
+        tdfu = tdf.drop_duplicates().reset_index(drop=True)
+        tdfu = tdfu.assign(cat=tdfu.index)
+        
+        tdf = tdf.merge(tdfu,left_on=['x','y'],right_on=['x','y'],how='left')        
+        
+        n = min(tdf.groupby(['x','y']).count().min()[0],n)
+        
+        kf = StratifiedKFold(n_splits=n,shuffle=True)
+    
+        cat = tdf['cat'].to_numpy()
+        
+        for i, (train_index, test_index) in enumerate(kf.split(x,cat)):
+            tr = x[test_index]
+            try:
+                if not (self.sep is None):
+                    self.sep -= 1
+                props = self.fit_(
+                    x[train_index],
+                    y[train_index],
+                    self.func,
+                    p0,
+                    bounds,
+                )
+                if not (self.sep is None):
+                    self.sep += 1
+                    self.state = i
+                if np.any(np.isnan(props)):
+                    preds[i] = np.nan
+                else:
+                    preds[test_index] = self.func(tr, *props)
+            except:
+                print(traceback.format_exc())
+        R2 = self.score(preds, y)   
+    
+        return R2
+    def kfold_constant(self,x,y,n=10):
+        N = len(x)
+        preds = np.ones_like(y) * np.nan       
+        kf = StratifiedKFold(n_splits=n)
+        
+        tdf = pd.DataFrame(x.astype(np.float32),columns=['x','y'])
+        tdfu = tdf.drop_duplicates().reset_index(drop=True)
+        tdfu = tdfu.assign(cat=tdfu.index)
+        
+        tdf = tdf.merge(tdfu,left_on=['x','y'],right_on=['x','y'],how='left')        
+        
+        n = min(tdf.groupby(['x','y']).count().min()[0],n)
+        
+        kf = StratifiedKFold(n_splits=n,shuffle=True)
+    
+        cat = tdf['cat'].to_numpy()
 
+        for i, (train_index, test_index) in enumerate(kf.split(x,cat)):
+            tr = y[test_index]
+            preds[test_index] = np.nanmean(y)
+            
+        R2 = self.score(preds, y)
+        return R2
+        
     # leave one out
     # @jit(target_backend="cuda")
     def loo(self, x, y):
@@ -371,6 +460,7 @@ class BaseTuner(ABC):
         N = len(x)
         preds = np.ones_like(y) * np.nan
         p0, bounds = self.set_bounds_p0(x, y)
+        p0, bounds = self.check_bounds(p0, bounds)
         for i in range(N):
             l = x[i]
             try:
@@ -942,8 +1032,8 @@ class OriTuner(BaseTuner):
 
 # fit using hyperbolic ratio function
 class ContrastTuner(BaseTuner):
-    def __init__(self, funcName, sep=None):
-        BaseTuner.__init__(self, sep)
+    def __init__(self, funcName, sep=None, xtol=10**-10, ftol = 1e-8):
+        BaseTuner.__init__(self, sep,xtol=xtol,ftol=ftol)
         self.set_function(funcName)
 
     def set_function(self, *args):
@@ -975,9 +1065,9 @@ class ContrastTuner(BaseTuner):
         except:
             c50 = 0.5
         return (
-            np.nanmin(avgy),
+            0,
             np.nanmax(avgy) - np.nanmin(avgy),
-            np.nanmin([c50, 1]),
+            np.nanmin([c50, 0.9]),
             2,
         )
 
@@ -1003,10 +1093,10 @@ class ContrastTuner(BaseTuner):
             #  maxAvg+0.2*np.abs(maxAvg), 1, 10),
             (0,                     # R0 lower bound
              0,                     # R lower bound
-             0.05,                  # c50 lower bound
-             0.5),                  # n lower bound
-            (0 + + np.finfo(float).eps,                     # R0 upper bound (constant)
-             2 * np.max(avgy),      # R upper bound
+             0.1,                  # c50 lower bound
+             1),                  # n lower bound
+            (0 + np.finfo(float).eps,                     # R0 upper bound (constant)
+             np.max(avgy),      # R upper bound
              0.9,                   # c50 upper bound
              3)                     # n upper bound
         )
@@ -1018,8 +1108,12 @@ class ContrastTuner(BaseTuner):
         if ((func is None) & (self.func == self.hyperbolic_modified)) | (
             (not (func is None)) & (func == self.hyperbolic_modified)
         ):
-            p0 = tuple(np.append(p0,1))
-            bounds = (tuple(np.append(bounds[0],1)),tuple(np.append(bounds[1],3)))
+            p0 = tuple(np.append(p0[1:],1))
+            p0 = np.array(p0)
+            p0[1] = 0.05
+            bl = np.array(bounds[0])     
+            bl[2] = 0.05
+            bounds = (tuple(np.append(bl[1:],1)),tuple(np.append(bounds[1][1:],3)))
             return p0, bounds  # just take default params and add the last scaling param
 
         if ((func is None) & (self.func == self.hyperbolic_split)) | (
@@ -1124,8 +1218,8 @@ class ContrastTuner(BaseTuner):
                         min2-0.2*np.abs(min2),
                         bounds[0][1],
                         bounds[0][1],
-                        0,  # np.nanmax([0, p01[-2]-0.2*p01[-2]]),
-                        0,  # np.nanmax([0, p02[-2]-0.2*p02[-2]]),
+                        0.1,  # np.nanmax([0, p01[-2]-0.2*p01[-2]]),
+                        0.1,  # np.nanmax([0, p02[-2]-0.2*p02[-2]]),
                         bounds[0][3],
                         bounds[0][3],
                     ),
@@ -1134,8 +1228,8 @@ class ContrastTuner(BaseTuner):
                         max2+0.2*np.abs(max2),
                         (max1-min1)+0.2*np.abs((max1-min1)),
                         (max2-min2)+0.2*np.abs((max2-min2)),
-                        1,  # np.nanmin([1, p01[-2]+0.2*p01[-2]]),
-                        1,  # np.nanmin([1, p02[-2]+0.2*p02[-2]]),
+                        0.9,  # np.nanmin([1, p01[-2]+0.2*p01[-2]]),
+                        0.9,  # np.nanmin([1, p02[-2]+0.2*p02[-2]]),
                         bounds[1][3],
                         bounds[1][3],
                     ),
@@ -1166,10 +1260,10 @@ class ContrastTuner(BaseTuner):
                         bounds[1][3],
                     ),
                 )
-            return p0, 
+            return p0, bounds 
         
         if ((func is None) & (self.func == self.hyperbolic_modified_split)) | (
-            (not (func is None)) & (func == self.hyperbolic__modified_split)
+            (not (func is None)) & (func == self.hyperbolic_modified_split)
         ):
             try:
                 
@@ -1177,31 +1271,27 @@ class ContrastTuner(BaseTuner):
                 p02 = self._make_prelim_guess(x[self.sep:], y[self.sep:])
                 
                 # add scaling factor at the end
-                p0 = (p01[0], p02[0], p01[1], p02[1],
-                      p01[2], p02[2], p01[3], p02[3],1,1)
+                p0 = (p01[1], p02[1],
+                      0.05, 0.05, p01[3], p02[3],1,1)
 
                 min1, min2, max1, max2 = self.get_specific_boundaries(x, y)
 
                 bounds = (
-                    (
-                        min1-0.2*np.abs(min1),
-                        min2-0.2*np.abs(min2),
+                    (                        
                         bounds[0][1],
                         bounds[0][1],
-                        0,  # np.nanmax([0, p01[-2]-0.2*p01[-2]]),
-                        0,  # np.nanmax([0, p02[-2]-0.2*p02[-2]]),
+                        0.05,  # np.nanmax([0, p01[-2]-0.2*p01[-2]]),
+                        0.05,  # np.nanmax([0, p02[-2]-0.2*p02[-2]]),
                         bounds[0][3],
                         bounds[0][3],
                         1,
                         1
                     ),
-                    (
-                        max1+0.2*np.abs(max1),
-                        max2+0.2*np.abs(max2),
+                    (                        
                         (max1-min1)+0.2*np.abs((max1-min1)),
                         (max2-min2)+0.2*np.abs((max2-min2)),
-                        1,  # np.nanmin([1, p01[-2]+0.2*p01[-2]]),
-                        1,  # np.nanmin([1, p02[-2]+0.2*p02[-2]]),
+                        0.9,  # np.nanmin([1, p01[-2]+0.2*p01[-2]]),
+                        0.9,  # np.nanmin([1, p02[-2]+0.2*p02[-2]]),
                         bounds[1][3],
                         bounds[1][3],
                         3,
@@ -1209,13 +1299,12 @@ class ContrastTuner(BaseTuner):
                     ),
                 )
             except:
-                p0 = (p0[0], p0[0], p0[1], p0[1],
-                      p0[2], p0[2], p0[3], p0[3],1,1)
+                p0 = (p0[1], p0[1],
+                      0.05, 0.05, p0[3], p0[3],1,1)
 
                 bounds = (
                     (
-                        bounds[0][0],
-                        bounds[0][0],
+                       
                         bounds[0][1],
                         bounds[0][1],
                         bounds[0][2],
@@ -1225,9 +1314,7 @@ class ContrastTuner(BaseTuner):
                         1,
                         1
                     ),
-                    (
-                        bounds[1][0],
-                        bounds[1][0],
+                    (                        
                         bounds[1][1],
                         bounds[1][1],
                         bounds[1][2],
@@ -1247,11 +1334,16 @@ class ContrastTuner(BaseTuner):
                 return self.hyperbolic(x, *self.props[[0, 2, 4, 6]])
             else:
                 return self.hyperbolic(x, *self.props[[1, 3, 5, 7]])
+        elif (self.func == self.hyperbolic_modified_split):#### add split func:
+            if state == 0:
+                return self.hyperbolic_modified(x, *self.props[[0, 2, 4, 6]])
+            else:
+                return self.hyperbolic_modified(x, *self.props[[1, 3, 5, 7]])
         else:
             if state == 0:
-                return self.hyperbolic(x, *self.props[[0, 2, 4, 5]])
+                return self.hyperbolic(x, *self.props[[0, 2, 4, 6]])
             else:
-                return self.hyperbolic(x, *self.props[[1, 3, 4, 5]])
+                return self.hyperbolic(x, *self.props[[1, 3, 5, 7]])
 
     def hyperbolic(self, c, R0, R, c50, n):
         return R * (c**n / (c50**n + c**n)) + R0
@@ -1299,26 +1391,27 @@ class ContrastTuner(BaseTuner):
             return np.nan
     
     ####
-    def hyperbolic_modified(self, c, R0, R, c50, n,s):
-        return R * (c**n / (c50**(s*n) + c**(s*n)) + R0
+    def hyperbolic_modified(self, c, R, c50, n,s):     
+        penalty = 1000 if (s>1.5) and (c50<0.5) else 0      
+        return R * (c**n / (c50**(s*n) + c**(s*n))) + penalty
                     
-    def hyperbolic_modified_split(self, c, R0q, R0a, Rq, Ra, c50q, c50a, nq, na,sq,sa):
+    def hyperbolic_modified_split(self, c,  Rq, Ra, c50q,c50a, nq, na,sq,sa):
         sep = self.sep
         # have one state only to predict
         if len(np.atleast_1d(c)) == 1:
             if self.state <= sep:
                 # quiet
-                y = self.hyperbolic_modified(c, R0q, Rq, c50q, nq,sq)
+                y = self.hyperbolic_modified(c, Rq, c50q, nq,sq)
             else:
                 # active
-                y = self.hyperbolic_modified(c, R0a, Ra, c50a, na,sa)
+                y = self.hyperbolic_modified(c, Ra, c50a, na,sa)
             return y
 
         if not (sep is None):
             quiet = c[:sep]
             active = c[sep:]
-            yq = self.hyperbolic_modified(quiet, R0q, Rq, c50q, nq,sq)
-            ya = self.hyperbolic_modified(active, R0a, Ra, c50a, na,sa)
+            yq = self.hyperbolic_modified(quiet, Rq, c50q, nq,sq)
+            ya = self.hyperbolic_modified(active, Ra, c50a, na,sa)
             return np.append(yq, ya)
         else:
             return np.nan
@@ -1345,12 +1438,13 @@ class GammaTuner(BaseTuner):
         if (not (self.prelim is None)):
             self.prelim[0] = np.nanmin(avgy)
             self.prelim[1] = np.nanmax(avgy) - np.nanmedian(avgy)
+            
             return self.prelim
 
         return (
             np.nanmin(avgy),
-            np.nanmax(avgy) - np.nanmin(avgy),
-            0.1,
+            np.nanmax(avgy),
+            1,
             0,
             2,
         )
@@ -1363,22 +1457,41 @@ class GammaTuner(BaseTuner):
             avgy[xi] = np.nanmean(y[x == xuu])
         minAvg = np.nanmin(avgy)
         maxAvg = np.nanmax(avgy) - np.nanmin(avgy)
-        bounds = (
-            (
-                minAvg,
-                0,
-                0,
-                0,
-                1,
-            ),
-            (
-                np.nanmax(avgy),
-                2*maxAvg,
-                5,
-                0.5,
-                100,
-            ),  # np.nanmax(y),  # np.nanmax(y),
-        )
+        if (self.prelim is None):
+            bounds = (
+                (
+                    min(minAvg,p0[0]),
+                    min(0.8*np.nanmax(avgy),p0[1]),
+                    0.1,
+                    0,
+                    1,
+                ),
+                (
+                    np.nanmax(avgy),
+                    1.2*np.nanmax(avgy),
+                    5,
+                    0.5,
+                    5,
+                ),  # np.nanmax(y),  # np.nanmax(y),
+            )
+        else:
+            bounds = (
+                (
+                    min(minAvg,p0[0]),
+                    min(0.5*maxAvg,p0[1]),
+                    min(self.prelim[2],1),
+                    0,
+                    1,
+                ),
+                (
+                    np.nanmax(avgy),
+                    1.2*maxAvg,
+                    max(self.prelim[2],5),
+                    1,
+                    5,
+                ),  # np.nanmax(y),  # np.nanmax(y),
+            )
+            
         if ((func is None) & (self.func == self.gamma)) | (
             (not (func is None)) & (func == self.gamma)
         ):
@@ -1602,10 +1715,10 @@ class Gauss2DTuner(BaseTuner):
         xdiff = np.nanmedian(np.diff(np.unique(x[:, 0])))
         ydiff = np.nanmedian(np.diff(np.unique(x[:, 1])))
 
-        df = pd.DataFrame({"x": x[:, 0], "y": x[:, 1], "resp": y})
+        df = pd.DataFrame({"x": x[:, 0].astype(np.float32), "y": x[:, 1].astype(np.float32), "resp": y})
         means = df.groupby(["x", "y"]).mean().reset_index()
         maxValInd = np.argmax(means["resp"])
-        maxVal = means.iloc[maxValInd]["resp"]
+        maxVal = means.iloc[maxValInd]["resp"].astype(np.float16)
 
         maxX = self.maxSpot[1]  # means.iloc[maxValInd]["x"]
         maxY = self.maxSpot[0]  # means.iloc[maxValInd]["y"]
@@ -1619,10 +1732,12 @@ class Gauss2DTuner(BaseTuner):
             0.5/2 if self.minR is None else self.minR,  # xdiff,
             0.5/2 if self.minR is None else self.minR,  # ydiff,
             0,
-            0,
+            np.nanmedian(y),
         )
-        return p0
-
+        return p0  
+        
+    
+    
     def set_bounds_p0(self, x, y, func=None):
 
         p0 = self._make_prelim_guess(x, y)
@@ -1633,7 +1748,7 @@ class Gauss2DTuner(BaseTuner):
         # 1 sd cannot exceed boarders
         maxA = np.max([np.abs(maxX - p0[1]), np.abs(minX - p0[1])])
         maxB = np.max([np.abs(maxY - p0[2]), np.abs(minY - p0[2])])
-        maxSd = np.max([maxA, maxB])/2
+        maxSd = np.max([maxA, maxB])
 
         xu = np.unique(x[:, 0])
         yu = np.unique(x[:, 1])
@@ -1641,14 +1756,16 @@ class Gauss2DTuner(BaseTuner):
         ydiff = np.nanmean(np.diff(yu))
         minDiff = np.nanmin([xdiff, ydiff])
 
-        possibleMaxX = np.nanmax(x[:, 0]) - np.nanmin(x[:, 0])
-        possibleMaxY = np.nanmax(x[:, 1]) - np.nanmin(x[:, 1])
-
+        possibleMaxX = maxSd if self.minR is None else np.nanmax([maxSd, self.minR+0.01]) #np.nanmax(x[:, 0]) - np.nanmin(x[:, 0])
+        possibleMaxY = maxSd if self.minR is None else np.nanmax([maxSd, self.minR+0.01])#np.nanmax(x[:, 1]) - np.nanmin(x[:, 1])
+        
+        rDiff = possibleMaxX-p0[3]     
+        
         bounds = (
             (
                 -np.inf,
-                self.maxSpot[1] - 5,  # ,np.nanmin(x[:, 0])
-                self.maxSpot[0] - 5,  # np.nanmin(x[:, 1])
+                self.maxSpot[1] - 1,  # ,np.nanmin(x[:, 0])
+                self.maxSpot[0] - 1,  # np.nanmin(x[:, 1])
                 0.5/2 if self.minR is None else self.minR,
                 0.5/2 if self.minR is None else self.minR,
                 0,
@@ -1656,10 +1773,10 @@ class Gauss2DTuner(BaseTuner):
             ),
             (
                 np.inf,
-                self.maxSpot[1] + 5,  # ,np.nanmax(x[:, 0])
-                self.maxSpot[0] + 5,  # np.nanmax(x[:, 1])
-                np.nanmax([maxSd, self.minR+0.01]),  # possibleMaxX,
-                np.nanmax([maxSd, self.minR+0.01]),  # possibleMaxY,
+                self.maxSpot[1] + 1,  # ,np.nanmax(x[:, 0])
+                self.maxSpot[0] + 1,  # np.nanmax(x[:, 1])
+                possibleMaxX,  # ,
+                possibleMaxY,  # ,
                 np.pi,
                 np.inf,
             ),
