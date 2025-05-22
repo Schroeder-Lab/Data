@@ -16,7 +16,7 @@ def define_directories():
     """
     Creates variables which contain the strings of important directory paths needed for the preprocessing.
     Note that the directory paths specified by the user can be of any shape and does not have to abide by
-    the default input seen below (i.e using double backslash).
+    the default input seen below (i.e. using double backslash).
 
     Returns
     -------
@@ -28,7 +28,7 @@ def define_directories():
            - IgnorePlanes (which planes to ignore, such as the flyback plane).
            - Save directory (where to save the preprocessed files, if left blank will save in the suite2p folder).
            - Whether to process the specified experiment or not (TRUE or FALSE).
-           Please also have a look at the example csv on github (named example_preprocess.csv)
+           Please also have a look at the example csv on GitHub (named example_preprocess.csv)
 
     s2pDir : str ["YourDirectoryPath"]
         The main directory where the suite2p folders are located; The assumed folder structure for the
@@ -67,11 +67,10 @@ def define_directories():
         # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
         # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
         # "D:\\preprocess.csv",  # "D:\\preprocessZCorrTest.csv",
-<<<<<<< Updated upstream
+
         "dataDefFile": "D:\\preprocess_Z.csv",  # "D:\\fitting_all.csv",
-=======
-        "dataDefFile":  "D:\\preprocessTmp.csv",#"D:\\preprocessZCorrTest.csv",  # "D:\\fitting_all.csv",
->>>>>>> Stashed changes
+        # "dataDefFile":  "D:\\preprocessTmp.csv",#"D:\\preprocessZCorrTest.csv",  # "D:\\fitting_all.csv",
+
         # "Z:\\ProcessedData\\",  # "D:\\Test\\",
         # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
         # "Z:\\ProcessedData\\",
@@ -91,19 +90,6 @@ def define_directories():
 def create_2p_processing_ops():
     """
         Creates the processing settings which includes:
-    <<<<<<< Updated upstream
-        - debug: Whether or not to debug (if True, lets you see exactly at which
-          lines errors occur, but parallel processing won't be done so processing
-          will be slower).
-        - plot: For each sorted ROI whether to plot the uncorrected, corrected,
-        normalised traces, Z location and Z profile.
-        - f0_percentile: The F0 percentile which determines which percentile of
-        the lowest fluorescence distribution to use.
-        - f0_window: The length of the rolling window in time (s) over which to
-        calculate F0.
-        - zcorrect_mode: The mode of Z correction such as with the Z stack
-        ("Stack").
-    =======
         - debug: Whether or not to debug (if True, lets you see exactly at which lines errors occur,
           but parallel processing won't be done so processing will be slower).
         - plot: For each sorted ROI whether to plot the uncorrected, corrected, normalised traces,
@@ -111,7 +97,6 @@ def create_2p_processing_ops():
         - f0_percentile: The F0 percentile which determines which percentile of the lowest fluorescence distribution to use.
         - f0_window: The length of the rolling window in time (s) over which to calculate F0.
         - zcorrect_mode: The mode of Z correction such as with the Z stack ("Stack").
-    >>>>>>> Stashed changes
         - remove_z_extremes: Whether or not to remove the Z extremes in the traces.
         - absZero: if None takes the default value. If a number that would be the zero for the sessions
         Please note: to change preprocessing settings, change the values in pops
@@ -305,16 +290,12 @@ def create_fitting_ops():
         "quiet_velocity": 0.5,
         "fraction_to_test": 1,
         "criterion": 0.9,
-<<<<<<< Updated upstream
-        "save_dir": r"C:\\OneDrive\\OneDrive - University of Sussex\\PreprocessedData\\fitting1\\fitting_new\\",
-        "processed files": "Z:\\ProcessedData\\",
-        "fitting_list": [r"E:\\fitting_all_neurons.csv"],
-=======
+        # "save_dir": r"C:\\OneDrive\\OneDrive - University of Sussex\\PreprocessedData\\fitting1\\fitting_new\\",
+        # "processed files": "Z:\\ProcessedData\\",
+        # "fitting_list": [r"E:\\fitting_all_neurons.csv"],
         "save_dir": "D:\\fitting_test_Contrast\\Modified",#"D:\\fittingPupilTest\\",#r"D:\\fitting_test_Contrast\\Modified",#,#r,r"D:\\fittingNE"
         "processed files": "Z:\\ProcessedData",
         "fitting_list":["D:\\fitting_all.csv"],#, ["D:\\fittingNE.csv"]
->>>>>>> Stashed changes
-
 
         # how to classify trials can be: "running"/"pupil"/"pupil-stationary"
         "classification": "running",
@@ -322,14 +303,9 @@ def create_fitting_ops():
         "fitOri": True,
         "fitTf": True,
         "fitSf": True,
-<<<<<<< Updated upstream
-        "fitContrast": False,
-=======
         "fitContrast": True,
         #regular or modified
         "contrastType": 'modified',
->>>>>>> Stashed changes
-
         "runOn": True,
         "runOff": True,
     }
