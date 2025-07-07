@@ -924,7 +924,7 @@ plt.plot()
 
     '''
 
-    puEScaled = puE[:, :].copy()
+    puEScaled = puE.copy()
     puEScaled_m = np.nanmean(puEScaled, 1)
 
     puEScaled_m -= np.nanmin(puEScaled_m)
@@ -1196,7 +1196,7 @@ def find_osi_dsi(paramsOri, direction):
     dris = np.zeros(paramsOri.shape[0], dtype=complex)
     for i in range(len(paramsOri)):
         prms = paramsOri[i, :]
-        fnc = direction[i]*tuner.func(rng, *prms).astype(np.float64)
+        fnc = tuner.func(rng, *prms).astype(np.float64)
         fnc[fnc <= 0] = 0
         fnc/=np.nanmax(fnc)
         dri = np.sum(np.exp(np.deg2rad(rng) * 1j)*(fnc/np.sum(fnc)))
@@ -1204,6 +1204,7 @@ def find_osi_dsi(paramsOri, direction):
         oris[i] = ori
         dris[i] = dri
     return oris, dris
+
 
 
 def load_grating_fitting_data(saveDir,sessionCsv):
@@ -1259,6 +1260,60 @@ def load_grating_fitting_data(saveDir,sessionCsv):
     
     return analysisData
 
+def load_grating_pupil_fitting_data(saveDir,sessionCsv):
+    sessions = pd.read_csv(sessionCsv)
+
+    sessions = sessions.to_dict('records')
+    
+    
+    analysisList = {'paramsOri': 'gratingOriTuning.stationay.params.npy', 'paramsOriSplit': "gratingOriTuning.paramsPupilStationary.npy", "varOriC": "gratingOriTuning.expVar.stationay.constant.npy", "varOriS": "gratingOriTuning.expVar.pupilStationarySplit.npy", "varOriN": "gratingOriTuning.expVar.stationay.noSplit.npy", "pvalOri": "gratingOriTuning.pVal.pupilStationarySplit.npy", "varOriSpecific": "gratingOriTuning.expVar.pupilStationarySplitSpecific.npy",
+                         'paramsTf': 'gratingTfTuning.stationay.params.npy', 'paramsTfSplit': "gratingTfTuning.paramsPupilStationary.npy", "varTfC": "gratingTfTuning.expVar.stationay.constant.npy", "varTfS": "gratingTfTuning.expVar.pupilStationarySplit.npy", "varTfN": "gratingTfTuning.expVar.stationay.noSplit.npy", "pvalTf": "gratingTfTuning.pVal.pupilStationarySplit.npy", "varTfSpecific": "gratingTfTuning.expVar.pupilStationarySplitSpecific.npy",
+                         'paramsSf': 'gratingSfTuning.stationay.params.npy', 'paramsSfSplit': "gratingSfTuning.paramsPupilStationary.npy", "varSfC": "gratingSfTuning.expVar.stationay.constant.npy", "varSfS": "gratingSfTuning.expVar.pupilStationarySplit.npy", "varSfN": "gratingSfTuning.expVar.stationay.noSplit.npy", "pvalSf": "gratingSfTuning.pVal.pupilStationarySplit.npy", "varSfSpecific": "gratingSfTuning.expVar.pupilStationarySplitSpecific.npy",
+                         'paramsContrast': 'gratingContrastTuning.stationay.params.npy', 'paramsContrastSplit': "gratingContrastTuning.paramsPupilStationary.npy", "varContrastC": "gratingContrastTuning.expVar.stationay.constant.npy", "varContrastS": "gratingContrastTuning.expVar.pupilStationarySplit.npy", "varContrastN": "gratingContrastTuning.expVar.stationay.noSplit.npy", "pvalContrast": "gratingContrastTuning.pVal.pupilStationarySplit.npy", "varContrastSpecific": "gratingContrastTuning.expVar.pupilStationarySplitSpecific.npy",
+                         "respP": "gratingResp.pVal.npy", "respDirection": "gratingResp.direction.npy"}
+
+    defaultShapes = {"respP": (1,), "respDirection": (1,),
+                     'paramsOri': (5,), 'paramsOriSplit': (5,2,), "varOriC": (1,), "varOriS": (1,), "varOriN": (1,), "pvalOri": (1,), "varOriSpecific": (2,), "nullOri": (5,2,500,),"permOri": (5,),
+                    'paramsTf': (4,), 'paramsTfSplit': (4,2,), "varTfC":(1,), "varTfS": (1,), "varTfN": (1,), "pvalTf": (1,), "varTfSpecific": (4,),"permTf": (4,),  "nullTf": (4,2,500,),
+                    'paramsSf': (4,), 'paramsSfSplit': (4,2,), "varSfC": (1,), "varSfS": (1,), "varSfN": (1,), "pvalSf": (1,), "varSfSpecific": (4,),"permSf": (4,),"nullSf": (4,2,500,),
+                    'paramsContrast': (4,), 'paramsContrastSplit': (4,2,), "varContrastC": (1,), "varContrastS": (1,), "varContrastN": (1,), "pvalContrast": (1,), "varContrastSpecific": (4,),"permContrast": (4,),"nullContrast": (4,2,1000,),
+                        }
+    analysisData = []
+    for si, s in enumerate(sessions):
+        
+        # if (s['Name']!='Uma') | (s['Date']!='2023-12-18'):
+        #     continue
+        datum = {}
+        fullPath = os.path.join(saveDir, s['Name'], s['Date'])
+        if (os.path.exists(fullPath)):
+            for key in analysisList.keys():
+                
+                requiredFile = os.path.join(fullPath, analysisList[key])
+                try:
+                    if os.path.exists(requiredFile):
+                        datum[key] = np.load(requiredFile)
+                    else:
+                        
+                        if ('respP' in datum.keys()):
+                            datum[key] = np.squeeze(np.ones((len(datum['respP']),*defaultShapes[key]))*np.nan)
+                            
+                        print(
+                            f"for path {s}\n the file {analysisList[key]} did not exist")
+                except:
+                    print(
+                        f"for path {s}\n could not load the file {analysisList[key]} ")
+        if len(datum) > 0:
+            datum['Id'] = np.repeat(s['Name'], len(datum["respP"]))
+            datum['Date'] = np.repeat(s['Date'], len(datum["respP"]))
+            datum['Nid'] = np.arange(len(datum["respP"]))
+        
+        
+                        
+        analysisData.append(datum)
+    analysisData = pd.DataFrame(analysisData)
+    
+    return analysisData
+
 def load_circle_analysis_data(saveDir,sessionCsv):
     # "D:\\Datadump\\Circles - Copy"
     
@@ -1269,7 +1324,8 @@ def load_circle_analysis_data(saveDir,sessionCsv):
     
     circleAnalysisList = {'fitTimes': "circlesResp.bestTime.npy", 'responseValue':'circlesResp.max.npy','responsePval': "circlesResp.pVal.npy", 'sizeEv': "circlesSizeTuning.expVar.gamma.npy", 'sizeEvConst': "circlesSizeTuning.expVar.constant.npy",
                           'sizeProps': "circlesSizeTuning.params.npy", 'sizePrefSize': "circlesSizeTuning.prefSize.npy", 'sizeWidth': "circlesSizeTuning.width.npy", 'gaussCorr': "circlesRF.corr.npy",
-                          'gaussPval': "circlesRF.pVal.npy", 'gaussEv': "circlesRF.expVar.gauss.npy", 'gaussEvConst': "circlesRF.expVar.constant.npy", 'gaussProps': "circlesRF.params.npy", "diameterMaps": "circlesRF.mapsDiameters.npy"
+                          'gaussPval': "circlesRF.pVal.npy", 'gaussEv': "circlesRF.expVar.gauss.npy", 'gaussEvConst': "circlesRF.expVar.constant.npy", 'gaussProps': "circlesRF.params.npy", "diameterMaps": "circlesRF.mapsDiameters.npy",
+                          'max':'circlesResp.max.npy','maxOpp':'circlesResp.maxOpp.npy'
                           }
     
     circleAnalysisData = []
@@ -1317,6 +1373,9 @@ def calculate_snr(responses):
     return varTime / varTrials
 
 def create_criteria_shuffle(nullDist,paramsSplit,paramType='frequency'):
+    
+    nullDist = np.round(nullDist,4)
+    paramsSplit = np.round(paramsSplit,4)
     if (paramType == 'frequency'):
         
         MInull = ((nullDist[:,0,1,:]+nullDist[:,1,1,:])-(nullDist[:,0,0,:]+nullDist[:,1,0,:]))/(0.5*(nullDist[:,0,1,:]+nullDist[:,1,1,:])+(nullDist[:,0,0,:]+nullDist[:,1,0,:]))
@@ -1487,4 +1546,57 @@ def get_contrast_params(p):
     
     params = np.array([Rc,c50c,cMax,c50s])
     return params
+       
+def get_histogram_bins(searchMatrix, bins, valCol=0, rel=False, returnCounts=False,customCounts = None):
+    '''
+    
+
+    Parameters
+    ----------
+    searchMatrix : TYPE
+        DESCRIPTION.
+    bins : TYPE
+        DESCRIPTION.
+    valCol : TYPE, optional
+        DESCRIPTION. The default is 0.
+    rel : TYPE, optional
+        DESCRIPTION. The default is False.
+    returnCounts : TYPE, optional
+        DESCRIPTION. The default is False.
+    customCounts : TYPE
+        cases when one to check actual percentage e.g. only neurons that could be measured at all.
+        has to be the size of the other columns
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    
+    
+    vals = np.zeros((searchMatrix.shape[1], len(bins)))
+    counts = np.zeros((len(bins)))
+    
+    if (not customCounts is None):
+        sizeDiff = searchMatrix.shape[-1] - customCounts.shape[-1]
+        if (sizeDiff>0):
+            customCounts = np.hstack((np.ones((searchMatrix.shape[0],sizeDiff)),customCounts))
         
+
+    for bi in range(len(bins)-1):
+        bInds = np.where((searchMatrix[:, valCol] >= bins[bi]) & (
+            searchMatrix[:, valCol] < bins[bi+1]))[0]
+        vals[:, bi] = np.sum(searchMatrix[bInds, :], 0)
+        if (rel):
+            count = len(bInds)
+            if (not customCounts is None):
+                count = np.sum(customCounts[bInds],0)
+            vals[:, bi] = vals[:, bi]/count
+            counts[bi] = len(bInds)
+    bInds = np.where(searchMatrix[:, valCol] >= bins[bi+1])[0]
+    vals[:, bi+1] = np.sum(searchMatrix[bInds, :], 0)
+    if (rel):
+        vals[:, bi+1] = vals[:, bi+1]/len(bInds)
+    if (returnCounts):
+        return vals, counts
+    return vals
