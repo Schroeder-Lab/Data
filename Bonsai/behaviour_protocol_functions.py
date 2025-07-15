@@ -128,9 +128,9 @@ def stimulus_gratings(directory, frameChanges):
         if (len(et) == len(stimProps)):
             warnings.warn(
                 "Assuming there was a false photodiode rise in the beginning, but check!")
-            st = frameChanges[0:-1:2].reshape(-1, 1).copy()
+            st = frameChanges[1::2].reshape(-1, 1).copy()
             # Gets the end times  of each stimulus.
-            # et = frameChanges[2::2].reshape(-1, 1).copy()
+            et = frameChanges[2::2].reshape(-1, 1).copy()
     # Adds the start and end times from above to the respective
     # lists.
 
@@ -170,7 +170,7 @@ def stimulus_gratingsLuminance(directory, frameChanges):
         warnings.warn(
             "Assuming the last end time was not recorded and assuming normal presentation time")
         mDur = np.nanmedian(et-st[:-1])
-        et = np.append(et,st[-1]+mDur)
+        et = np.atleast_2d(np.append(et,st[-1]+mDur)).T
     if len(stimProps) != len(st):
         # raise ValueError(
         #     "Number of frames and stimuli do not match. Skpping"
