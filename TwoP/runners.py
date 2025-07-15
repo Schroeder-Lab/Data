@@ -675,7 +675,7 @@ def process_s2p_directory(
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
                 pops, planeDirs, zstackPath, saveDirectory, (
-                    piezoTraces[:, p]-piezoTraces[0, max(p-1, planeRange[0])]).reshape(-1, 1), p
+                    piezoTraces[:, p]-piezoTraces[0,0]).reshape(-1, 1), p
             )
             for p in planeRange
         )
