@@ -10,7 +10,7 @@ import pandas as pd
 import scipy as sp
 import os
 import numpy as np
-from Data.TwoP.general import get_file_in_directory
+from TwoP.general import get_file_in_directory
 
 
 def get_stimulus_info(filePath, props=None):

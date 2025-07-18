@@ -7,9 +7,6 @@ Created on Fri Oct 21 08:39:57 2022
 
 """Runner functions"""
 
-
-
-
 from suite2p.registration.zalign import compute_zpos
 from joblib import Parallel, delayed
 import numpy as np
@@ -25,19 +22,19 @@ import scipy as sp
 import tifffile
 import re
 import warnings
-from Data.TwoP.process_tiff import *
-from Data.TwoP.preprocess_traces import *
-from Data.Bonsai.extract_data import *
-from Data.Bonsai.behaviour_protocol_functions import *
-from Data.TwoP.general import *
-from Data.user_defs import create_2p_processing_ops, directories_to_register
+from TwoP.process_tiff import *
+from TwoP.preprocess_traces import *
+from Bonsai.extract_data import *
+from Bonsai.behaviour_protocol_functions import *
+from TwoP.general import *
+from user_defs import create_2p_processing_ops, directories_to_register
 import matplotlib.gridspec as gridspec
+
+
 def _process_s2p_singlePlane(
-    pops, planeDirs, zstackPath, saveDirectory, piezo, plane
+        pops, planeDirs, zstackPath, saveDirectory, piezo, plane
 ):
     """
-
-
     Parameters
     ----------
     pops : dict [6]
@@ -72,10 +69,11 @@ def _process_s2p_singlePlane(
 
     """
     # Sets the current plane to processed.
+    # TODO (SS): This is incorrect: planeDirs could be shorter than plane.
     if plane > len(planeDirs) - 1:
         return None
     currDir = planeDirs[plane]
-    if not(os.path.exists(os.path.join(currDir, "F.npy"))):
+    if not (os.path.exists(os.path.join(currDir, "F.npy"))):
         return None
 
     # Array of fluorescence traces [ROIs x timepoints].
@@ -88,7 +86,6 @@ def _process_s2p_singlePlane(
     stat = np.load(os.path.join(currDir, "stat.npy"), allow_pickle=True)
     #  Dictionary of options and intermediate outputs.
     ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
-    # TODO: why an empty dict here?
     processing_metadata = {}
 
     if pops["plot"]:
@@ -113,10 +110,7 @@ def _process_s2p_singlePlane(
     # Creates array to place the X, Y and Z positions of ROIs.
     cellLocs = np.zeros((len(stat), 3))
     # Gets the resolution (in pixels) along the y dimension.
-    if type(ops["refImg"]) is np.ndarray:
-        ySpan = ops["refImg"].shape[1]
-    if type(ops["refImg"]) is list:
-        ySpan = ops["refImg"][0].shape[1]
+    ySpan = ops["Ly"]
     if pops["absZero"] is None:
         # Takes default darkest value
         # Adds the absolute signal value to F, see function for a more details.
@@ -136,7 +130,7 @@ def _process_s2p_singlePlane(
         # Determines the relative Y position in the FOV by getting the
         # location in pixels of the center of the ROI and divides this by the
         # total resolution.
-        relYpos = s["med"][1] / ySpan
+        relYpos = s["med"][0] / ySpan
         # Due to the fast volume scanning technique used (with a piezo),
         # the plane is imaged at a slant which spans the Y dimension.
         # So the location of the cell in Z depends on its position in Y.
@@ -156,23 +150,27 @@ def _process_s2p_singlePlane(
         cellLocs[i, :] = np.append(s["med"], zPos)
 
     # Convert the locations to actual distance in microns
+    # TODO (SS): Put this into separate function, so it can be adapted more easily by user. Also add parameter to decide
+    #  whether to convert or not.
     lastFile = ops['filelist'][-1]
     tif = tifffile.TiffFile(lastFile)
     customTifData = tif.pages[0].tags['Artist'].value
     zoomFactor = int(re.findall('"scanZoomFactor": ([0-9])', customTifData)[0])
+    # TODO (SS): Define these values as user specific inputs.
     zooms = [1, 1.5, 2, 4, 8, 16]
     totalSize = [730, 490, 360, 180, 95, 50]
     width = tif.pages[0].tags['ImageWidth'].value
     length = tif.pages[0].tags['ImageLength'].value
     zoomF = sp.interpolate.interp1d(zooms, totalSize)
     currentTotalSize = zoomF(zoomFactor)
-    cellLocs[:, 0] = (cellLocs[:, 0]/length) * currentTotalSize
-    cellLocs[:, 1] = (cellLocs[:, 1]/width) * currentTotalSize
+    cellLocs[:, 0] = (cellLocs[:, 0] / length) * currentTotalSize
+    cellLocs[:, 1] = (cellLocs[:, 1] / width) * currentTotalSize
 
     # Calculates the corrected neuropil traces and the specific values that
     # were used to determine the correction factor (intercept and slope of
     # linear fits, F traces bin values, N traces bin values). Refer to function
     # for further details.
+    # TODO (SS): function can be simplified / made more efficient.
     Fc, regPars, F_binValues, N_binValues = correct_neuropil(
         F,
         N,
@@ -195,6 +193,7 @@ def _process_s2p_singlePlane(
     # Multi-step process for Z correction.
     zprofiles = None  # Creates NoneType object to place the z profiles.
     zTrace = None  # Creates NoneType object to place the z traces.
+    # TODO (SS): is that necessary?
     # Specifies the current directory as the path to the registered binary and
     # ops file (Hack to avoid random reg directories).
     ops["reg_file"] = os.path.join(currDir, "data.bin")
@@ -204,6 +203,7 @@ def _process_s2p_singlePlane(
 
     # Unless there is no Z stack path specified, does Z correction.
     if not (zstackPath is None):
+        # TODO (SS): get rid of try/except
         try:
             channel = ops["align_by_chan"]
             if (channel == 1):
@@ -241,6 +241,7 @@ def _process_s2p_singlePlane(
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
 
+                # TODO (SS): go through this function.
                 zstack = register_zstack(
                     zstackPath,
                     spacing=1,
@@ -253,10 +254,13 @@ def _process_s2p_singlePlane(
 
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
+                # TODO (SS): avoid reading and writing ops
                 r = ops['reg_file']
                 ops['reg_file'] = reg_file
                 ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 ops['reg_file'] = r
+                # TODO (SS): do we have to overwrite ops? If yes, save to save directory?! This will save zcorr into
+                #  ops, which is huge. Don't do it. In next elif check instead whether zcorr file exists.
                 np.save(ops["ops_path"], ops)
             # Calculates Z correlation if Z stack was already registered.
             elif not ("zcorr" in ops.keys()):
@@ -267,6 +271,7 @@ def _process_s2p_singlePlane(
                 ops['reg_file'] = reg_file
                 ops, zcorr = compute_zpos(zstack, ops, reg_file)
                 ops['reg_file'] = r
+                # TODO (SS): again don't overwite ops.
                 # Saves the current ops path to the ops file.
                 np.save(ops["ops_path"], ops)
             # If the Z stack has been registered and Z correlation has been
@@ -280,6 +285,7 @@ def _process_s2p_singlePlane(
                 zstack = zstack_functional
             # Gets the location of each frame in Z based on the highest
             # correlation value.
+            # TODO (SS): gaussian_filter1d should be called with mode='nearest'
             zTrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
                 zcorr, 2, axis=0), axis=0)).astype(int)
             # Computes the Z profiles for each ROI.
@@ -291,6 +297,7 @@ def _process_s2p_singlePlane(
                 smoothing_factor=2,
                 abs_zero=pops["absZero"])
 
+            # TODO (SS): Is that useful? If not, delete isZcorrected.
             # quantify how many z profiles are at 0 (meaning the neuropil was stronger)
             isZcorrected = ~np.all(zprofiles == 0, axis=0)
             # Corrects traces for z motion based on the Z profiles.
@@ -409,7 +416,6 @@ def _process_s2p_singlePlane(
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
             if zTrace is not None:
-
                 plt.plot(zTrace)
                 plt.gca().invert_yaxis()
                 plt.axhline(np.nanmedian(zTrace), c="green")
@@ -432,11 +438,11 @@ def _process_s2p_singlePlane(
             )
 
             with open(
-                os.path.join(
-                    saveDirectoryPlot,
-                    "Plane" + str(plane) + "Neuron" + str(i) + ".fig.pickle",
-                ),
-                "wb",
+                    os.path.join(
+                        saveDirectoryPlot,
+                        "Plane" + str(plane) + "Neuron" + str(i) + ".fig.pickle",
+                    ),
+                    "wb",
             ) as file:
                 pickle.dump(fig, file)
             # Print Part
@@ -574,15 +580,15 @@ def _process_s2p_singlePlane(
             )
 
             with open(
-                os.path.join(
-                    saveDirectoryPlot,
-                    "Plane"
-                    + str(plane)
-                    + "Neuron"
-                    + str(i)
-                    + "_zoom.fig.pickle",
-                ),
-                "wb",
+                    os.path.join(
+                        saveDirectoryPlot,
+                        "Plane"
+                        + str(plane)
+                        + "Neuron"
+                        + str(i)
+                        + "_zoom.fig.pickle",
+                    ),
+                    "wb",
             ) as file:
                 pickle.dump(fig, file)
 
@@ -591,13 +597,13 @@ def _process_s2p_singlePlane(
 
 
 def process_s2p_directory(
-    suite2pDirectory,
-    pops=create_2p_processing_ops(),
-    piezoTraces=None,
-    zstackPath=None,
-    saveDirectory=None,
-    ignorePlanes=None,
-    debug=False,
+        suite2pDirectory,
+        pops=create_2p_processing_ops(),
+        piezoTraces=None,
+        zstackPath=None,
+        saveDirectory=None,
+        ignorePlanes=None,
+        debug=False,
 ):
     """
     This function runs over a suite2p directory and pre-processes the data in
@@ -640,7 +646,7 @@ def process_s2p_directory(
 
     isBoutons = ('selected_plane' in ops.keys())
     # Loads the number of planes into a variable.
-    numPlanes = ops["nplanes"]
+    # TODO (SS): it seems this assumes that planeDirs starts with plane0; correct?
     # Creates an array with the plane range.
     planeRange = np.arange(len(planeDirs))
     # Removes the ignored plane (if specified) from the plane range array.
@@ -651,7 +657,9 @@ def process_s2p_directory(
             re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
     # find what plane directories exist and match piezo plane number to them
 
+    # TODO (SS): Consider not deleting any planes from piezoTraces
     if not (len(ignorePlanes) == 0):
+        # TODO (SS): if planeDirs does not contain plane0 but ignorePlanes does, the 1st plane will be ignored
         planeRange = np.delete(planeRange, ignorePlanes)
         repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
         piezoTraces = piezoTraces[:, repPlanes] if not (
@@ -674,8 +682,7 @@ def process_s2p_directory(
         # Refer to the function for a more thorough description.
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, planeDirs, zstackPath, saveDirectory, (
-                    piezoTraces[:, p]-piezoTraces[0,0]).reshape(-1, 1), p
+                pops, planeDirs, zstackPath, saveDirectory, piezoTraces[:, p].reshape(-1, 1), p
             )
             for p in planeRange
         )
@@ -686,8 +693,7 @@ def process_s2p_directory(
         p = ops['selected_plane']
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, list([planeDirs[-1]]), zstackPath, saveDirectory, piezoTraces[:,
-                                                                                    p].reshape(-1, 1), p
+                pops, list([planeDirs[-1]]), zstackPath, saveDirectory, piezoTraces[:, p].reshape(-1, 1), p
             )
             for p in [0]
         )
@@ -762,7 +768,7 @@ def process_s2p_directory(
 # bonsai + arduino
 # TODO: comment
 def process_metadata_directory(
-    bonsai_dir, ops=None, pops=create_2p_processing_ops(), saveDirectory=None
+        bonsai_dir, ops=None, pops=create_2p_processing_ops(), saveDirectory=None
 ):
     """
 
@@ -926,7 +932,7 @@ def process_metadata_directory(
             print("Error in frame time extraction in directory: " + di)
             print("\nresorting to giving first and last frame")
             print(traceback.format_exc())
-            frameChanges = [lastFrame, nt[-1]+lastFrame]
+            frameChanges = [lastFrame, nt[-1] + lastFrame]
         try:
             # process stimuli
             stimulusResults = process_stimulus(propTitles, di, frameChanges)
@@ -938,11 +944,11 @@ def process_metadata_directory(
 
         try:
             # lick spout
-            lickSpout = np.ones_like(frameclock)*np.nan
+            lickSpout = np.ones_like(frameclock) * np.nan
             if ("lick" in chans):
                 lickSpout = nidaq[:, chans == "lick"]
             licks.append(lickSpout)
-            lickTimes.append(nt+lastFrame)
+            lickTimes.append(nt + lastFrame)
         except:
             print("Could not load licking data")
         # get video data if possible
@@ -1061,9 +1067,9 @@ def process_metadata_directory(
                 # make a nan array with length of video (cannot place the time)
                 print('filling the possible times with empty timestamps')
                 if ~np.isnan(nframes1):
-                    faceTimes.append(np.ones(nframes1)*np.nan)
+                    faceTimes.append(np.ones(nframes1) * np.nan)
                 if ~np.isnan(nframes2):
-                    bodyTimes.append(np.ones(nframes2)*np.nan)
+                    bodyTimes.append(np.ones(nframes2) * np.nan)
 
         except:
             print("Error in arduino processing in directory: " + di)
@@ -1071,9 +1077,9 @@ def process_metadata_directory(
 
             print('filling the possible times with empty timestamps')
             if ~np.isnan(nframes1):
-                faceTimes.append(np.ones(nframes1)*np.nan)
+                faceTimes.append(np.ones(nframes1) * np.nan)
             if ~np.isnan(nframes2):
-                bodyTimes.append(np.ones(nframes2)*np.nan)
+                bodyTimes.append(np.ones(nframes2) * np.nan)
 
         # Gets the last frame from the previous experiment.
         # This is then added to all the different times so the times for the
@@ -1172,12 +1178,12 @@ def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
     name = dataEntry.Name
     date = dataEntry.Date
     zstack = dataEntry.Zstack
-    ignorePlanes = np.fromstring(str(dataEntry.IgnorePlanes), sep=",")
     saveDirectory = dataEntry.SaveDir
     process = dataEntry.Process
 
     # Joins suite2p directory with the name and the date.
     s2pDirectory = os.path.join(s2pDir, name, date, "suite2p")
+    saveDirectory = os.path.join(saveDirectory, name, date)
 
     # If this path doesn't exist, returns a ValueError.
     if not os.path.exists(s2pDirectory):
@@ -1203,7 +1209,7 @@ def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
             raise ValueError(
                 "Z stack Directory not found. Please check the number in the processing csv"
             )
-    # Joins suite2p directory with the name and the date.
+    # Joins metadata directory with the name and the date.
     metadataDirectory = os.path.join(metadataDir, name, date)
 
     # If metadata directory does not exist, returns this ValueError.
@@ -1212,13 +1218,7 @@ def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
             "metadata directory " + metadataDirectory + "was not found."
         )
 
-    if not type(saveDirectory) is str:
-        # If the saveDirectory is not a string, saves files created here
-        # in a folder called PreProcessedFiles. This exists in the s2pDirectory.
-        # This also means this folder is not created if the saveDirectory
-        # is specified.
-        saveDirectory = os.path.join(s2pDirectory, "PreprocessedFiles")
-    # Creates the folder Preprocessedfiles if it doesn't exist yet
+    # Creates save directory if it doesn't exist yet
     if not os.path.isdir(saveDirectory):
         os.makedirs(saveDirectory)
     return s2pDirectory, zstackPath, metadataDirectory, saveDirectory

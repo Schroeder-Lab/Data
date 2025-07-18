@@ -1,0 +1,11 @@
+numpy==2.0.2
+pandas==2.3.1
+matplotlib==3.9.4
+scipy==1.13.1
+seaborn~=0.13.2
+git+https://github.com/MouseLand/suite2p.git
+tifffile==2024.8.30
+joblib==1.5.1
+numba==0.60.0
+scikit-learn==1.6.1
+natsort==8.4.0

@@ -10,9 +10,9 @@ import scipy as sp
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 import os
-from Data.TwoP.general import *
-from Data.TwoP.general import get_file_in_directory
-from Data.Bonsai.behaviour_protocol_functions import *
+from TwoP.general import *
+from TwoP.general import get_file_in_directory
+from Bonsai.behaviour_protocol_functions import *
 
 """Pre-process data recorded with Bonsai."""
 # -*- coding: utf-8 -*-
@@ -670,6 +670,7 @@ def get_piezo_trace_for_plane(
         for avgInd, pi in enumerate(piezoBatchRange):
             # Determines the section of the piezo trace to take into account given the piezo start and end times
             # specified above.
+            # TODO (SS): Check that this still works if length(inds) is not equal to len(avgTrace[:, avgInd]).
             inds = np.where(
                 (piezoTime >= piezoStarts[pi]) & (piezoTime < piezoEnds[pi])
             )

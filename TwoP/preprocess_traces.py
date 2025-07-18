@@ -1,7 +1,7 @@
 """Pre-process calcium traces extracted from tiff files."""
 import numpy as np
 from scipy import optimize
-from Data.TwoP.general import linear_analytical_solution
+from TwoP.general import linear_analytical_solution
 import pandas as pd
 
 
@@ -17,6 +17,7 @@ def correct_neuropil(
     Npil_window_F0=60,
     verbose=True,
 ):
+    # TODO (SS): simplify.
     """
     Estimates the correction factor r for neuropil correction, so that:
         C = S - rN
@@ -441,7 +442,7 @@ def remove_zcorrected_faults(ztrace, zprofiles, signals, metadata={}):
         # metadata["removedIndex"].append(np.where(np.isnan(signals))[0])
     return signals
 
-
+# TODO (SS): make zeroValue a user input parameter
 def zero_signal(F, zeroValue=19520):
     """
 

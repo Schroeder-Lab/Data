@@ -15,8 +15,8 @@ Set  get_sparsenoise_info with only one session and the save directory
 """
 
 
-from Data.TwoP.runners import read_directory_dictionary
-from Data.user_defs import (
+from TwoP.runners import read_directory_dictionary
+from user_defs import (
     define_directories,
     create_sparse_registration,
     get_sparsenoise_info,
@@ -37,8 +37,8 @@ import imp
 from suite2p import default_ops
 from suite2p.registration import utils, rigid
 from suite2p import run_s2p
-from Data.TwoP.registration_defs import *
-from Data.TwoP.runners import *
+from TwoP.registration_defs import *
+from TwoP.runners import *
 
 
 sparseSession, tmpSave = get_sparsenoise_info()

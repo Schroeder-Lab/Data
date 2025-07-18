@@ -43,7 +43,7 @@ from suite2p.io.utils import init_ops
 import traceback
 import glob
 from os import path
-from Data.user_defs import define_directories, create_ops_boutton_registration, create_detection_ops
+from user_defs import define_directories, create_ops_boutton_registration, create_detection_ops
 import os
 import shutil
 def run_single_registration(dataEntry):

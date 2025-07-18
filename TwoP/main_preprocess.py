@@ -1,25 +1,9 @@
-import numpy as np
-from matplotlib import pyplot as plt
-import random
-import sklearn
-import seaborn as sns
-import scipy as sp
-from matplotlib import rc
-import matplotlib.ticker as mtick
-import matplotlib as mpl
-import pandas as pd
-import os
-import glob
-import pickle
-import traceback
+from TwoP.runners import *
+from user_defs import *
 
-from Data.TwoP.general import get_ops_file
-from Data.TwoP.runners import *
-from Data.Bonsai.extract_data import *
-from Data.user_defs import *
-from Data.Bonsai.behaviour_protocol_functions import stimulus_prcoessing_dictionary
-
-# TODO: change folder_defs to user_defs and move one level up
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 
 # %% load directories and processing ops
 
@@ -55,6 +39,7 @@ for i in range(len(database)):
     # Goes through the pandas dataframe called database created above and
     # if True in the column "Process", the processing continues.
     if database.loc[i]["Process"]:
+        # TODO (SS): get rid of try/except
         try:
             print("reading directories" + str(database.loc[i]))
             (
@@ -70,8 +55,6 @@ for i in range(len(database)):
             ignorePlanes = np.atleast_1d(
                 np.array(database.loc[i]["IgnorePlanes"]).astype(int)
             )
-            # make save directory the main root
-            saveDirectory = os.path.split(s2pDirectory)[0]
             # Returns the ops dictionary.
             ops = get_ops_file(s2pDirectory)
             if pops["process_suite2p"]:
@@ -81,6 +64,7 @@ for i in range(len(database)):
                 # z-axis for all planes.
                 planePiezo = get_piezo_data(ops)
                 print("processing suite2p data")
+                # TODO (SS): get rid of try/except
                 try:
                     fc = process_s2p_directory(
                         s2pDirectory,

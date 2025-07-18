@@ -18,11 +18,11 @@ from suite2p.extraction.extract import extract_traces
 from suite2p.extraction.masks import create_masks
 from suite2p.registration.register import register_frames, compute_reference
 from suite2p.registration import rigid
-from Data.TwoP.preprocess_traces import correct_neuropil
+from TwoP.preprocess_traces import correct_neuropil
 from suite2p.default_ops import default_ops
 from numba import jit
 
-from Data.TwoP.preprocess_traces import zero_signal
+from TwoP.preprocess_traces import zero_signal
 
 
 # @jit(forceobj=True)
@@ -197,7 +197,8 @@ def _register_swipe(zstack, start, finish, progress):
         zstack[stackRange, :, :] = res[0]
     return zstack
 
-
+# TODO (SS): logic is incorrect. Loop from top to bottom and use offsets to make final shifts, or call
+#  suite2p.register_frames with nZ = len(zstack).
 def register_zstack_frames(zstack):
     """
     Wrapper-like function. Performs interative local registration through the
@@ -330,16 +331,19 @@ def register_zstack(
     for i in range(planes):
         # Uses the suite2p registration function to align the 10 frames taken
         # per plane to the first frame in each plane.
+        # TODO (SS): bidiphase should be 0!
         res = register_frames(
             image[i, 0, :, :], image[i, :, :, :].astype(np.int16), bidiphase=1
         )
 
         # Calculates the mean of those 10 registered frames per plane.
         zstack[i, :, :] = np.mean(res[0], axis=0)
+    # TODO (SS): pretty sure that this is wrong, or could be improved.
     # Performs local registration of the Z stack using the neighboring planes
     # as reference.
     zstack = register_zstack_frames(zstack)
 
+    # TODO (SS): check the correctness of this part. Didn't understand yet.
     # Unless there is no piezo trace, the Z stack is slanted according to the
     # piezo movement. The frames are acquired using fast imaging
     # (sawtooth) which means that along the y axis the Z differs. This is

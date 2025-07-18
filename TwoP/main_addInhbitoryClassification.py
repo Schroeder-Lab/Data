@@ -21,10 +21,10 @@ import glob
 import pickle
 import traceback
 
-from Data.TwoP.general import get_ops_file
-from Data.TwoP.runners import *
-from Data.Bonsai.extract_data import *
-from Data.user_defs import *
+from TwoP.general import get_ops_file
+from TwoP.runners import *
+from Bonsai.extract_data import *
+from user_defs import *
 
 # %%
 dirs = define_directories()

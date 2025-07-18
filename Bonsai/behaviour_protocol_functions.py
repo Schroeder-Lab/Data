@@ -5,7 +5,7 @@ Created on Fri Jan 12 09:51:58 2024
 @author: liad0
 """
 import numpy as np
-from Data.Bonsai.log_extraction_functions import get_stimulus_info, get_sparse_noise
+from Bonsai.log_extraction_functions import get_stimulus_info, get_sparse_noise
 import glob
 import os
 import warnings
