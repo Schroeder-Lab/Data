@@ -32,7 +32,7 @@ import matplotlib.gridspec as gridspec
 
 
 def _process_s2p_singlePlane(
-        pops, planeDirs, zstackPath, saveDirectory, piezo, plane
+        pops, currDir, zstackPath, saveDirectory, piezo, plane
 ):
     """
     Parameters
@@ -69,10 +69,10 @@ def _process_s2p_singlePlane(
 
     """
     # Sets the current plane to processed.
-    # TODO (SS): This is incorrect: planeDirs could be shorter than plane.
-    if plane > len(planeDirs) - 1:
-        return None
-    currDir = planeDirs[plane]
+    # TODO (SS) OLD:
+    # if plane > len(planeDirs) - 1:
+    #     return None
+    # TODO (SS): what happens if None is returned?
     if not (os.path.exists(os.path.join(currDir, "F.npy"))):
         return None
 
@@ -196,8 +196,10 @@ def _process_s2p_singlePlane(
     # TODO (SS): is that necessary?
     # Specifies the current directory as the path to the registered binary and
     # ops file (Hack to avoid random reg directories).
-    ops["reg_file"] = os.path.join(currDir, "data.bin")
-    ops["ops_path"] = os.path.join(currDir, "ops.npy")
+    ops_zcorr = ops.copy()
+    ops_zcorr["reg_file"] = os.path.join(currDir, "data.bin")
+    ops_zcorr["ops_path"] = os.path.join(currDir, "ops.npy")
+    ops_zcorr['nonrigid'] = False
 
     isZcorrected = np.zeros(F.shape[1]).astype(bool)
 
@@ -206,14 +208,14 @@ def _process_s2p_singlePlane(
         # TODO (SS): get rid of try/except
         try:
             channel = ops["align_by_chan"]
-            if (channel == 1):
-                reg_file = ops["reg_file"]
+            if channel == 1:
+                reg_file = ops_zcorr["reg_file"]
                 # Gets the reference image from Suite2P.
-                refImg = ops["meanImg"]
+                refImg = ops_zcorr["meanImg"]
             else:
-                reg_file = ops["reg_file_chan2"]
+                reg_file = ops_zcorr["reg_file_chan2"]
                 # Gets the reference image from Suite2P.
-                refImg = ops["meanImg_chan2"]
+                refImg = ops_zcorr["meanImg_chan2"]
 
             # Creates registered Z stack path.
             zFileName = os.path.join(
@@ -221,7 +223,7 @@ def _process_s2p_singlePlane(
             )
 
             # if we are using channel 2 we want to have a stack of channel 1 for the flourescence level in each channel
-            if (channel != 1):
+            if channel != 1:
                 zFileName_functional = os.path.join(
                     saveDirectory, f"zstackAngle_plane{plane}_chan1.tif"
                 )
@@ -229,6 +231,7 @@ def _process_s2p_singlePlane(
                 if not (os.path.exists(zFileName_functional)):
                     zstack_functional = register_zstack(
                         zstackPath,
+                        ops_zcorr,
                         spacing=1,
                         piezo=piezo,
                         target_image=ops['meanImg'],
@@ -241,20 +244,21 @@ def _process_s2p_singlePlane(
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
 
-                # TODO (SS): go through this function.
+                # TODO (SS): can we read spacing from tiff of zstack?
                 zstack = register_zstack(
                     zstackPath,
+                    ops_zcorr,
                     spacing=1,
                     piezo=piezo,
                     target_image=refImg,
-                    channel=channel,
+                    channel=channel
                 )
                 # Saves registered Z stack in the specified or default saveDir.
                 skimage.io.imsave(zFileName, zstack)
 
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                # TODO (SS): avoid reading and writing ops
+                # TODO (SS): avoid reading and writing ops -> ops used in compute_zpos (needs reg_file)
                 r = ops['reg_file']
                 ops['reg_file'] = reg_file
                 ops, zcorr = compute_zpos(zstack, ops, reg_file)
@@ -636,8 +640,7 @@ def process_s2p_directory(
         os.makedirs(saveDirectory)
     # Creates a list which contains the directories to the subfolders for each
     # plane.
-    planeDirs = glob.glob(os.path.join(
-        suite2pDirectory, "plane*"))
+    planeDirs = glob.glob(os.path.join(suite2pDirectory, "plane*"))
     planeDirs = np.sort(planeDirs)
     # Loads the ops dictionary from the combined directory.
     ops = np.load(
@@ -646,24 +649,27 @@ def process_s2p_directory(
 
     isBoutons = ('selected_plane' in ops.keys())
     # Loads the number of planes into a variable.
-    # TODO (SS): it seems this assumes that planeDirs starts with plane0; correct?
     # Creates an array with the plane range.
-    planeRange = np.arange(len(planeDirs))
+    planeRange = [int(re.findall(r'plane(\d+)', s)[0]) for s in planeDirs]
+    # TODO (SS) OLD: planeRange = np.arange(len(planeDirs))
     # Removes the ignored plane (if specified) from the plane range array.
-    if (isBoutons):
+    if isBoutons or ignorePlanes is None:
         ignorePlanes = []
-    else:
-        ignorePlanes = [i for i, s in enumerate(planeDirs) if int(
-            re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
-    # find what plane directories exist and match piezo plane number to them
+    # TODO (SS) OLD:
+    # else:
+    #     ignorePlanes = [i for i, s in enumerate(planeDirs) if int(
+    #         re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
 
-    # TODO (SS): Consider not deleting any planes from piezoTraces
-    if not (len(ignorePlanes) == 0):
-        # TODO (SS): if planeDirs does not contain plane0 but ignorePlanes does, the 1st plane will be ignored
-        planeRange = np.delete(planeRange, ignorePlanes)
-        repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
-        piezoTraces = piezoTraces[:, repPlanes] if not (
-            isBoutons) else piezoTraces[:, ops['selected_plane']]
+    planeRange = np.delete(planeRange, ignorePlanes)
+    # TODO (SS) OLD:
+    # # find what plane directories exist and match piezo plane number to them
+    # # TODO (SS): Consider not deleting any planes from piezoTraces
+    # if not (len(ignorePlanes) == 0):
+    #     # TODO (SS): if planeDirs does not contain plane0 but ignorePlanes does, the 1st plane will be ignored
+    #     planeRange = np.delete(planeRange, ignorePlanes)
+    #     repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
+    #     piezoTraces = piezoTraces[:, repPlanes] if not (
+    #         isBoutons) else piezoTraces[:, ops['selected_plane']]
 
     # Determine the absolute time before processing.
     preTime = time.time()
@@ -676,13 +682,13 @@ def process_s2p_directory(
         jobnum = 1
 
     # not a bouton recording proceed normally
-    if not (isBoutons):
+    if not isBoutons:
         # Processes the 2P data for the planes specified in the plane range.
         # This gives a list of dictionaries with all the planes.
         # Refer to the function for a more thorough description.
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, planeDirs, zstackPath, saveDirectory, piezoTraces[:, p].reshape(-1, 1), p
+                pops, planeDirs[p], zstackPath, saveDirectory, piezoTraces[:, p].reshape(-1, 1), p
             )
             for p in planeRange
         )

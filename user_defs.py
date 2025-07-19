@@ -9,6 +9,7 @@ import pandas as pd
 import pathlib
 import os
 
+# TODO (SS): check which functions are used.
 
 def define_directories():
     """
@@ -89,7 +90,7 @@ def create_2p_processing_ops():
 
 
     """
-    # TODO: what are alternative options for zcorrect_mode?
+    # TODO (SS): what are alternative options for zcorrect_mode?
     pops = {
         "debug": True,
         "plot": True,

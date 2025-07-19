@@ -4,6 +4,7 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/.venv_3.9" />
+      <excludeFolder url="file://$MODULE_DIR$/obsolete" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (Data)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
