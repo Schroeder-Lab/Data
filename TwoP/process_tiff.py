@@ -26,7 +26,7 @@ from TwoP.preprocess_traces import zero_signal
 
 
 # @jit(forceobj=True)
-def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
+def _reslice_zstack(stack, piezo, spacing=1):
     """
     Slants the Z stack planes according to how slanted the imaged frames are.
     This is done because the frames are acquired using a fast scanning technique
@@ -39,8 +39,8 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
     ----------
     stack : array [z,x,y]
         the registered image stack.
-    piezoNorm : array [t]
-        the piezo depth normalised to the stack spacing.
+    piezo : array [t]
+        the piezo depth.
     i: int
         the frame to create
     Returns
@@ -48,104 +48,53 @@ def _fill_plane_piezo(stack, piezoNorm, i, spacing=1):
     a normalised frame.
 
     """
-    # Normalises the piezo trace to the top depth.
-    piezoNorm -= piezoNorm[0]
+    stack_resliced = np.zeros_like(stack)
 
-    # Adds the value of the current Z stack plane (equivalent to 1um/plane).
-    piezoNorm += i
+    # Set top of piezo trace to zero.
+    piezo -= piezo[0]
+    # Convert piezo values from microns to z stack spacing.
+    piezoNorm = piezo / spacing
 
     # Gets the number of planes and no. of pixels along X and Y of the Z stack.
     planes = stack.shape[0]
     resolutionx = stack.shape[1]
     resolutiony = stack.shape[2]
 
-    # interpolate
-    ratio = resolutiony/len(piezoNorm)
-    # f = sp.interpolate.interp1d(np.arange(piezoNorm.shape[0]), piezoNorm)
-    # piezoNorm = f(np.arange(0,piezoNorm.shape[0]-1,spacing/10))
+    # Transfer function: imaged line -> plane in Z stack.
     f = sp.interpolate.interp1d(np.linspace(
-        0, resolutiony-1, len(piezoNorm)), piezoNorm[:, 0])
+        0, resolutiony, len(piezoNorm)), piezoNorm[:, 0])
     piezoNorm = f(np.arange(0, resolutiony))
+    # Set centre of piezo trace to zero. Will be the top most plane in the resliced Z stack.
+    piezoNorm -= piezoNorm[int(np.round(len(piezoNorm) / 2))]
 
-    # Creates a variable that tells the current location in Y (in pixels).
-    currPixelY = 0
-    # Will contain the slanted image in the current plane.
-    slantImg = np.zeros(stack.shape[1:])
-    # Gets the total amount of pixels in y
-    # (used to calculate how many pixels per piezo step).
-    pixelsPerMoveY = np.ones(len(piezoNorm)) * resolutiony
+    xx = np.arange(0, resolutionx)
+    yy = np.arange(0, resolutiony)
 
-    # Gets the number of pixels per piezo step.
-    # np.round(pixelsPerMoveY / len(piezoNorm)).astype(int)
-    numPixelsY = pixelsPerMoveY / len(piezoNorm)
-
-    # Corrects in case of rounding error.
-    Yerr = resolutiony-1 - sum(numPixelsY)
-    numPixelsY[-1] += Yerr
-
-    # Gets the end points (in pixels) of each piezo step.
-    pixelsY = np.cumsum(numPixelsY).astype(int)
     # Creates an interpolating function based on the z stack.
     interp = sp.interpolate.RegularGridInterpolator(
         (
-            np.arange(0, planes, spacing),
-            np.arange(0, resolutiony),
-            np.arange(0, resolutionx),
+            np.arange(0, planes),
+            yy,
+            xx,
         ),
         stack,
         fill_value=None,
         bounds_error=False,
         method='nearest'
     )
-    for yt in range(len(piezoNorm)):
-        depth = piezoNorm[yt]
 
-        # If beyond the depth, takes the final frame.
-        # if depth > planes - 1:
-        #     depth = planes - 1
-        # If below the topmost frame, takes the first one.
-        # if depth < 0:
-        #     depth = 0
+    X, Y = np.meshgrid(xx, yy, indexing='xy')
+    Z0 = np.tile(piezoNorm.reshape(-1, 1), (1, resolutionx))
 
-        line = interp(
-            (
-                depth,
-                yt,
-                np.arange(0, resolutionx),
-            )
-        )
+    for p in range(planes):
+        Z = Z0 + p
+        # Clip values outside the bounds to the bounds of the stack.
+        Z = np.clip(Z, 0, (planes - 1) * spacing)
+        # Reslices the Z stack plane according to the piezo trace.
+        plane_points = np.stack([Z.ravel(), Y.ravel(), X.ravel()], axis=1)
+        stack_resliced[p, :, :] = interp(plane_points).reshape(X.shape)
 
-        slantImg[int(yt), 0:resolutionx] = line
-    # for d in range(len(piezoNorm)):  # For each piezo step
-    #     endPointY = pixelsY[
-    #         d
-    #     ]  # Gets the end point for the current piezo step.
-    #     depth = piezoNorm[d]  # Gets the current depth from the piezo trace.
-
-    #     # If beyond the depth, takes the final frame.
-    #     if depth > planes - 1:
-    #         depth = planes - 1
-    #     # If below the topmost frame, takes the first one.
-    #     if depth < 0:
-    #         depth = 0
-    #     # For every pixel within the current piezo step.
-    #     for yt in np.arange(currPixelY, endPointY):
-    #         # print (depth,yt)
-    #         # Determines the approximate pixel values along one y line
-    #         # given the depth.
-    #         line = interp(
-    #             (
-    #                 depth,
-    #                 yt,
-    #                 np.arange(0, resolutionx),
-    #             )
-    #         )
-    #         # Appends the newly created line to the slanted image stack.
-    #         slantImg[np.floor(yt), 0:resolutionx] = line
-    #     # Updates the current location in y.
-    #     currPixelY += numPixelsY[d]
-
-    return slantImg
+    return stack_resliced
 
 
 def register_zstack_frames(zstack, ops):
@@ -185,27 +134,16 @@ def register_zstack_frames(zstack, ops):
     y_off = y_off - np.median(y_off)
     x_off = x_off - np.median(x_off)
     # Apply the shifts to the z stack.
-    zstack = shift_frames(zstack.astype(np.float32), y_off.astype(int), x_off.astype(int), yoff1=None, xoff1=None,
+    zstack = shift_frames(zstack.astype(np.float32), yoff=y_off.astype(int), xoff=x_off.astype(int), yoff1=None, xoff1=None,
                           ops=ops)
     return zstack
-    # TODO (SS) OLD:
-    # # Start from centre take triples and align them
-    # centreFrame = int(np.floor(zstack.shape[0] / 2))
-    # # Performs registration from mid to top plane.
-    # zstack = _register_swipe(zstack, centreFrame, 0, -1)
-    # # Performs registration from mid to bottom plane.
-    # zstack = _register_swipe(zstack, centreFrame, zstack.shape[0], 1)
-    # # Performs registration from top to bottom plane.
-    # zstack = _register_swipe(zstack, 0, zstack.shape[0], 1)
-    # return zstack
 
 
 def register_stack_to_ref(zstack, refImg, ops=default_ops()):
     """
     Registers the Z stack to the reference image using the same approach
     as registering the frames to the reference image.
-    All functions come from suite2p, see their docs for further information on
-    the functions.
+    All functions come from suite2p, see their docs for further information.
 
     Parameters
     ----------
@@ -224,32 +162,26 @@ def register_stack_to_ref(zstack, refImg, ops=default_ops()):
     """
     # Processes reference image for phase correlation with frames.
     ref = rigid.phasecorr_reference(refImg, ops["smooth_sigma"])
-    data = rigid.apply_masks(
+    stack_with_mask = rigid.apply_masks(
         zstack.astype(np.float32),
         *rigid.compute_masks(
             refImg=refImg,
-            maskSlope=ops["spatial_taper"]
-            if ops["1Preg"]
-            else 3 * ops["smooth_sigma"],
+            maskSlope=3 * ops["smooth_sigma"],
         )
     )
     # Performs rigid phase correlation between the Z stack and the ref image.
     corrRes = rigid.phasecorr(
-        data,
+        stack_with_mask,
         ref.astype(np.complex64),
         ops["maxregshift"],
         ops["smooth_sigma_time"],
     )
-    # Gets the maximum shifts in x and y.
+    # Gets the shifts in x and y for the zstack-plane most correlated with the reference image.
     maxCor = np.argmax(corrRes[-1])
     dx = corrRes[1][maxCor]
     dy = corrRes[0][maxCor]
-    zstackCorrected = np.zeros_like(zstack)
-
-    # Shifts every plane according to the phase corr with the ref image.
-    for z in range(zstack.shape[0]):
-        frame = zstack[z, :, :]
-        zstackCorrected[z, :, :] = rigid.shift_frame(frame=frame, dy=dy, dx=dx)
+    zstackCorrected = shift_frames(zstack.astype(np.float32), yoff=np.tile(dy, zstack.shape[0]),
+                                   xoff=np.tile(dx, zstack.shape[0]), yoff1=None, xoff1=None, ops=ops)
     return zstackCorrected
 
 
@@ -289,59 +221,39 @@ def register_zstack(
     """
     # Loads Z stack.
     image = skimage.io.imread(tiff_path)
-    # there are two channel
+    # If there are two channel, choose input channel.
     if image.ndim > 4:
         image = image[:, :, channel - 1, :, :]
 
-    # Gets the number of planes and no. of pixels along X and Y.
+    # Average repeated frames per plane in Z stack.
     planes = image.shape[0]
     repetitions = image.shape[1]
     resolutionx = image.shape[2]
     resolutiony = image.shape[3]
-    # Prepares an array where the processed Z stack planes will be placed.
     zstack = np.zeros((planes, resolutionx, resolutiony))
-
     for i in range(planes):
-        # Uses the suite2p registration function to align the 10 frames taken
+        # Uses the suite2p registration function to align the repeated frames taken
         # per plane to the middle repetition of each plane.
         res = register_frames(
-            image[i, np.round(repetitions/2), :, :], image[i, :, :, :], ops=ops
+            image[i, int(np.round(repetitions/2)), :, :], image[i, :, :, :], ops=ops
         )
-        # Calculates the mean repeated frames per plane.
+        # Calculates the mean across repeated frames per plane.
         zstack[i, :, :] = np.mean(res[0], axis=0)
-    # TODO (SS): pretty sure that this is wrong, or could be improved.
-    # Performs local registration of the Z stack using the neighboring planes
-    # as reference.
+
+    # Registers planes of Z stack to each other.
     zstack = register_zstack_frames(zstack, ops)
 
-    # TODO (SS): check the correctness of this part. Didn't understand yet.
-    # Unless there is no piezo trace, the Z stack is slanted according to the
+    # Unless there is no piezo trace, the Z stack is resliced according to the
     # piezo movement. The frames are acquired using fast imaging
     # (sawtooth) which means that along the y axis the Z differs. This is
     # different to taking the Z stack which uses slow imaging.
-    # TODO (SS): make sure that piezo is not None.
+    # TODO (SS): make sure that piezo and target_image are not None.
 
-    # Normalises the piezo depending on the spacing between planes.
-    piezoNorm = piezo / spacing
-    zstackTmp = np.zeros(zstack.shape)
-
-    # Changes the slant of each plane of the Z stack using the function
-    # _fill_plane_piezo. See function for details.
-    for p in range(planes):
-        zstackTmp[p, :, :] = _fill_plane_piezo(zstack, piezoNorm, p)
-    # apply a gaussian filter of 1 sigma on the y axis
-    zstack = zstackTmp
-
-    if not (target_image is None):
-        # Registers the z Stack to the reference image using functions from
-        # suite2p. See function for details.
-        zstack = register_stack_to_ref(zstack, target_image)
-
-    # zstack = sp.ndimage.gaussian_filter(zstack, (0, 1, 0))
+    # Changes the slant of each plane of the Z stack.
+    zstack = _reslice_zstack(zstack, piezo, spacing=spacing)
+    # Registers the z Stack to the reference image.
+    zstack = register_stack_to_ref(zstack, target_image, ops)
     return zstack
-
-
-# TODO
 
 
 def extract_zprofiles(

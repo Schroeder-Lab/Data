@@ -4,14 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Corrected import statements.&#10;Added TODOs">
-      <change beforePath="$PROJECT_DIR$/.idea/2p.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/2p.iml" afterDir="false" />
+    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Corrected alignment of z-stack">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Ephys/RunProcessingExample.py" beforeDir="false" afterPath="$PROJECT_DIR$/Ephys/RunProcessingExample.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TwoP/RunProcessingExample.py" beforeDir="false" afterPath="$PROJECT_DIR$/obsolete/RunProcessingExample.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/process_tiff.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/process_tiff.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/runners.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/runners.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/user_defs.py" beforeDir="false" afterPath="$PROJECT_DIR$/user_defs.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,7 +70,7 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "run.code.analysis.last.selected.profile": "aDefault",
-    "settings.editor.selected.configurable": "Errors",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -134,7 +130,7 @@
       <workItem from="1657010047964" duration="7823000" />
       <workItem from="1657029504343" duration="7210000" />
       <workItem from="1752739687467" duration="30620000" />
-      <workItem from="1752917097167" duration="17448000" />
+      <workItem from="1752917097167" duration="38851000" />
     </task>
     <task id="LOCAL-00001" summary="Corrected import statements.&#10;Added TODOs">
       <option name="closed" value="true" />
@@ -144,7 +140,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752861576697</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Corrected alignment of z-stack">
+      <option name="closed" value="true" />
+      <created>1752946028018</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1752946028018</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -163,14 +167,15 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Corrected import statements.&#10;Added TODOs" />
-    <option name="LAST_COMMIT_MESSAGE" value="Corrected import statements.&#10;Added TODOs" />
+    <MESSAGE value="Corrected alignment of z-stack" />
+    <option name="LAST_COMMIT_MESSAGE" value="Corrected alignment of z-stack" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>685</line>
+          <line>689</line>
           <option name="timeStamp" value="21" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -180,33 +185,48 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>244</line>
+          <line>247</line>
           <option name="timeStamp" value="41" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>469</line>
+          <line>356</line>
           <option name="timeStamp" value="45" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>291</line>
+          <line>295</line>
           <option name="timeStamp" value="46" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>361</line>
-          <option name="timeStamp" value="48" />
+          <line>122</line>
+          <option name="timeStamp" value="51" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/.venv_3.9/Lib/site-packages/suite2p/registration/register.py</url>
-          <line>302</line>
-          <option name="timeStamp" value="50" />
+          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
+          <line>256</line>
+          <option name="timeStamp" value="54" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
+          <line>53</line>
+          <option name="timeStamp" value="56" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
+          <line>230</line>
+          <option name="timeStamp" value="57" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
+          <line>269</line>
+          <option name="timeStamp" value="58" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Data$main_preprocess.coverage" NAME="main_preprocess Coverage Results" MODIFIED="1752849676001" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TwoP" />
+    <SUITE FILE_PATH="coverage/Data$main_preprocess.coverage" NAME="main_preprocess Coverage Results" MODIFIED="1753031104911" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TwoP" />
   </component>
 </project>

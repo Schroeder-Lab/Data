@@ -138,10 +138,10 @@ def _process_s2p_singlePlane(
         # scans through the plane. To determine the correct Z location,
         # the relative Y position was computed in the previous line to compute
         # the index in the piezo array which corresponds to the ROIs location.
-        piezoInd = int(np.round((len(piezo) - 1) * relYpos))
+        piezoInd = int(np.round((piezo.shape[0] - 1) * relYpos))
         # Determines the Z position of the ROI based on the index calculated
         # in the previous line.
-        zPos = piezo[piezoInd]
+        zPos = piezo[piezoInd, plane]
         # Appends the array with the YX positions of the center of the ROI
         # taken from the stat array and the z position of each ROI.
         # NOTE: Suite2P outputs the positions in XY as [Y,X], need to be kept in
@@ -244,12 +244,12 @@ def _process_s2p_singlePlane(
             # Registers Z stack unless it was already registered and saved.
             if not (os.path.exists(zFileName)):
 
-                # TODO (SS): can we read spacing from tiff of zstack?
+                # TODO (SS): spacing should be parameter in user_defs.py
                 zstack = register_zstack(
                     zstackPath,
                     ops_zcorr,
                     spacing=1,
-                    piezo=piezo,
+                    piezo=np.vstack((piezo[:, plane:plane+1], np.reshape(piezo[0:1, plane+1 % piezo.shape[1]], (1,1)))),
                     target_image=refImg,
                     channel=channel
                 )
@@ -688,7 +688,7 @@ def process_s2p_directory(
         # Refer to the function for a more thorough description.
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, planeDirs[p], zstackPath, saveDirectory, piezoTraces[:, p].reshape(-1, 1), p
+                pops, planeDirs[p], zstackPath, saveDirectory, piezoTraces, p
             )
             for p in planeRange
         )
