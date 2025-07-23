@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Corrected alignment of z-stack">
+    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Simplified alignment of z-stack">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/process_tiff.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/process_tiff.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/runners.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/runners.py" afterDir="false" />
@@ -130,7 +130,7 @@
       <workItem from="1657010047964" duration="7823000" />
       <workItem from="1657029504343" duration="7210000" />
       <workItem from="1752739687467" duration="30620000" />
-      <workItem from="1752917097167" duration="38851000" />
+      <workItem from="1752917097167" duration="53114000" />
     </task>
     <task id="LOCAL-00001" summary="Corrected import statements.&#10;Added TODOs">
       <option name="closed" value="true" />
@@ -148,7 +148,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752946028018</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Simplified alignment of z-stack">
+      <option name="closed" value="true" />
+      <created>1753179299780</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1753179299780</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -168,14 +176,15 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Corrected import statements.&#10;Added TODOs" />
     <MESSAGE value="Corrected alignment of z-stack" />
-    <option name="LAST_COMMIT_MESSAGE" value="Corrected alignment of z-stack" />
+    <MESSAGE value="Simplified alignment of z-stack" />
+    <option name="LAST_COMMIT_MESSAGE" value="Simplified alignment of z-stack" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>689</line>
+          <line>679</line>
           <option name="timeStamp" value="21" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -185,17 +194,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>247</line>
-          <option name="timeStamp" value="41" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>356</line>
-          <option name="timeStamp" value="45" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>295</line>
+          <line>285</line>
           <option name="timeStamp" value="46" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -204,23 +203,13 @@
           <option name="timeStamp" value="51" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>256</line>
-          <option name="timeStamp" value="54" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
           <line>53</line>
           <option name="timeStamp" value="56" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>230</line>
-          <option name="timeStamp" value="57" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>269</line>
+          <line>252</line>
           <option name="timeStamp" value="58" />
         </line-breakpoint>
       </breakpoints>

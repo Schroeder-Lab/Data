@@ -204,6 +204,7 @@ def _process_s2p_singlePlane(
     isZcorrected = np.zeros(F.shape[1]).astype(bool)
 
     # Unless there is no Z stack path specified, does Z correction.
+    # TODO (SS): make sure at beginning that zstackPath exists.
     if not (zstackPath is None):
         # TODO (SS): get rid of try/except
         try:
@@ -233,7 +234,8 @@ def _process_s2p_singlePlane(
                         zstackPath,
                         ops_zcorr,
                         spacing=1,
-                        piezo=piezo,
+                        piezo=np.vstack((piezo[:, plane:plane + 1],
+                                         np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
                         target_image=ops['meanImg'],
                         channel=1,
                     )
@@ -249,7 +251,8 @@ def _process_s2p_singlePlane(
                     zstackPath,
                     ops_zcorr,
                     spacing=1,
-                    piezo=np.vstack((piezo[:, plane:plane+1], np.reshape(piezo[0:1, plane+1 % piezo.shape[1]], (1,1)))),
+                    piezo=np.vstack((piezo[:, plane:plane + 1],
+                                     np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
                     target_image=refImg,
                     channel=channel
                 )
@@ -258,40 +261,27 @@ def _process_s2p_singlePlane(
 
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                # TODO (SS): avoid reading and writing ops -> ops used in compute_zpos (needs reg_file)
-                r = ops['reg_file']
-                ops['reg_file'] = reg_file
-                ops, zcorr = compute_zpos(zstack, ops, reg_file)
-                ops['reg_file'] = r
-                # TODO (SS): do we have to overwrite ops? If yes, save to save directory?! This will save zcorr into
-                #  ops, which is huge. Don't do it. In next elif check instead whether zcorr file exists.
-                np.save(ops["ops_path"], ops)
+                ops, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
             # Calculates Z correlation if Z stack was already registered.
-            elif not ("zcorr" in ops.keys()):
+            elif not os.path.exists(os.path.join(saveDirectory, "planes.zcorrelation")):
                 zstack = skimage.io.imread(zFileName)
                 # Calculates how correlated the frames are with each plane
                 # within the Z stack (suite2p function).
-                r = ops['reg_file']
-                ops['reg_file'] = reg_file
-                ops, zcorr = compute_zpos(zstack, ops, reg_file)
-                ops['reg_file'] = r
-                # TODO (SS): again don't overwite ops.
-                # Saves the current ops path to the ops file.
-                np.save(ops["ops_path"], ops)
+                ops, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
             # If the Z stack has been registered and Z correlation has been
             # done, loads the saved registered Z stack and the Z correlation
             # values from the ops.
             else:
-                zstack = skimage.io.imread(zFileName)
-                zcorr = ops["zcorr"]
+                if channel == 1:
+                    zstack = skimage.io.imread(zFileName)
+                zcorr = np.load(os.path.join(saveDirectory, "planes.zcorrelation"))
             # if we used the second channel then from now on use the main (channel 1) stack to extract flouresence profile
-            if (channel != 1):
+            if channel != 1:
                 zstack = zstack_functional
             # Gets the location of each frame in Z based on the highest
             # correlation value.
-            # TODO (SS): gaussian_filter1d should be called with mode='nearest'
             zTrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
-                zcorr, 2, axis=0), axis=0)).astype(int)
+                zcorr, 2, axis=0, mode='nearest'), axis=0)).astype(int)
             # Computes the Z profiles for each ROI.
             zprofiles = extract_zprofiles(
                 currDir,

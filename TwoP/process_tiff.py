@@ -251,6 +251,8 @@ def register_zstack(
 
     # Changes the slant of each plane of the Z stack.
     zstack = _reslice_zstack(zstack, piezo, spacing=spacing)
+    # TODO (SS): smooth zstack planes!
+    #  And perform non-rigid registration with target_image!
     # Registers the z Stack to the reference image.
     zstack = register_stack_to_ref(zstack, target_image, ops)
     return zstack
@@ -273,7 +275,7 @@ def extract_zprofiles(
     ----------
     extraction_path: str
         The current directory path.
-    zstack : np.array [x x y x z]
+    zstack : np.array [Z x Y x X]
         Registered z-stack where slices are oriented the same way as imaged
         planes (output of register_zstack).
     neuropil_correction : np.array [nROIs]
@@ -321,8 +323,8 @@ def extract_zprofiles(
     isCell = np.load(os.path.join(extraction_path, "iscell.npy")).astype(bool)
 
     # Gets the resolution in X and Y of the z stack.
-    X = zstack.shape[1]
-    Y = zstack.shape[2]
+    X = zstack.shape[2]
+    Y = zstack.shape[1]
 
     if (ROI_masks is None) and (neuropil_masks is None):
         # Suite2P function: creates cell and neuropil masks.
@@ -332,10 +334,10 @@ def extract_zprofiles(
     # each plane in the Z stack like a frame in time; this is the same function
     # that is used to extract the F and N traces.
     # Aditionally extracts the neuropil traces.
-    zProfile, Fneu = extract_traces(zstack, rois, npils, 1)
+    zProfile, Fneu = extract_traces(zstack, rois, npils)
 
     # Adds the zero signal value. Refer to function for further details.
-    if (abs_zero is None):
+    if abs_zero is None:
         zProfile = zero_signal(zProfile)
         Fneu = zero_signal(Fneu)
     else:
