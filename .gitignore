@@ -137,3 +137,5 @@ TwoP/folder_defs.py
 user_defs.py
 Ephys/preprocess.csv
 Ephys/user_defs_ephys.py
+
+workspace.xml

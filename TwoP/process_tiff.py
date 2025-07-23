@@ -17,7 +17,7 @@ import pandas as pd
 from suite2p.extraction.extract import extract_traces
 from suite2p.extraction.masks import create_masks
 from suite2p.registration.register import register_frames, compute_reference, shift_frames
-from suite2p.registration import rigid
+from suite2p.registration import rigid, nonrigid
 from TwoP.preprocess_traces import correct_neuropil
 from suite2p.default_ops import default_ops
 from numba import jit
@@ -26,7 +26,7 @@ from TwoP.preprocess_traces import zero_signal
 
 
 # @jit(forceobj=True)
-def _reslice_zstack(stack, piezo, spacing=1):
+def reslice_zstack(stack, piezo, spacing=1):
     """
     Slants the Z stack planes according to how slanted the imaged frames are.
     This is done because the frames are acquired using a fast scanning technique
@@ -160,28 +160,44 @@ def register_stack_to_ref(zstack, refImg, ops=default_ops()):
         The corrected Z stack.
 
     """
-    # Processes reference image for phase correlation with frames.
-    ref = rigid.phasecorr_reference(refImg, ops["smooth_sigma"])
-    stack_with_mask = rigid.apply_masks(
+
+    # Align all frames in the Z stack to the reference image.
+    registration = register_frames(refImg, zstack.astype(np.float32), ops=ops)
+    # Find plane in zstack that matches best with the reference image.
+    best_plane = np.argmax(np.mean(registration[6], axis=1))
+    # Apply non-rigid registration for best matching plane to all planes of Z stack.
+    blocks = nonrigid.make_blocks(Ly=ops['Ly'], Lx=ops['Lx'], block_size=ops["block_size"])
+    zstackCorrected = shift_frames(
         zstack.astype(np.float32),
-        *rigid.compute_masks(
-            refImg=refImg,
-            maskSlope=3 * ops["smooth_sigma"],
-        )
-    )
-    # Performs rigid phase correlation between the Z stack and the ref image.
-    corrRes = rigid.phasecorr(
-        stack_with_mask,
-        ref.astype(np.complex64),
-        ops["maxregshift"],
-        ops["smooth_sigma_time"],
-    )
-    # Gets the shifts in x and y for the zstack-plane most correlated with the reference image.
-    maxCor = np.argmax(corrRes[-1])
-    dx = corrRes[1][maxCor]
-    dy = corrRes[0][maxCor]
-    zstackCorrected = shift_frames(zstack.astype(np.float32), yoff=np.tile(dy, zstack.shape[0]),
-                                   xoff=np.tile(dx, zstack.shape[0]), yoff1=None, xoff1=None, ops=ops)
+        yoff=np.tile(registration[1][best_plane], zstack.shape[0]),
+        xoff=np.tile(registration[2][best_plane], zstack.shape[0]),
+        yoff1=np.tile(registration[4][best_plane].reshape(1, -1), (zstack.shape[0], 1)),
+        xoff1=np.tile(registration[5][best_plane].reshape(1, -1), (zstack.shape[0], 1)),
+        blocks=blocks,
+        ops=ops)
+
+    # # Processes reference image for phase correlation with frames.
+    # ref = rigid.phasecorr_reference(refImg, ops["smooth_sigma"])
+    # stack_with_mask = rigid.apply_masks(
+    #     zstack.astype(np.float32),
+    #     *rigid.compute_masks(
+    #         refImg=refImg,
+    #         maskSlope=3 * ops["smooth_sigma"],
+    #     )
+    # )
+    # # Performs rigid phase correlation between the Z stack and the ref image.
+    # corrRes = rigid.phasecorr(
+    #     stack_with_mask,
+    #     ref.astype(np.complex64),
+    #     ops["maxregshift"],
+    #     ops["smooth_sigma_time"],
+    # )
+    # # Gets the shifts in x and y for the zstack-plane most correlated with the reference image.
+    # maxCor = np.argmax(corrRes[-1])
+    # dx = corrRes[1][maxCor]
+    # dy = corrRes[0][maxCor]
+    # zstackCorrected = shift_frames(zstack.astype(np.float32), yoff=np.tile(dy, zstack.shape[0]),
+    #                                xoff=np.tile(dx, zstack.shape[0]), yoff1=None, xoff1=None, ops=ops)
     return zstackCorrected
 
 
@@ -250,11 +266,12 @@ def register_zstack(
     # TODO (SS): make sure that piezo and target_image are not None.
 
     # Changes the slant of each plane of the Z stack.
-    zstack = _reslice_zstack(zstack, piezo, spacing=spacing)
-    # TODO (SS): smooth zstack planes!
-    #  And perform non-rigid registration with target_image!
+    zstack = reslice_zstack(zstack, piezo, spacing=spacing)
+    # TODO (SS): make we are using reasonable block sizes for non-rigid alignment?!
     # Registers the z Stack to the reference image.
-    zstack = register_stack_to_ref(zstack, target_image, ops)
+    ops1 = ops.copy()
+    ops1['nonrigid'] = True
+    zstack = register_stack_to_ref(zstack, target_image, ops1)
     return zstack
 
 
