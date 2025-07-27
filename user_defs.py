@@ -90,14 +90,14 @@ def create_2p_processing_ops():
 
 
     """
-    # TODO (SS): what are alternative options for zcorrect_mode?
     pops = {
         "debug": True,
         "plot": True,
         "f0_percentile": 8,
         "f0_window": 300,
         "Npil_f0_window": 60,
-        "zcorrect_mode": "Stack",
+        # "zcorrect_mode": "Stack",
+        "zcorrect_reference": "first", # "first" or "median"
         "remove_z_extremes": True,
         "process_suite2p": True,
         "process_bonsai": False,

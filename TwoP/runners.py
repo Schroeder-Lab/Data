@@ -32,7 +32,7 @@ import matplotlib.gridspec as gridspec
 
 
 def _process_s2p_singlePlane(
-        pops, currDir, zstackPath, saveDirectory, piezo, plane
+        pops, currDir, zstack_raw_path, saveDirectory, piezo, plane
 ):
     """
     Parameters
@@ -44,7 +44,7 @@ def _process_s2p_singlePlane(
     planeDirs : list [str of directories]
         List containing the directories refering to the plane subfolders in the
         suite2p folder.
-    zstackPath : str [zStackDir\Animal\Z stack folder\Z stack.tif]
+    zstack_raw_path : str [zStackDir\Animal\Z stack folder\Z stack.tif]
         The path of the acquired z-stack.
     saveDirectory : str, optional
         the directory where the processed data will be saved.
@@ -68,64 +68,159 @@ def _process_s2p_singlePlane(
         - Cell locations in Y, X and Z: np.array[no. of ROIs, 3]
 
     """
-    # Sets the current plane to processed.
-    # TODO (SS) OLD:
-    # if plane > len(planeDirs) - 1:
-    #     return None
     # TODO (SS): what happens if None is returned?
     if not (os.path.exists(os.path.join(currDir, "F.npy"))):
         return None
+    processed_path = os.path.join(saveDirectory, "2P_processed")
+    os.makedirs(processed_path, exist_ok=True)
 
-    # Array of fluorescence traces [ROIs x timepoints].
-    F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T
-    # Array of neuropil traces [ROIs x timepoints].
-    N = np.load(os.path.join(currDir, "Fneu.npy")).T
-    # Array to determine if an ROI is a cell [ROIs].
-    isCell = np.load(os.path.join(currDir, "iscell.npy")).T
-    # Array of objects with statistics computed for each cell [ROIs]
+    # Load neural data.
+    F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T # (t, nROIs)
+    N = np.load(os.path.join(currDir, "Fneu.npy")).T # (t, nROIs)
+    isCell = np.load(os.path.join(currDir, "iscell.npy")) # (nROIs, 2)
     stat = np.load(os.path.join(currDir, "stat.npy"), allow_pickle=True)
-    #  Dictionary of options and intermediate outputs.
     ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
-    processing_metadata = {}
-
-    if pops["plot"]:
-        saveDirectoryPlot = os.path.join(saveDirectory, 'plots')
-        if not os.path.isdir(saveDirectoryPlot):
-            os.makedirs(saveDirectoryPlot)
-
-    # remove bad frames
+    # Only include ROIs curated cells.
+    F = F[:, isCell[:, 0].astype(bool)]
+    N = N[:, isCell[:, 0].astype(bool)]
+    stat = stat[isCell[:, 0].astype(bool)]
+    # Remove bad frames.
     badFrames = ops['badframes']
     F[badFrames, :] = np.nan
     N[badFrames, :] = np.nan
 
-    # Gets the acquisition frame rate.
-    fs = ops["fs"]
-    # Updates F to only include the ROIs considered cells.
-    F = F[:, isCell[0, :].astype(bool)]
-    # Updates N to only include the ROIs considered cells.
-    N = N[:, isCell[0, :].astype(bool)]
-    # Updates stat to only include the ROIs considered cells.
-    stat = stat[isCell[0, :].astype(bool)]
-
-    # Creates array to place the X, Y and Z positions of ROIs.
-    cellLocs = np.zeros((len(stat), 3))
-    # Gets the resolution (in pixels) along the y dimension.
-    ySpan = ops["Ly"]
+    # TODO (SS): always specify absolute zero!
+    # Add value at absolute zero (dark signal) to the traces.
     if pops["absZero"] is None:
-        # Takes default darkest value
-        # Adds the absolute signal value to F, see function for a more details.
         F = zero_signal(F)
-        # Adds the absolute signal value to N, see function for a more details.
         N = zero_signal(N)
     else:
-        # Takes user darkest value
-        # Adds the absolute signal value to F, see function for a more details.
         F = zero_signal(F, pops["absZero"])
-        # Adds the absolute signal value to N, see function for a more details.
         N = zero_signal(N, pops["absZero"])
+
+    # If Z stack was generated (and path to file provided), perform Z correction.
+    if not (zstack_raw_path is None):
+        channel = ops["align_by_chan"] # imaging channel used for alignment
+        zstack_path = os.path.join(
+            processed_path, f"zstack_plane{plane}_chan{channel}.tif"
+        )
+        # Initiate parameters for Z stack alignment and reslicing. Specifies path to the registered movie (.bin) and
+        # non-rigid registration method.
+        ops_zcorr = ops.copy()
+        ops_zcorr["reg_file"] = os.path.join(currDir, "data.bin")
+        # ops_zcorr["ops_path"] = os.path.join(currDir, "ops.npy")
+        ops_zcorr['nonrigid'] = False
+
+        # Use reference image from the channel that was used for alignment.
+        if channel == 1:
+            refImg = ops_zcorr["meanImg"]
+        else:
+            refImg = ops_zcorr["meanImg_chan2"]
+        # If frames were aligned using the non-functional channel (2), we also need a registered Z stack for that
+        # channel to register each frame in depth.
+        if channel != 1:
+            zstack_functional_path = os.path.join(
+                processed_path, f"zstack_plane{plane}_chan1.tif"
+            )
+            if not os.path.exists(zstack_functional_path):
+                zstack_functional = register_zstack(
+                    zstack_raw_path,
+                    ops_zcorr,
+                    spacing=1,
+                    piezo=np.vstack((piezo[:, plane:plane + 1],
+                                     np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
+                    target_image=ops['meanImg'],
+                    channel=1,
+                )
+                # Save registered Z stack in the specified or default saveDir.
+                skimage.io.imsave(zstack_functional_path, zstack_functional)
+            else:
+                zstack_functional = skimage.io.imread(zstack_functional_path)
+        # If Z stack not saved yet, register and reslice raw Z Stack and determine correlations with movie frames.
+        if not (os.path.exists(zstack_path)):
+            # TODO (SS): spacing should be parameter in user_defs.py
+            zstack = register_zstack(
+                zstack_raw_path,
+                ops_zcorr,
+                spacing=1,
+                piezo=np.vstack((piezo[:, plane:plane + 1],
+                                 np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
+                target_image=refImg,
+                channel=channel
+            )
+            skimage.io.imsave(zstack_path, zstack)
+            _, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
+            np.save(os.path.join(processed_path, f"zcorr_plane{plane}.npy"), zcorr)
+        # If Z stack was created but correlations were not, compute correlations.
+        elif not os.path.exists(os.path.join(processed_path, f"zcorr_plane{plane}.npy")):
+            zstack = skimage.io.imread(zstack_path)
+            _, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
+        # If Z stack and correlations were saved, load them.
+        else:
+            if channel == 1:
+                zstack = skimage.io.imread(zstack_path)
+            # TODO (SS): load correct plane specific zcorr
+            zcorr = np.load(os.path.join(processed_path, f"zcorr_plane{plane}.npy"))
+
+        # If we used the non-funciton channel (2) for alignment, we now need to use the registered Z stack of the
+        # functional channel (1) to correct the recorded calcium traces.
+        if channel != 1:
+            zstack = zstack_functional
+        # Determine Z profiles for each ROI and their neuropil.
+        # TODO (SS): smoothing_factor should be a parameter in user_defs.py
+        F_profiles, N_profiles = extract_zprofiles(currDir, zstack, smoothing_factor=0.5, abs_zero=pops["absZero"])
+
+        # For each frame, determine which slice in the Z stack it matches best.
+        # TODO (SS): sigma should be a parameter in user_defs.py
+        ztrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
+            zcorr, 2, axis=0, mode='nearest'), axis=0)).astype(int)
+        # Determine best reference depth.
+        if pops["zcorrect_reference"] == "first": # across first experiment
+            reference_depth = np.nanmedian(ztrace[:ops['frames_per_folder'][0]])
+        else: # across all experiments
+            reference_depth = np.nanmedian(ztrace)
+
+        # Correct ROI and neuropil traces for z motion.
+        # TODO (SS): theshold should be a parameter in user_defs.py
+        F_zcorrected, N_zcorrected = correct_zmotion(F, N, F_profiles, N_profiles, ztrace, reference_depth,
+                              ignore_faults=pops["remove_z_extremes"], threshold= 0.2, metadata=pops)
+    else:
+        # If no Z correction is performed (for example if no Z stack was given)
+        # only the uncorrected delta F over F is considered.
+        Fcz = dF
+        zstack = np.nan
+        zcorr = np.nan
+
+    fs = ops["fs"]
+    # Calculates the corrected neuropil traces and the specific values that
+    # were used to determine the correction factor (intercept and slope of
+    # linear fits, F traces bin values, N traces bin values). Refer to function
+    # for further details.
+    # TODO (SS): function can be simplified / made more efficient.
+    Fc, regPars, F_binValues, N_binValues = correct_neuropil(
+        F,
+        N,
+        fs,
+        prctl_F0=pops["f0_percentile"],
+        Npil_window_F0=pops["Npil_f0_window"],
+    )
+    # Calculates the baseline fluorescence F0 used to calculate delta F over F.
+    F0 = get_F0(
+        Fc,
+        fs,
+        prctl_F=pops["f0_percentile"],
+        window_size=pops["f0_window"],
+        framesPerFolder=ops["frames_per_folder"],
+    )
+    # Calculates delta F oer F given the corrected neuropil traces and the
+    # baseline fluorescence.
+    dF = get_delta_F_over_F(Fc, F0)
 
     # For each ROI, the location is determined from the suite2p output "stat"
     # (for X and Y) and from the piezo (for Z).
+    cellLocs = np.zeros((len(stat), 3))
+    # Gets the resolution (in pixels) along the y dimension.
+    ySpan = ops["Ly"]
     for i, s in enumerate(stat):
         # Determines the relative Y position in the FOV by getting the
         # location in pixels of the center of the ROI and divides this by the
@@ -166,160 +261,13 @@ def _process_s2p_singlePlane(
     cellLocs[:, 0] = (cellLocs[:, 0] / length) * currentTotalSize
     cellLocs[:, 1] = (cellLocs[:, 1] / width) * currentTotalSize
 
-    # Calculates the corrected neuropil traces and the specific values that
-    # were used to determine the correction factor (intercept and slope of
-    # linear fits, F traces bin values, N traces bin values). Refer to function
-    # for further details.
-    # TODO (SS): function can be simplified / made more efficient.
-    Fc, regPars, F_binValues, N_binValues = correct_neuropil(
-        F,
-        N,
-        fs,
-        prctl_F0=pops["f0_percentile"],
-        Npil_window_F0=pops["Npil_f0_window"],
-    )
-    # Calculates the baseline fluorescence F0 used to calculate delta F over F.
-    F0 = get_F0(
-        Fc,
-        fs,
-        prctl_F=pops["f0_percentile"],
-        window_size=pops["f0_window"],
-        framesPerFolder=ops["frames_per_folder"],
-    )
-    # Calculates delta F oer F given the corrected neuropil traces and the
-    # baseline fluorescence.
-    dF = get_delta_F_over_F(Fc, F0)
-
-    # Multi-step process for Z correction.
-    zprofiles = None  # Creates NoneType object to place the z profiles.
-    zTrace = None  # Creates NoneType object to place the z traces.
-    # TODO (SS): is that necessary?
-    # Specifies the current directory as the path to the registered binary and
-    # ops file (Hack to avoid random reg directories).
-    ops_zcorr = ops.copy()
-    ops_zcorr["reg_file"] = os.path.join(currDir, "data.bin")
-    ops_zcorr["ops_path"] = os.path.join(currDir, "ops.npy")
-    ops_zcorr['nonrigid'] = False
-
-    isZcorrected = np.zeros(F.shape[1]).astype(bool)
-
-    # Unless there is no Z stack path specified, does Z correction.
-    # TODO (SS): make sure at beginning that zstackPath exists.
-    if not (zstackPath is None):
-        # TODO (SS): get rid of try/except
-        try:
-            channel = ops["align_by_chan"]
-            if channel == 1:
-                reg_file = ops_zcorr["reg_file"]
-                # Gets the reference image from Suite2P.
-                refImg = ops_zcorr["meanImg"]
-            else:
-                reg_file = ops_zcorr["reg_file_chan2"]
-                # Gets the reference image from Suite2P.
-                refImg = ops_zcorr["meanImg_chan2"]
-
-            # Creates registered Z stack path.
-            zFileName = os.path.join(
-                saveDirectory, f"zstackAngle_plane{plane}_chan{channel}.tif"
-            )
-
-            # if we are using channel 2 we want to have a stack of channel 1 for the flourescence level in each channel
-            if channel != 1:
-                zFileName_functional = os.path.join(
-                    saveDirectory, f"zstackAngle_plane{plane}_chan1.tif"
-                )
-
-                if not (os.path.exists(zFileName_functional)):
-                    zstack_functional = register_zstack(
-                        zstackPath,
-                        ops_zcorr,
-                        spacing=1,
-                        piezo=np.vstack((piezo[:, plane:plane + 1],
-                                         np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
-                        target_image=ops['meanImg'],
-                        channel=1,
-                    )
-                    # Saves registered Z stack in the specified or default saveDir.
-                    skimage.io.imsave(zFileName_functional, zstack_functional)
-                else:
-                    zstack_functional = skimage.io.imread(zFileName_functional)
-            # Registers Z stack unless it was already registered and saved.
-            if not (os.path.exists(zFileName)):
-
-                # TODO (SS): spacing should be parameter in user_defs.py
-                zstack = register_zstack(
-                    zstackPath,
-                    ops_zcorr,
-                    spacing=1,
-                    piezo=np.vstack((piezo[:, plane:plane + 1],
-                                     np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
-                    target_image=refImg,
-                    channel=channel
-                )
-                # Saves registered Z stack in the specified or default saveDir.
-                skimage.io.imsave(zFileName, zstack)
-
-                # Calculates how correlated the frames are with each plane
-                # within the Z stack (suite2p function).
-                ops, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
-            # Calculates Z correlation if Z stack was already registered.
-            elif not os.path.exists(os.path.join(saveDirectory, "planes.zcorrelation")):
-                zstack = skimage.io.imread(zFileName)
-                # Calculates how correlated the frames are with each plane
-                # within the Z stack (suite2p function).
-                ops, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
-            # If the Z stack has been registered and Z correlation has been
-            # done, loads the saved registered Z stack and the Z correlation
-            # values from the ops.
-            else:
-                if channel == 1:
-                    zstack = skimage.io.imread(zFileName)
-                zcorr = np.load(os.path.join(saveDirectory, "planes.zcorrelation"))
-            # if we used the second channel then from now on use the main (channel 1) stack to extract flouresence profile
-            if channel != 1:
-                zstack = zstack_functional
-            # Gets the location of each frame in Z based on the highest
-            # correlation value.
-            zTrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
-                zcorr, 2, axis=0, mode='nearest'), axis=0)).astype(int)
-            # Computes the Z profiles for each ROI.
-            zprofiles = extract_zprofiles(
-                currDir,
-                zstack,
-                neuropil_correction=regPars[:, :],
-                metadata=processing_metadata,
-                smoothing_factor=2,
-                abs_zero=pops["absZero"])
-
-            # TODO (SS): Is that useful? If not, delete isZcorrected.
-            # quantify how many z profiles are at 0 (meaning the neuropil was stronger)
-            isZcorrected = ~np.all(zprofiles == 0, axis=0)
-            # Corrects traces for z motion based on the Z profiles.
-            Fcz = correct_zmotion(
-                dF,
-                zprofiles,
-                zTrace.copy(),
-                ignore_faults=pops["remove_z_extremes"],
-                metadata=pops,
-            )
-        except:
-            # If there is an error in processing, the uncorrected delta F over
-            # F is considered.
-            print(currDir + ": Error in correcting z-motion")
-            print(traceback.format_exc())
-            Fcz = dF
-    else:
-        # If no Z correction is performed (for example if no Z stack was given)
-        # only the uncorrected delta F over F is considered.
-        Fcz = dF
-        zcorr = np.nan
     # Places all the results in a dictionary (dF/F, Z corrected dF/F,
     # z profiles, z traces and the cell locations in X, Y and Z).
     results = {
         "dff": dF,
         "dff_zcorr": Fcz,
-        "zProfiles": zprofiles,
-        "zTrace": zTrace,
+        "zProfiles": F_profiles,
+        "zTrace": ztrace,
         "zCorr_stack": zcorr,
         "locs": cellLocs,
         "isZcorrected": isZcorrected,
@@ -327,6 +275,18 @@ def _process_s2p_singlePlane(
     }
 
     if pops["plot"]:
+        saveDirectoryPlot = os.path.join(saveDirectory, 'plots')
+        if not os.path.isdir(saveDirectoryPlot):
+            os.makedirs(saveDirectoryPlot)
+
+            # TODO (SS): compare reference image to best matching slice in Z stack
+            # TODO (SS): compare these profiles to Z profiles
+            z_F_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
+            z_N_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
+            for p in np.unique(ztrace):
+                z_F_quartiles[p, :] = np.percentile(F[ztrace == p, :], 25, axis=0)
+                z_N_quartiles[p, :] = np.percentile(N[ztrace == p, :], 25, axis=0)
+
         for i in range(dF.shape[-1]):
             # Print full
             fig = plt.figure(1, figsize=(12, 6))
@@ -335,8 +295,8 @@ def _process_s2p_singlePlane(
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
-            if ((not (zprofiles is None)) & (not (zTrace is None))):
-                plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
+            if ((not (F_profiles is None)) & (not (ztrace is None))):
+                plt.plot(F_profiles[:, i], range(F_profiles.shape[0]))
                 plt.legend(
                     ["Z profile"],
                     # bbox_to_anchor=(1.01, 1),
@@ -345,17 +305,17 @@ def _process_s2p_singlePlane(
                 plt.xlabel("fluorescence")
                 plt.ylabel("depth")
                 plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(zTrace), c="green")
-                plt.axhline(np.nanmax(zTrace), c="red")
-                plt.axhline(np.nanmin(zTrace), c="blue")
+                plt.axhline(np.nanmedian(ztrace), c="green")
+                plt.axhline(np.nanmax(ztrace), c="red")
+                plt.axhline(np.nanmin(ztrace), c="blue")
                 # Adding text labels
-                plt.text(0, np.nanmedian(zTrace), 'Median',
+                plt.text(0, np.nanmedian(ztrace), 'Median',
                          color='green', fontsize=10, va='bottom')
-                plt.text(0, np.nanmax(zTrace), 'Maximum',
+                plt.text(0, np.nanmax(ztrace), 'Maximum',
                          color='red', fontsize=10, va='bottom')
-                plt.text(0, np.nanmin(zTrace), 'Minimum',
+                plt.text(0, np.nanmin(ztrace), 'Minimum',
                          color='blue', fontsize=10, va='bottom')
-                plt.xlim(0, max(zprofiles[:, i]))
+                plt.xlim(0, max(F_profiles[:, i]))
 
             xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
 
@@ -409,10 +369,10 @@ def _process_s2p_singlePlane(
 
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
-            if zTrace is not None:
-                plt.plot(zTrace)
+            if ztrace is not None:
+                plt.plot(ztrace)
                 plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(zTrace), c="green")
+                plt.axhline(np.nanmedian(ztrace), c="green")
                 plt.legend(
                     ["Z trace"],
                     # bbox_to_anchor=(1.01, 1),
@@ -420,7 +380,7 @@ def _process_s2p_singlePlane(
                 )
                 plt.xlabel("time (frames)")
                 plt.tick_params(axis='y', labelright=True, labelleft=False)
-                plt.xlim(0, zTrace.shape[0])
+                plt.xlim(0, ztrace.shape[0])
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
             plt.savefig(
@@ -485,8 +445,8 @@ def _process_s2p_singlePlane(
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
-            if zprofiles is not None:
-                plt.plot(zprofiles[:, i], range(zprofiles.shape[0]))
+            if F_profiles is not None:
+                plt.plot(F_profiles[:, i], range(F_profiles.shape[0]))
                 plt.legend(
                     ["Z profile"],
                     loc="upper left"
@@ -494,17 +454,17 @@ def _process_s2p_singlePlane(
                 plt.xlabel("fluorescence")
                 plt.ylabel("depth")
                 plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(zTrace), c="green")
-                plt.axhline(np.nanmax(zTrace), c="red")
-                plt.axhline(np.nanmin(zTrace), c="blue")
+                plt.axhline(np.nanmedian(ztrace), c="green")
+                plt.axhline(np.nanmax(ztrace), c="red")
+                plt.axhline(np.nanmin(ztrace), c="blue")
                 # Adding text labels
-                plt.text(0, np.nanmedian(zTrace), 'Median',
+                plt.text(0, np.nanmedian(ztrace), 'Median',
                          color='green', fontsize=10, va='bottom')
-                plt.text(0, np.nanmax(zTrace), 'Maximum',
+                plt.text(0, np.nanmax(ztrace), 'Maximum',
                          color='red', fontsize=10, va='bottom')
-                plt.text(0, np.nanmin(zTrace), 'Minimum',
+                plt.text(0, np.nanmin(ztrace), 'Minimum',
                          color='blue', fontsize=10, va='bottom')
-                plt.xlim(0, max(zprofiles[:, i]))
+                plt.xlim(0, max(F_profiles[:, i]))
 
             xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
             plt.plot(F[:500, i], "b")
@@ -550,10 +510,10 @@ def _process_s2p_singlePlane(
 
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
 
-            if zTrace is not None:
-                plt.plot(zTrace[:500])
+            if ztrace is not None:
+                plt.plot(ztrace[:500])
                 plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(zTrace), c="green")
+                plt.axhline(np.nanmedian(ztrace), c="green")
                 plt.legend(
                     ["Z trace"],
                     loc="upper right"
@@ -591,9 +551,9 @@ def _process_s2p_singlePlane(
 
 
 def process_s2p_directory(
-        suite2pDirectory,
+        suite2p_directory,
         pops=create_2p_processing_ops(),
-        piezoTraces=None,
+        piezo=None,
         zstackPath=None,
         saveDirectory=None,
         ignorePlanes=None,
@@ -608,9 +568,9 @@ def process_s2p_directory(
 
     Parameters
     ----------
-    suite2pDirectory : str [s2pDir/Animal/Date/suite2p]
+    suite2p_directory : str [s2pDir/Animal/Date/suite2p]
         the suite2p parent directory, where the plane directories are.
-    piezoTraces : [time X plane] um
+    piezo : [time X plane] um
         a metadata directory for the piezo trace.
     zstackPath : str [zStackDir\Animal\Z stack folder\Z stack.tif]
         the path of the acquired z-stack.
@@ -625,12 +585,12 @@ def process_s2p_directory(
     """
     if saveDirectory is None:
         # Creates the directory where the processed data will be saved.
-        saveDirectory = os.path.join(suite2pDirectory, "ProcessedData")
+        saveDirectory = os.path.join(suite2p_directory, "ProcessedData")
     if not os.path.isdir(saveDirectory):
         os.makedirs(saveDirectory)
     # Creates a list which contains the directories to the subfolders for each
     # plane.
-    planeDirs = glob.glob(os.path.join(suite2pDirectory, "plane*"))
+    planeDirs = glob.glob(os.path.join(suite2p_directory, "plane*"))
     planeDirs = np.sort(planeDirs)
     # Loads the ops dictionary from the combined directory.
     ops = np.load(
@@ -678,9 +638,9 @@ def process_s2p_directory(
         # Refer to the function for a more thorough description.
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, planeDirs[p], zstackPath, saveDirectory, piezoTraces, p
+                pops, planeDirs[plane], zstackPath, saveDirectory, piezo, plane
             )
-            for p in planeRange
+            for plane in planeRange
         )
         # signalList = _process_s2p_singlePlane(planeDirs,zstackPath,saveDirectory,piezoTraces[:,0],1)
         # Determines the absolute time after processing.
@@ -689,7 +649,7 @@ def process_s2p_directory(
         p = ops['selected_plane']
         results = Parallel(n_jobs=jobnum, verbose=5)(
             delayed(_process_s2p_singlePlane)(
-                pops, list([planeDirs[-1]]), zstackPath, saveDirectory, piezoTraces[:, p].reshape(-1, 1), p
+                pops, list([planeDirs[-1]]), zstackPath, saveDirectory, piezo[:, p].reshape(-1, 1), p
             )
             for p in [0]
         )

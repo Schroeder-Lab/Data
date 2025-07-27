@@ -43,7 +43,7 @@ for i in range(len(database)):
         try:
             print("reading directories" + str(database.loc[i]))
             (
-                s2pDirectory,
+                suite2p_directory,
                 zstackPath,
                 metadataDirectory,
                 saveDirectory,
@@ -56,20 +56,20 @@ for i in range(len(database)):
                 np.array(database.loc[i]["IgnorePlanes"]).astype(int)
             )
             # Returns the ops dictionary.
-            ops = get_ops_file(s2pDirectory)
+            ops = get_ops_file(suite2p_directory)
             if pops["process_suite2p"]:
 
                 print("getting piezo data")
                 # Returns the movement of the piezo within one frame across the
                 # z-axis for all planes.
-                planePiezo = get_piezo_data(ops)
+                piezo = get_piezo_data(ops)
                 print("processing suite2p data")
                 # TODO (SS): get rid of try/except
                 try:
                     fc = process_s2p_directory(
-                        s2pDirectory,
+                        suite2p_directory,
                         pops,
-                        planePiezo,
+                        piezo,
                         zstackPath,
                         saveDirectory=saveDirectory,
                         ignorePlanes=ignorePlanes,

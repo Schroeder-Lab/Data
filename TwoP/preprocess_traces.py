@@ -1,6 +1,6 @@
 """Pre-process calcium traces extracted from tiff files."""
 import numpy as np
-from scipy import optimize
+from scipy.signal import argrelmin
 from TwoP.general import linear_analytical_solution
 import pandas as pd
 
@@ -153,8 +153,8 @@ def correct_neuropil(
     return signal, regPars, F_binValues, N_binValues
 
 
-# TODO
-def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold=0.2, metadata={}):
+def correct_zmotion(F, N, F_profiles, N_profiles, ztrace, reference_depth, ignore_faults=True, threshold=0.2,
+                    metadata={}):
     """
     Corrects changes in fluorescence due to brain movement along z-axis
     (depth). Method is based on algorithm described in Ryan, ..., Lagnado
@@ -165,7 +165,7 @@ def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold=0.2, 
     F : np.array [t x nROIs]
         Calcium traces (measured signal) of ROIs from a single(!) plane.
         It is assumed that these are neuropil corrected!
-    zprofiles : np.array [slices x nROIs]
+    F_profiles : np.array [slices x nROIs]
         Fluorescence profiles of ROIs across depth of z-stack.
         These profiles are assumed to be neuropil corrected!
     ztrace : np.array [t]
@@ -175,7 +175,7 @@ def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold=0.2, 
         Whether to remove the timepoints where imaging took place in a plane
         that is meaningless to a cell's activity. Default is True.
 
-    ampThreshold: float, optional
+    threshold: float, optional
         The cutoff for amplification that is deemed too high (thus amplifying noise).
         Default is 0.2 (amplification X5).
 
@@ -184,40 +184,20 @@ def correct_zmotion(F, zprofiles, ztrace, ignore_faults=True, ampThreshold=0.2, 
     signal : np.array [t x nROIs]
         Z-corrected calcium traces.
     """
+    # Determine correction factor for F and N for each slice in Z stack.
+    F_factors = F_profiles / F_profiles[reference_depth, :]
+    N_factors = N_profiles / N_profiles[reference_depth, :]
 
-    """
-    Steps
-    1) Create correction vector based on z-profiles and ztrace.
-    2) Correct calcium traces using correction vector.
-    """
-
-    # Chooses the depth to which to compare all the ROI depths (this is the
-    # median depth across the whole zTrace).
-    referenceDepth = int(np.round(np.median(ztrace)))
-    # zprofiles = zprofiles - np.min(zprofiles, 0)
-    # Calculates the correction factor by dividing the z profiles with the
-    # z profile at the reference depth.
-    zprofiles = zprofiles.copy()
-    # zprofiles -= np.nanmin(zprofiles)
-    correctionFactor = np.abs(zprofiles / zprofiles[referenceDepth, :])
-    # Assigns the correction factor for each frame based on its location in the
-    # Z trace.
-    correctionMatrix = correctionFactor[ztrace, :]
-
-    # remove parts that are too amplified
-    correctionMatrix[correctionMatrix < ampThreshold] = np.nan
-    # Applies the Z correction by dividing the frames in the fluorescence
-    # traces by the correction factor.
-    signal = F / correctionMatrix
-
-    # Removes the timepoints where imaging took place in a plane that is
-    # meaningless to a cell's activity and returns the corrected signal.
-    # See function for details.
+    # Disregard corrections for ROI traces when depth is outside the ROI's profile.
     if ignore_faults:
-        signal = remove_zcorrected_faults(
-            ztrace, correctionFactor, signal, metadata
-        )
-    return signal
+        F_factors = remove_zcorrected_faults(F_factors, reference_depth)
+    # Disregard corrections smaller than threshold.
+    F_factors[F_factors < threshold] = np.nan
+    N_factors[N_factors < threshold] = np.nan
+    # Apply correction to F and N.
+    F_corrected = F / F_factors[ztrace, :]
+    N_corrected = N / N_factors[ztrace, :]
+    return F_corrected, N_corrected
 
 
 # TODO
@@ -307,7 +287,7 @@ def get_delta_F_over_F(Fc, F0):
     # return (Fc - F0) / np.fmax(1, F0)
 
 
-def remove_zcorrected_faults(ztrace, zprofiles, signals, metadata={}):
+def remove_zcorrected_faults(zprofiles, reference_depth):
     """
     This function cleans timepoints in the trace where the imaging takes place
     in a plane that is meaningless as to cell activity.
@@ -329,118 +309,22 @@ def remove_zcorrected_faults(ztrace, zprofiles, signals, metadata={}):
     signals: the corrected signals with the faulty timepoints removed.
 
     """
-    # Gets the zprofiles which are only in the imaged planes.
-    zp_focused = zprofiles[min(ztrace): max(ztrace), :]
-    # Normalises the zTrace so that the top imaged plane is the first plane.
-    ztrace -= min(ztrace)
-    # Calculates the difference between the z profiles for one plane and the
-    # plane before. This gives the change in fluorescence between planes.
-    dif = np.diff(zp_focused, 1, axis=0)
-    # Gets in which plane the fluorescence changes for each cell (where there
-    # is a peak).
-    zero_crossings_inds = np.where(np.diff(np.signbit(dif), axis=0))
-    # The planes where there is a peak/trough (=crossings).
-    zero_crossing = zero_crossings_inds[0]
-    # The cells that correspond to the planes in zero_crossing.
-    cells = zero_crossings_inds[1]
-    # Gets the imaging plane by taking the median plane in the z trace.
-    imagingPlane = np.median(ztrace)  # -min(ztrace)
+    zprofiles_corrected = np.copy(zprofiles)
+    for roi in np.arange(zprofiles.shape[1]):
+        # Determine indices of all troughs in the z profile.
+        trough_inds = argrelmin(zprofiles[:,roi])[0]
+        if len(trough_inds) == 0:
+            # No troughs found, return the original profile.
+            continue
+        # Find the two troughs closest to the reference depth.
+        neighbor = np.searchsorted(trough_inds, reference_depth)
+        # Set Z profile beyond the troughs to NaN.
+        if neighbor < len(trough_inds) and trough_inds[neighbor] < zprofiles.shape[0] - 1:
+            zprofiles_corrected[trough_inds[neighbor]+1:, roi] = np.nan
+        if neighbor > 0 and trough_inds[neighbor] > 0:
+            zprofiles_corrected[:trough_inds[neighbor]-1, roi] = np.nan
 
-    metadata["removedIndex"] = []
-    # For each cell,
-    for i in range(signals.shape[1]):
-
-        # new logic
-        removePoint = []
-        # check where the higher fluorescnces are (normalised to plane)
-        upInds = np.where(zp_focused[:, i] > 1)[0]
-        if (len(upInds) > 0):
-            closestHighPoint = upInds[np.argmin(np.abs(upInds-imagingPlane))]
-
-            # cannot go high in fluorescence in more than one place
-            if (closestHighPoint > imagingPlane):
-                signals[np.isin(
-                    ztrace, upInds[upInds < closestHighPoint]), i] = np.nan
-            else:
-                signals[np.isin(
-                    ztrace, upInds[upInds > closestHighPoint]), i] = np.nan
-
-        downInds = np.where(zp_focused[:, i] < 1)[0]
-        zpDowns = zp_focused[downInds, i]
-        downDif = np.diff(zpDowns, 1, axis=0)
-        zero_crossings_inds = np.where(np.diff(np.signbit(downDif), axis=0))[0]
-        if (len(zero_crossings_inds)):
-            downLimits = downInds[zero_crossings_inds]
-            # find out the points that are above the imaging plane
-            dlAbove = downLimits[downLimits < imagingPlane]
-            if (len(dlAbove) > 0):
-                closestLowPoint = dlAbove[np.argmin(
-                    np.abs(dlAbove-imagingPlane))]
-                signals[ztrace < closestLowPoint, i] = np.nan
-
-            # same for below
-            dlBelow = downLimits[downLimits > imagingPlane]
-            if (len(dlBelow) > 0):
-                closestLowPoint = dlBelow[np.argmin(
-                    np.abs(dlBelow-imagingPlane))]
-                signals[ztrace > closestLowPoint, i] = np.nan
-
-            # it is not in a trough, make sure it doesn't go beyond one
-
-        # Gets the indices where there are crossings for the specified cell.
-        # cellInds = np.where(cells == i)[0]
-        # # No zero crossings of the derivative means imaging is on a
-        # # monotonous slope.
-
-        # if len(cellInds) == 0:
-        #     continue
-        # # Gets the planes where most fluorescence comes from.
-        # zc = zero_crossing[cellInds]
-        # # Calculates the distance of the crossing plane from the median
-        # # imaging plane.
-        # distFromPlane = imagingPlane - zc
-        # # If there are many crossings, finds out what is the closest one to
-        # # the imaging plane.
-        # planeCrossingInd = np.argmin(abs(distFromPlane))
-        # planeCrossing = zc[planeCrossingInd]
-
-        # # Removes the signals where there is more than one crossing.
-        # if len(zc) > 1:
-        #     # The imaging plane has the first crossing. Discards anything
-        #     # that comes after the rest.
-        #     # If the first crossing is closest to the imaging plane:
-        #     if planeCrossingInd == 0:
-        #         # Replaces the datapoints with NaNs if the location in z is
-        #         # after the first crossing.
-        #         signals[np.where(ztrace > zc[1]), i] = np.nan
-        #     # For all the cases where the crossing closest to the imaging plane
-        #     # is not the first, all values are discarded where the plane is
-        #     # before the crossing.
-        #     else:
-        #         signals[
-        #             np.where(ztrace < zc[planeCrossingInd - 1]), i
-        #         ] = np.nan
-
-        # # Checks if differential is positive before crossing.
-        # # If that's the case we're golden, the problem is if it is negative.
-        # # Then it's a trough and it depends on what side of the trough we are
-        # # imaging.
-
-        # # If the first crossing is below the imaging plane, removes the
-        # # timepoints after the crossing.
-        # if dif[planeCrossing - 1, i] < 0:
-        #     if distFromPlane[planeCrossingInd] < 0:
-
-        #         removeInd = np.where(ztrace > planeCrossing + 1)[0]
-        #     else:
-        #         # In the opposite case, it removes the points from before the
-        #         # crossing.
-        #         removeInd = np.where(ztrace < planeCrossing + 1)[0]
-
-        #     signals[removeInd, i] = np.nan
-        # # Adds the indices of the removed points to a dictionary.
-        # metadata["removedIndex"].append(np.where(np.isnan(signals))[0])
-    return signals
+    return zprofiles_corrected
 
 # TODO (SS): make zeroValue a user input parameter
 def zero_signal(F, zeroValue=19520):

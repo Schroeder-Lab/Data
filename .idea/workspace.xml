@@ -4,10 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Simplified alignment of z-stack">
+    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Non-rigid alignment of zstack-planes to reference image">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Bonsai/extract_data.py" beforeDir="false" afterPath="$PROJECT_DIR$/Bonsai/extract_data.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TwoP/main_preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/main_preprocess.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TwoP/preprocess_traces.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/preprocess_traces.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/process_tiff.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/process_tiff.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/runners.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/runners.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/user_defs.py" beforeDir="false" afterPath="$PROJECT_DIR$/user_defs.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -36,6 +40,9 @@
     &quot;assignee&quot;: &quot;sylviaschroeder&quot;
   }
 }</component>
+  <component name="GithubDefaultAccount">
+    <option name="defaultAccountId" value="58ed456d-75e7-46ba-85b7-01419393dd23" />
+  </component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/Schroeder-Lab/Data.git&quot;,
@@ -54,26 +61,26 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.main_preprocess.executor": "Debug",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "corrections-2P",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "C:/dev/toolboxes/MouseLand/suite2p/suite2p/run_s2p.py",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "run.code.analysis.last.selected.profile": "aDefault",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.main_preprocess.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;corrections-2P&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/dev/toolboxes/MouseLand/suite2p/suite2p/run_s2p.py&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;aDefault&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.github.copilot.settings.general.GeneralConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\dev\workspaces\2p\TwoP" />
@@ -131,6 +138,10 @@
       <workItem from="1657029504343" duration="7210000" />
       <workItem from="1752739687467" duration="30620000" />
       <workItem from="1752917097167" duration="53114000" />
+      <workItem from="1753384994020" duration="29000" />
+      <workItem from="1753624192834" duration="3645000" />
+      <workItem from="1753627875729" duration="141000" />
+      <workItem from="1753628036198" duration="14322000" />
     </task>
     <task id="LOCAL-00001" summary="Corrected import statements.&#10;Added TODOs">
       <option name="closed" value="true" />
@@ -156,7 +167,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753179299780</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Non-rigid alignment of zstack-planes to reference image">
+      <option name="closed" value="true" />
+      <created>1753297236934</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1753297236934</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -177,14 +196,15 @@
     <MESSAGE value="Corrected import statements.&#10;Added TODOs" />
     <MESSAGE value="Corrected alignment of z-stack" />
     <MESSAGE value="Simplified alignment of z-stack" />
-    <option name="LAST_COMMIT_MESSAGE" value="Simplified alignment of z-stack" />
+    <MESSAGE value="Non-rigid alignment of zstack-planes to reference image" />
+    <option name="LAST_COMMIT_MESSAGE" value="Non-rigid alignment of zstack-planes to reference image" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>679</line>
+          <line>639</line>
           <option name="timeStamp" value="21" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -193,23 +213,13 @@
           <option name="timeStamp" value="23" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>285</line>
-          <option name="timeStamp" value="46" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>122</line>
+          <line>110</line>
           <option name="timeStamp" value="51" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>53</line>
-          <option name="timeStamp" value="56" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>252</line>
+          <line>240</line>
           <option name="timeStamp" value="58" />
         </line-breakpoint>
       </breakpoints>

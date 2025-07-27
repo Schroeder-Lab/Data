@@ -622,7 +622,7 @@ def get_piezo_trace_for_plane(
 
     Returns
     -------
-    planePiezo : np.array [miliseconds in one frame, nplanes]
+    piezo : np.array [miliseconds in one frame, nplanes]
         Movement of piezo across z-axis for all planes.
         Location in depth (in microns) is for each milisecond within one plane.
 
@@ -703,7 +703,7 @@ def get_piezo_data(ops):
 
     Returns
     -------
-    planePiezo : np.array [miliseconds in one frame, nplanes]
+    piezo : np.array [miliseconds in one frame, nplanes]
         Movement of piezo across z-axis for all planes.
         Location in depth (in microns) is for each milisecond within one plane.
 

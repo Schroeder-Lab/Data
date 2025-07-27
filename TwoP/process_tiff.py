@@ -2,31 +2,19 @@
 
 
 import os
-import numpy as np
-import pandas as pd
-import skimage
-import scipy as sp
-from skimage import io
-from skimage import data
-from skimage import metrics
-from skimage.util import img_as_float
-import tifftools as tt
-import pandas as pd
 
+import numpy as np
+import scipy as sp
+import skimage
 # from pystackreg import StackReg
-from suite2p.extraction.extract import extract_traces
-from suite2p.extraction.masks import create_masks
-from suite2p.registration.register import register_frames, compute_reference, shift_frames
-from suite2p.registration import rigid, nonrigid
-from TwoP.preprocess_traces import correct_neuropil
-from suite2p.default_ops import default_ops
-from numba import jit
+from suite2p.extraction import extract, masks
+from suite2p.registration import nonrigid, register
 
 from TwoP.preprocess_traces import zero_signal
 
 
 # @jit(forceobj=True)
-def reslice_zstack(stack, piezo, spacing=1):
+def reslice_zstack(stack: np.ndarray, piezo: np.ndarray, spacing=1):
     """
     Slants the Z stack planes according to how slanted the imaged frames are.
     This is done because the frames are acquired using a fast scanning technique
@@ -123,7 +111,7 @@ def register_zstack_frames(zstack, ops):
     y_off = np.zeros(zstack.shape[0])
     x_off = np.zeros(zstack.shape[0])
     for i in range(zstack.shape[0] - 1):
-        registration = register_frames(zstack[i, :, :], np.expand_dims(zstack[i + 1], axis=0).astype(np.float32),
+        registration = register.register_frames(zstack[i, :, :], np.expand_dims(zstack[i + 1], axis=0).astype(np.float32),
                                        ops=ops)
         y_off[i+1] = registration[1][0]
         x_off[i+1] = registration[2][0]
@@ -134,12 +122,12 @@ def register_zstack_frames(zstack, ops):
     y_off = y_off - np.median(y_off)
     x_off = x_off - np.median(x_off)
     # Apply the shifts to the z stack.
-    zstack = shift_frames(zstack.astype(np.float32), yoff=y_off.astype(int), xoff=x_off.astype(int), yoff1=None, xoff1=None,
+    zstack = register.shift_frames(zstack.astype(np.float32), yoff=y_off.astype(int), xoff=x_off.astype(int), yoff1=None, xoff1=None,
                           ops=ops)
     return zstack
 
 
-def register_stack_to_ref(zstack, refImg, ops=default_ops()):
+def register_stack_to_ref(zstack, refImg, ops):
     """
     Registers the Z stack to the reference image using the same approach
     as registering the frames to the reference image.
@@ -162,12 +150,12 @@ def register_stack_to_ref(zstack, refImg, ops=default_ops()):
     """
 
     # Align all frames in the Z stack to the reference image.
-    registration = register_frames(refImg, zstack.astype(np.float32), ops=ops)
+    registration = register.register_frames(refImg, zstack.astype(np.float32), ops=ops)
     # Find plane in zstack that matches best with the reference image.
     best_plane = np.argmax(np.mean(registration[6], axis=1))
     # Apply non-rigid registration for best matching plane to all planes of Z stack.
     blocks = nonrigid.make_blocks(Ly=ops['Ly'], Lx=ops['Lx'], block_size=ops["block_size"])
-    zstackCorrected = shift_frames(
+    zstackCorrected = register.shift_frames(
         zstack.astype(np.float32),
         yoff=np.tile(registration[1][best_plane], zstack.shape[0]),
         xoff=np.tile(registration[2][best_plane], zstack.shape[0]),
@@ -196,7 +184,7 @@ def register_stack_to_ref(zstack, refImg, ops=default_ops()):
     # maxCor = np.argmax(corrRes[-1])
     # dx = corrRes[1][maxCor]
     # dy = corrRes[0][maxCor]
-    # zstackCorrected = shift_frames(zstack.astype(np.float32), yoff=np.tile(dy, zstack.shape[0]),
+    # zstackCorrected = register.shift_frames(zstack.astype(np.float32), yoff=np.tile(dy, zstack.shape[0]),
     #                                xoff=np.tile(dx, zstack.shape[0]), yoff1=None, xoff1=None, ops=ops)
     return zstackCorrected
 
@@ -250,7 +238,7 @@ def register_zstack(
     for i in range(planes):
         # Uses the suite2p registration function to align the repeated frames taken
         # per plane to the middle repetition of each plane.
-        res = register_frames(
+        res = register.register_frames(
             image[i, int(np.round(repetitions/2)), :, :], image[i, :, :, :], ops=ops
         )
         # Calculates the mean across repeated frames per plane.
@@ -276,13 +264,9 @@ def register_zstack(
 
 
 def extract_zprofiles(
-    extraction_path,
+    plane_date_path,
     zstack,
-    neuropil_correction=None,
-    ROI_masks=None,
-    neuropil_masks=None,
     smoothing_factor=None,
-    metadata={},
     abs_zero=None,
 ):
     """
@@ -290,21 +274,18 @@ def extract_zprofiles(
 
     Parameters
     ----------
-    extraction_path: str
+    plane_date_path: str
         The current directory path.
     zstack : np.array [Z x Y x X]
         Registered z-stack where slices are oriented the same way as imaged
         planes (output of register_zstack).
-    neuropil_correction : np.array [nROIs]
-        Correction factors determined by preprocess_traces.correct_neuropil.
-    ROI_masks : np.array [x x y x nROIs]
-        (output of suite2p so need to check the format of their ROI masks)
-        Pixel masks of ROIs in space (x- and y-axis).
-    neuropil_masks : np.array [x x y x nROIs]
-        (this assumes that suite2p actually uses masks for neuropil)
-        Pixel masks of ROI's neuropil in space (x- and y-axis).
-    smoothing_factor:
-
+    smoothing_factor: np.float, optional
+        The standard deviation of the gaussian filter used to smooth the
+        z-profile traces. If None, no smoothing is applied.
+    abs_zero : np.float, optional
+        The absolute zero signal value. If None, the zero signal is calculated
+        as the minimum value of the z-profile traces. If a float, the zero
+        signal is set to this value.
 
 
     Returns
@@ -312,82 +293,33 @@ def extract_zprofiles(
     zprofiles : np.array [z x nROIs]
         Depth profiles of ROIs.
     """
-    """
-    Steps
-    1) Extracts fluorescence within ROI masks across all slices of z-stack.
-    2) Extracts fluorescence within neuropil masks across all slices of z-stack.
-    3) Performs neuropil correction on ROI traces using neuropil traces and 
-    correction factors.
-    4) Smoothes the Z profile traces with a gaussian filter.
-    
-    Notes (useful functions in suite2p);
-    - neuropil masks are created in 
-    /suite2p/extraction/masks.create_neuropil_masks called from 
-    masks.create_masks
-    - ROI and neuropil traces extracted in 
-    /suite2p/extraction/extract.extract_traces called from 
-      extract.extraction_wrapper
-    - to register frames, see line 285 (rigid registration) in 
-    /suite2p/registration/register for rigid registration
-    """
-    # Loads suite2p outputs stat, ops and iscell.
-    stat = np.load(
-        os.path.join(extraction_path, "stat.npy"), allow_pickle=True
-    )
-    ops = np.load(
-        os.path.join(extraction_path, "ops.npy"), allow_pickle=True
-    ).item()
-    isCell = np.load(os.path.join(extraction_path, "iscell.npy")).astype(bool)
+    # Load neural data.
+    stats = np.load(os.path.join(plane_date_path, "stat.npy"), allow_pickle=True)
+    ops = np.load(os.path.join(plane_date_path, "ops.npy"), allow_pickle=True).item()
+    isCell = np.load(os.path.join(plane_date_path, "iscell.npy")).astype(bool)
+    # Disregard ROIs which are not considered cells.
+    stats = stats[isCell[:, 0]]
 
-    # Gets the resolution in X and Y of the z stack.
+    # Get masks for ROIs and neuropil.
     X = zstack.shape[2]
     Y = zstack.shape[1]
+    rois, npils = masks.create_masks(stats, Y, X, ops)
 
-    if (ROI_masks is None) and (neuropil_masks is None):
-        # Suite2P function: creates cell and neuropil masks.
-        rois, npils = create_masks(stat, Y, X, ops)
+    # Get fluorescence profiles of ROI and neuropil masks across depth of Z stack.
+    F_profiles, N_profiles = extract.extract_traces(zstack, rois, npils)
+    F_profiles = F_profiles.T # (z-slices, nROIs)
+    N_profiles = N_profiles.T # (z-slices, nROIs)
 
-    # Gets the "fluorescence traces" for each ROI within the Z stack. Treats
-    # each plane in the Z stack like a frame in time; this is the same function
-    # that is used to extract the F and N traces.
-    # Aditionally extracts the neuropil traces.
-    zProfile, Fneu = extract_traces(zstack, rois, npils)
-
-    # Adds the zero signal value. Refer to function for further details.
+    # Subtract absolute zero value of fluorescence signal.
     if abs_zero is None:
-        zProfile = zero_signal(zProfile)
-        Fneu = zero_signal(Fneu)
+        F_profiles = zero_signal(F_profiles)
+        N_profiles = zero_signal(N_profiles)
     else:
-        zProfile = zero_signal(zProfile, abs_zero)
-        Fneu = zero_signal(Fneu, abs_zero)
-
-    # Only takes the ROIs which are considered cells.
-    zProfile = zProfile[isCell[:, 0], :].T
-    Fneu = Fneu[isCell[:, 0], :].T
-
-    neuMin = np.nanmin(Fneu, 0)
-    ZprofMin = np.nanmin(zProfile, 0)
-
-    FneuRaw = Fneu.copy()
-    zprofileRaw = zProfile.T.copy()
-
-    Fneu -= neuMin
-    zProfile -= ZprofMin
-    # Performs neuropil correction of the zProfile.
-    if not (neuropil_correction is None):
-        zProfile = np.fmax(zProfile - (neuropil_correction[1, :].reshape(
-            1, -1) * Fneu + neuropil_correction[0, :].reshape(1, -1)), 0)
-        # iF - (b * iN + a) + F0[:, iROI]
-    #
-    zProfile += ZprofMin
-    # Smoothes the Z profile using a gaussian filter.
+        F_profiles = zero_signal(F_profiles, abs_zero)
+        N_profiles = zero_signal(N_profiles, abs_zero)
+    # Smooth Z profiles.
     if not (smoothing_factor is None):
-        zProfile = sp.ndimage.gaussian_filter1d(
-            zProfile, smoothing_factor, axis=0
-        )
+        F_profiles = sp.ndimage.gaussian_filter1d(F_profiles, smoothing_factor, axis=0, mode="nearest")
+        N_profiles = sp.ndimage.gaussian_filter1d(N_profiles, smoothing_factor, axis=0, mode="nearest")
 
-    # Appends the raw and neuropil corrected Z profiles into a dictionary.
-    metadata["zprofiles_raw"] = zprofileRaw
-    metadata["zprofiles_neuropil"] = Fneu.T
-
-    return zProfile
+    return F_profiles, N_profiles
