@@ -4,11 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Updated correction for z-motion. Works now on raw F and N.&#10;Renamed variables.">
+    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Z-motion correction based on z-profile and z-trace.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TwoP/main_preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/main_preprocess.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/preprocess_traces.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/preprocess_traces.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TwoP/process_tiff.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/process_tiff.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/runners.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/runners.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -141,7 +139,7 @@
       <workItem from="1753627875729" duration="141000" />
       <workItem from="1753628036198" duration="15676000" />
       <workItem from="1753690151347" duration="63000" />
-      <workItem from="1753776038557" duration="14894000" />
+      <workItem from="1753776038557" duration="23702000" />
     </task>
     <task id="LOCAL-00001" summary="Corrected import statements.&#10;Added TODOs">
       <option name="closed" value="true" />
@@ -183,7 +181,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753643561641</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Z-motion correction based on z-profile and z-trace.">
+      <option name="closed" value="true" />
+      <created>1753872988646</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1753872988646</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -206,40 +212,16 @@
     <MESSAGE value="Simplified alignment of z-stack" />
     <MESSAGE value="Non-rigid alignment of zstack-planes to reference image" />
     <MESSAGE value="Updated correction for z-motion. Works now on raw F and N.&#10;Renamed variables." />
-    <option name="LAST_COMMIT_MESSAGE" value="Updated correction for z-motion. Works now on raw F and N.&#10;Renamed variables." />
+    <MESSAGE value="Z-motion correction based on z-profile and z-trace." />
+    <option name="LAST_COMMIT_MESSAGE" value="Z-motion correction based on z-profile and z-trace." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>626</line>
-          <option name="timeStamp" value="21" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/main_preprocess.py</url>
-          <line>67</line>
-          <option name="timeStamp" value="23" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
           <line>226</line>
           <option name="timeStamp" value="59" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/preprocess_traces.py</url>
-          <line>257</line>
-          <option name="timeStamp" value="60" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>218</line>
-          <option name="timeStamp" value="61" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
-          <line>199</line>
-          <option name="timeStamp" value="66" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

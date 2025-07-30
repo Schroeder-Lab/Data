@@ -1,11 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 21 08:39:57 2022
-
-@author: LABadmin
-"""
-
-"""Runner functions"""
+from matplotlib.colors import ListedColormap
 
 from suite2p.registration.zalign import compute_zpos
 from joblib import Parallel, delayed
@@ -252,36 +245,60 @@ def _process_s2p_singlePlane(
     # Places all the results in a dictionary (dF/F, Z corrected dF/F,
     # z profiles, z traces and the cell locations in X, Y and Z).
     results = {
-        "dff": dF,
-        "dff_zcorr": F_ncorrected,
-        "zProfiles": F_profiles,
-        "zTrace": ztrace,
         "zCorr_stack": zcorr,
+        "zTrace": ztrace,
+        "zProfiles": F_profiles,
+        "dff": dF,
         "locs": cellLocs,
         "cellId": np.where(isCell[0, :].astype(bool))[0],
     }
 
     if pops["plot"]:
         saveDirectoryPlot = os.path.join(saveDirectory, 'plots')
-        if not os.path.isdir(saveDirectoryPlot):
-            os.makedirs(saveDirectoryPlot)
+        os.makedirs(saveDirectoryPlot, exist_ok=True)
 
-            # TODO (SS): compare reference image to best matching slice in Z stack
-            # TODO (SS): compare these profiles to Z profiles
-            z_F_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
-            z_N_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
-            for p in np.unique(ztrace):
-                z_F_quartiles[p, :] = np.percentile(F[ztrace == p, :], 25, axis=0)
-                z_N_quartiles[p, :] = np.percentile(N[ztrace == p, :], 25, axis=0)
+        # For each plane:
+        # (1) ROI masks (on black background)
+        # Create a colormap: black for 0, then rainbow for ROIs
+        n_rois = len(stat)
+        rainbow = plt.get_cmap('gist_rainbow', n_rois)
+        colors = np.vstack(([0, 0, 0, 1], rainbow(np.arange(n_rois))))
+        cmap = ListedColormap(colors)
+        # Create a mask with ROIs numbered from 1 to n_rois.
+        mask = np.zeros((ops['Ly'], ops['Lx']), dtype=np.uint8)
+        for n, roi in enumerate(stat):
+            ypix = roi['ypix'][~roi['overlap']]
+            xpix = roi['xpix'][~roi['overlap']]
+            mask[ypix, xpix] = n + 1
+        plt.figure(figsize=(15, 15))
+        plt.subplots_adjust(top=0.95)
+        plt.imshow(mask, cmap=cmap, vmin=0, vmax=n_rois)
+        # Add ROI IDs as text labels in the center of each ROI
+        for n, roi in enumerate(stat):
+            y, x = roi['med']
+            plt.text(x, y, str(n), color='white', fontsize=12, ha='center', va='center', fontweight='bold')
+        plt.tight_layout()
+        plt.show()
 
+        # (2) ROI outlines on best matching slice in stack
+        # (3) Comparison between reference image and best matching slice in stack
+
+        # TODO (SS): compare these profiles to Z profiles
+        z_F_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
+        z_N_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
+        for p in np.unique(ztrace):
+            z_F_quartiles[p, :] = np.percentile(F[ztrace == p, :], 25, axis=0)
+            z_N_quartiles[p, :] = np.percentile(N[ztrace == p, :], 25, axis=0)
+
+        # For each ROI:
         for i in range(dF.shape[-1]):
-            # Print full
+            # (A) Plot all data (complete time traces).
             fig = plt.figure(1, figsize=(12, 6))
             gs = gridspec.GridSpec(10, 10)
             gs.update(wspace=0.2, hspace=0.2)
-            # plotting Z profile
-            xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
+            # (1) Z profile from ROI and neuropil masks, and low values of F and N traces recorded at different depths
+            xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
             if not (F_profiles is None) and not (ztrace is None):
                 plt.plot(F_profiles[:, i], range(F_profiles.shape[0]))
                 plt.legend(
@@ -295,7 +312,6 @@ def _process_s2p_singlePlane(
                 plt.axhline(np.nanmedian(ztrace), c="green")
                 plt.axhline(np.nanmax(ztrace), c="red")
                 plt.axhline(np.nanmin(ztrace), c="blue")
-                # Adding text labels
                 plt.text(0, np.nanmedian(ztrace), 'Median',
                          color='green', fontsize=10, va='bottom')
                 plt.text(0, np.nanmax(ztrace), 'Maximum',
@@ -304,58 +320,8 @@ def _process_s2p_singlePlane(
                          color='blue', fontsize=10, va='bottom')
                 plt.xlim(0, max(F_profiles[:, i]))
 
-            xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
-
-            plt.plot(F[:, i], "b")
-            plt.plot(N[:, i], "r")
-            plt.legend(
-                ["Fluorescence", "Neuropil"],
-                # bbox_to_anchor=(1.01, 1),
-                loc="upper right",
-            )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
-
-            xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
-
-            plt.plot(F_ncorrected[:, i], "k")
-            plt.plot(F0[:, i], "b", linewidth=4, zorder=10)
-            plt.legend(
-                ["Corrected F", "F0"],
-                # bbox_to_anchor=(1.01, 1),
-                loc="upper right",
-            )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
-
-            xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
-
-            plt.plot(dF[:, i], "b", linewidth=3)
-            plt.legend(
-                ["dF/F"],
-                # bbox_to_anchor=(1.01, 1),
-                loc="upper right",
-            )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
-
-            xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
-
-            plt.plot(F_ncorrected[:, i], c="purple")
-            plt.legend(
-                ["dF/F z-zcorrected"],
-                # bbox_to_anchor=(1.01, 1),
-                loc="upper right",
-            )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
-
+            # (2) z trace of plane
             xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
-
             if ztrace is not None:
                 plt.plot(ztrace)
                 plt.gca().invert_yaxis()
@@ -368,6 +334,45 @@ def _process_s2p_singlePlane(
                 plt.xlabel("time (frames)")
                 plt.tick_params(axis='y', labelright=True, labelleft=False)
                 plt.xlim(0, ztrace.shape[0])
+
+            # (3) Raw and z-motion corrected ROI and neuropil traces
+            xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
+            plt.plot(F[:, i], "b")
+            plt.plot(N[:, i], "r")
+            plt.legend(
+                ["Fluorescence", "Neuropil"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, dF.shape[0])
+
+            # (4) Neuropil-corrected ROI traces and F0
+            xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
+            plt.plot(F_ncorrected[:, i], "k")
+            plt.plot(F0[:, i], "b", linewidth=4, zorder=10)
+            plt.legend(
+                ["Corrected F", "F0"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, dF.shape[0])
+
+            # (5) dF/F
+            xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
+            plt.plot(dF[:, i], "b", linewidth=3)
+            plt.legend(
+                ["dF/F"],
+                # bbox_to_anchor=(1.01, 1),
+                loc="upper right",
+            )
+            plt.xticks([])
+            plt.tick_params(axis='y', labelright=True, labelleft=False)
+            plt.xlim(0, dF.shape[0])
+
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
             plt.savefig(
@@ -423,36 +428,15 @@ def _process_s2p_singlePlane(
             #     ax["profile"].set_xlabel("fluorescence")
             #     ax["profile"].set_xlabel("depth")
 
-            # Print full
+            # (B) Plot traces in a zoomed-in view (first 500 frames).
             plt.close()
             fig = plt.figure(1, figsize=(12, 6))
             gs = gridspec.GridSpec(10, 10)
             gs.update(wspace=0.2, hspace=0.2)
 
-            # plotting Z profile
-            xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
+            # (1) z trace of plane
 
-            if F_profiles is not None:
-                plt.plot(F_profiles[:, i], range(F_profiles.shape[0]))
-                plt.legend(
-                    ["Z profile"],
-                    loc="upper left"
-                )
-                plt.xlabel("fluorescence")
-                plt.ylabel("depth")
-                plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(ztrace), c="green")
-                plt.axhline(np.nanmax(ztrace), c="red")
-                plt.axhline(np.nanmin(ztrace), c="blue")
-                # Adding text labels
-                plt.text(0, np.nanmedian(ztrace), 'Median',
-                         color='green', fontsize=10, va='bottom')
-                plt.text(0, np.nanmax(ztrace), 'Maximum',
-                         color='red', fontsize=10, va='bottom')
-                plt.text(0, np.nanmin(ztrace), 'Minimum',
-                         color='blue', fontsize=10, va='bottom')
-                plt.xlim(0, max(F_profiles[:, i]))
-
+            # (2) Raw and z-motion corrected ROI and neuropil traces
             xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
             plt.plot(F[:500, i], "b")
             plt.plot(N[:500, i], "r")
@@ -464,6 +448,7 @@ def _process_s2p_singlePlane(
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, dF[:500].shape[0])
 
+            # (4) Neuropil-corrected ROI traces and F0
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
             plt.plot(F_ncorrected[:500, i], "k")
             plt.plot(F0[:500, i], "b", linewidth=4, zorder=10)
@@ -475,6 +460,7 @@ def _process_s2p_singlePlane(
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, dF[:500].shape[0])
 
+            # (5) dF/F
             xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
             plt.plot(dF[:500, i], "b", linewidth=3)
             plt.legend(
@@ -484,30 +470,6 @@ def _process_s2p_singlePlane(
             plt.xticks([])
             plt.tick_params(axis='y', labelright=True, labelleft=False)
             plt.xlim(0, dF[:500].shape[0])
-
-            xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
-            plt.plot(F_ncorrected[:500, i], c="purple")
-            plt.legend(
-                ["dF/F z-zcorrected"],
-                loc="upper right",
-            )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF[:500].shape[0])
-
-            xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
-
-            if ztrace is not None:
-                plt.plot(ztrace[:500])
-                plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(ztrace), c="green")
-                plt.legend(
-                    ["Z trace"],
-                    loc="upper right"
-                )
-                plt.xlabel("time (frames)")
-                plt.tick_params(axis='y', labelright=True, labelleft=False)
-                plt.xlim(0, dF[:500].shape[0])
 
             manager = plt.get_current_fig_manager()
             manager.full_screen_toggle()
@@ -623,12 +585,18 @@ def process_s2p_directory(
         # Processes the 2P data for the planes specified in the plane range.
         # This gives a list of dictionaries with all the planes.
         # Refer to the function for a more thorough description.
-        results = Parallel(n_jobs=jobnum, verbose=5)(
-            delayed(_process_s2p_singlePlane)(
+        # results = Parallel(n_jobs=jobnum, verbose=5)(
+        #     delayed(_process_s2p_singlePlane)(
+        #         pops, planeDirs[plane], zstackPath, saveDirectory, piezo, plane
+        #     )
+        #     for plane in planeRange
+        # )
+        results = [
+            _process_s2p_singlePlane(
                 pops, planeDirs[plane], zstackPath, saveDirectory, piezo, plane
             )
             for plane in planeRange
-        )
+        ]
         # signalList = _process_s2p_singlePlane(planeDirs,zstackPath,saveDirectory,piezoTraces[:,0],1)
         # Determines the absolute time after processing.
     # bouton recording
@@ -641,9 +609,12 @@ def process_s2p_directory(
             for p in [0]
         )
 
+    # If plotting: ztraces of all planes.
+
     postTime = time.time()
     print("Processing took: " + str(postTime - preTime) + " ms")
 
+    # TODO: only create planes, the rest is already in results.
     # Collect results from all the planes.
     planes = np.array([])
     signalList = []
@@ -654,11 +625,11 @@ def process_s2p_directory(
     cellIds = []
     for i in range(len(results)):
         if not (results[i] is None):
-            signalList.append(results[i]["dff_zcorr"])
-            signalLocs.append(results[i]["locs"])
+            zCorrs.append(results[i]["zCorr_stack"])
             zTraces.append(results[i]["zTrace"])
             zProfiles.append(results[i]["zProfiles"])
-            zCorrs.append(results[i]["zCorr_stack"])
+            signalList.append(results[i]["dff"])
+            signalLocs.append(results[i]["locs"])
             cellIds.append(results[i]["cellId"])
             res = signalList[i]
             planes = np.append(planes, np.ones(res.shape[1]) * planeRange[i]) if not isBoutons else np.append(
@@ -672,6 +643,7 @@ def process_s2p_directory(
         if not zTraces[i] is None:
             zTraces[i] = zTraces[i][: int(minLength)]
             zCorrs[i] = zCorrs[i][: int(minLength)]
+    # TODO: Do this when saving.
     # Combine all results into arrays.
     signals = np.hstack(signalList)
     locs = np.vstack(signalLocs)
@@ -680,6 +652,7 @@ def process_s2p_directory(
     zCorrs = np.swapaxes(np.dstack(zCorrs).T, 1, 2)
     cellIds = np.hstack(cellIds)
 
+    # TODO: change naming.
     # Saves the results as individual npy files.
     np.save(os.path.join(saveDirectory, "calcium.dff.npy"), signals)
     np.save(os.path.join(saveDirectory, "rois.planes.npy"), planes)

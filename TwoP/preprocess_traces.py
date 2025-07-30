@@ -17,7 +17,6 @@ def correct_neuropil(
     Npil_window_F0=60,
     verbose=True,
 ):
-    # TODO (SS): simplify.
     """
     Estimates the correction factor r for neuropil correction, so that:
         C = S - rN
