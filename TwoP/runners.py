@@ -9,7 +9,7 @@ Created on Fri Oct 21 08:39:57 2022
 
 from suite2p.registration.zalign import compute_zpos
 from joblib import Parallel, delayed
-import numpy as np
+# import numpy as np
 import time
 import traceback
 import io
@@ -73,6 +73,10 @@ def _process_s2p_singlePlane(
         return None
     processed_path = os.path.join(saveDirectory, "2P_processed")
     os.makedirs(processed_path, exist_ok=True)
+
+    # TODO: we could add option to re-register each frame to the best matching slice in the Z stack, rather than
+    #  trusting the registration to the template image. BUT: zstack was collected at quite different time point and may
+    #  look quite different. Also, only 10 repeats of the same plane were collected. -> excuse not to do it
 
     # Load neural data.
     F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T # (t, nROIs)
@@ -139,7 +143,7 @@ def _process_s2p_singlePlane(
         # If Z stack not saved yet, register and reslice raw Z Stack and determine correlations with movie frames.
         if not (os.path.exists(zstack_path)):
             # TODO (SS): spacing should be parameter in user_defs.py
-            zstack = register_zstack(
+            (zstack, best_plane) = register_zstack(
                 zstack_raw_path,
                 ops_zcorr,
                 spacing=1,
@@ -149,6 +153,7 @@ def _process_s2p_singlePlane(
                 channel=channel
             )
             skimage.io.imsave(zstack_path, zstack)
+            np.save(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"), best_plane)
             _, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
             np.save(os.path.join(processed_path, f"zcorr_plane{plane}.npy"), zcorr)
         # If Z stack was created but correlations were not, compute correlations.
@@ -176,75 +181,58 @@ def _process_s2p_singlePlane(
             zcorr, 2, axis=0, mode='nearest'), axis=0)).astype(int)
         # Determine best reference depth.
         if pops["zcorrect_reference"] == "first": # across first experiment
-            reference_depth = np.nanmedian(ztrace[:ops['frames_per_folder'][0]])
+            reference_depth = np.nanmedian(ztrace[:ops['frames_per_folder'][0]]).astype(int)
         else: # across all experiments
-            reference_depth = np.nanmedian(ztrace)
+            reference_depth = np.nanmedian(ztrace).astype(int)
 
         # Correct ROI and neuropil traces for z motion.
-        # TODO (SS): theshold should be a parameter in user_defs.py
+        # TODO (SS): threshold should be a parameter in user_defs.py
         F_zcorrected, N_zcorrected = correct_zmotion(F, N, F_profiles, N_profiles, ztrace, reference_depth,
-                              ignore_faults=pops["remove_z_extremes"], threshold= 0.2, metadata=pops)
+                              ignore_faults=pops["remove_z_extremes"], frames_per_experiment=ops["frames_per_folder"])
     else:
         # If no Z correction is performed (for example if no Z stack was given)
         # only the uncorrected delta F over F is considered.
-        Fcz = dF
+        F_zcorrected = F
+        N_zcorrected = N
         zstack = np.nan
         zcorr = np.nan
 
     fs = ops["fs"]
-    # Calculates the corrected neuropil traces and the specific values that
-    # were used to determine the correction factor (intercept and slope of
-    # linear fits, F traces bin values, N traces bin values). Refer to function
-    # for further details.
-    # TODO (SS): function can be simplified / made more efficient.
-    Fc, regPars, F_binValues, N_binValues = correct_neuropil(
-        F,
-        N,
+    # Perform neuropil correction.
+    F_ncorrected, _, _, _ = correct_neuropil(
+        F_zcorrected,
+        N_zcorrected,
         fs,
         prctl_F0=pops["f0_percentile"],
         Npil_window_F0=pops["Npil_f0_window"],
     )
-    # Calculates the baseline fluorescence F0 used to calculate delta F over F.
+    # Calculate baseline fluorescence F0.
     F0 = get_F0(
-        Fc,
+        F_ncorrected,
         fs,
         prctl_F=pops["f0_percentile"],
         window_size=pops["f0_window"],
         framesPerFolder=ops["frames_per_folder"],
     )
-    # Calculates delta F oer F given the corrected neuropil traces and the
-    # baseline fluorescence.
-    dF = get_delta_F_over_F(Fc, F0)
+    # Calculates delta F oer F.
+    # TODO: decide whether to divide by constant of changing F0.
+    dF = get_delta_F_over_F(F_ncorrected, F0)
 
-    # For each ROI, the location is determined from the suite2p output "stat"
-    # (for X and Y) and from the piezo (for Z).
+    # Determine location of each ROI in 3D, in units of microns. Depth is relative to the top-most position of the
+    # z-actuator (piezo).
     cellLocs = np.zeros((len(stat), 3))
-    # Gets the resolution (in pixels) along the y dimension.
+    # First, determine depth.
     ySpan = ops["Ly"]
     for i, s in enumerate(stat):
-        # Determines the relative Y position in the FOV by getting the
-        # location in pixels of the center of the ROI and divides this by the
-        # total resolution.
+        # Determine relative Y position wihtin FOV.
         relYpos = s["med"][0] / ySpan
-        # Due to the fast volume scanning technique used (with a piezo),
-        # the plane is imaged at a slant which spans the Y dimension.
-        # So the location of the cell in Z depends on its position in Y.
-        # For each plane, the piezo array contains the location in Z as it
-        # scans through the plane. To determine the correct Z location,
-        # the relative Y position was computed in the previous line to compute
-        # the index in the piezo array which corresponds to the ROIs location.
+        # Determine position of actuator (piezo), which depends on relative Y position. (Scanning along X dimension is
+        # so fast that we can ignore it.)
         piezoInd = int(np.round((piezo.shape[0] - 1) * relYpos))
-        # Determines the Z position of the ROI based on the index calculated
-        # in the previous line.
         zPos = piezo[piezoInd, plane]
-        # Appends the array with the YX positions of the center of the ROI
-        # taken from the stat array and the z position of each ROI.
-        # NOTE: Suite2P outputs the positions in XY as [Y,X], need to be kept in
-        # mind when wanting to associate a cell with it's location in the FOV
-        # as the assumed order would usually be [X,Y].
         cellLocs[i, :] = np.append(s["med"], zPos)
 
-    # Convert the locations to actual distance in microns
+    # Second, convert locations in horzontal plane from pixels to microns.
     # TODO (SS): Put this into separate function, so it can be adapted more easily by user. Also add parameter to decide
     #  whether to convert or not.
     lastFile = ops['filelist'][-1]
@@ -265,12 +253,11 @@ def _process_s2p_singlePlane(
     # z profiles, z traces and the cell locations in X, Y and Z).
     results = {
         "dff": dF,
-        "dff_zcorr": Fcz,
+        "dff_zcorr": F_ncorrected,
         "zProfiles": F_profiles,
         "zTrace": ztrace,
         "zCorr_stack": zcorr,
         "locs": cellLocs,
-        "isZcorrected": isZcorrected,
         "cellId": np.where(isCell[0, :].astype(bool))[0],
     }
 
@@ -295,7 +282,7 @@ def _process_s2p_singlePlane(
             # plotting Z profile
             xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
 
-            if ((not (F_profiles is None)) & (not (ztrace is None))):
+            if not (F_profiles is None) and not (ztrace is None):
                 plt.plot(F_profiles[:, i], range(F_profiles.shape[0]))
                 plt.legend(
                     ["Z profile"],
@@ -332,7 +319,7 @@ def _process_s2p_singlePlane(
 
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
 
-            plt.plot(Fc[:, i], "k")
+            plt.plot(F_ncorrected[:, i], "k")
             plt.plot(F0[:, i], "b", linewidth=4, zorder=10)
             plt.legend(
                 ["Corrected F", "F0"],
@@ -357,7 +344,7 @@ def _process_s2p_singlePlane(
 
             xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
 
-            plt.plot(Fcz[:, i], c="purple")
+            plt.plot(F_ncorrected[:, i], c="purple")
             plt.legend(
                 ["dF/F z-zcorrected"],
                 # bbox_to_anchor=(1.01, 1),
@@ -408,7 +395,7 @@ def _process_s2p_singlePlane(
             #     bbox_to_anchor=(1.01, 1),
             #     loc="upper left",
             # )
-            # ax["corr"].plot(Fc[1:500, i], "k")
+            # ax["corr"].plot(F_ncorrected[1:500, i], "k")
             # ax["corr"].plot(F0[1:500, i], "b", linewidth=4)
             # ax["corr"].legend(
             #     ["Corrected F", "F0"],
@@ -478,7 +465,7 @@ def _process_s2p_singlePlane(
             plt.xlim(0, dF[:500].shape[0])
 
             xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
-            plt.plot(Fc[:500, i], "k")
+            plt.plot(F_ncorrected[:500, i], "k")
             plt.plot(F0[:500, i], "b", linewidth=4, zorder=10)
             plt.legend(
                 ["Corrected F", "F0"],
@@ -499,7 +486,7 @@ def _process_s2p_singlePlane(
             plt.xlim(0, dF[:500].shape[0])
 
             xtr_subplot = fig.add_subplot(gs[6:8, 1:10], sharey=xtr_subplot_df)
-            plt.plot(Fcz[:500, i], c="purple")
+            plt.plot(F_ncorrected[:500, i], c="purple")
             plt.legend(
                 ["dF/F z-zcorrected"],
                 loc="upper right",
@@ -657,18 +644,14 @@ def process_s2p_directory(
     postTime = time.time()
     print("Processing took: " + str(postTime - preTime) + " ms")
 
-    # Creates lists to place the outputs from the function
-    # _process_s2p_singlePlane.
+    # Collect results from all the planes.
     planes = np.array([])
-
     signalList = []
     signalLocs = []
     zTraces = []
     zProfiles = []
-    isZcorrectedList = []
     zCorrs = []
     cellIds = []
-    # Appends lists with the results for all the planes.
     for i in range(len(results)):
         if not (results[i] is None):
             signalList.append(results[i]["dff_zcorr"])
@@ -677,38 +660,25 @@ def process_s2p_directory(
             zProfiles.append(results[i]["zProfiles"])
             zCorrs.append(results[i]["zCorr_stack"])
             cellIds.append(results[i]["cellId"])
-            isZcorrectedList.append(results[i]["isZcorrected"])
-            # Places the signal into an array.
             res = signalList[i]
-            # Specifies which plane each ROI belongs to.
-
             planes = np.append(planes, np.ones(res.shape[1]) * planeRange[i]) if not isBoutons else np.append(
                 planes, np.ones(res.shape[1]) * ops['selected_plane'])
-    # Specifies number to compare the length of the signals to.
+    # Clip all signals the same length (to the shortest signal).
     minLength = np.inf
     for i in range(len(signalList)):
-        # Checks the minumum length of the signals for each plane.
         minLength = np.min((signalList[i].shape[0], minLength))
     for i in range(len(signalList)):
-        # Updates the signalList to only include frames until the minimum
-        # length determined above.
-        # This is done to discard any additional frames that were recorded for
-        # some planes but not all.
         signalList[i] = signalList[i][: int(minLength), :]
         if not zTraces[i] is None:
-            # Updates the zTraces and zCorrs to only include frames until the minimum
-            # length determined above.
             zTraces[i] = zTraces[i][: int(minLength)]
             zCorrs[i] = zCorrs[i][: int(minLength)]
-    # Combines results from each plane into a single array for signals,
-    # locations, zProfile and zTrace.
+    # Combine all results into arrays.
     signals = np.hstack(signalList)
     locs = np.vstack(signalLocs)
     zProfile = np.hstack(zProfiles)
     zTrace = np.vstack(zTraces)
     zCorrs = np.swapaxes(np.dstack(zCorrs).T, 1, 2)
     cellIds = np.hstack(cellIds)
-    isZcorrected = np.hstack(isZcorrectedList)
 
     # Saves the results as individual npy files.
     np.save(os.path.join(saveDirectory, "calcium.dff.npy"), signals)
@@ -716,18 +686,14 @@ def process_s2p_directory(
     np.save(os.path.join(saveDirectory, "rois.id.npy"), cellIds)
     np.save(os.path.join(saveDirectory, "rois.xyz.npy"), locs)
     np.save(os.path.join(saveDirectory, "rois.zProfiles.npy"), zProfile.T)
-    np.save(os.path.join(saveDirectory, "rois.isZCorrected.npy"), isZcorrected)
     np.save(os.path.join(saveDirectory, "planes.zTrace"), zTrace)
     np.save(os.path.join(saveDirectory, "planes.zcorrelation"), zCorrs)
 
 
-# bonsai + arduino
-# TODO: comment
 def process_metadata_directory(
         bonsai_dir, ops=None, pops=create_2p_processing_ops(), saveDirectory=None
 ):
     """
-
     Processes all the metadata obtained. Assumes the metadata was recorded with
     two separated devices (in our case a niDaq and an Arduino). The niDaq was
     used to record the photodiode changes,the frameclock, pockels, piezo
@@ -771,11 +737,10 @@ def process_metadata_directory(
     Returns
     -------
     None.
-
     """
 
-    if saveDirectory is None:
-        saveDirectory = os.path.join(suite2pDirectory, "ProcessedData")
+    # if saveDirectory is None:
+    #     saveDirectory = os.path.join(suite2pDirectory, "ProcessedData")
     # metadataDirectory_dirList = glob.glob(os.path.join(metadataDirectory,'*'))
 
     if not os.path.isdir(saveDirectory):

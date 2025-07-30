@@ -186,7 +186,7 @@ def register_stack_to_ref(zstack, refImg, ops):
     # dy = corrRes[0][maxCor]
     # zstackCorrected = register.shift_frames(zstack.astype(np.float32), yoff=np.tile(dy, zstack.shape[0]),
     #                                xoff=np.tile(dx, zstack.shape[0]), yoff1=None, xoff1=None, ops=ops)
-    return zstackCorrected
+    return zstackCorrected, best_plane
 
 
 def register_zstack(
@@ -259,8 +259,8 @@ def register_zstack(
     # Registers the z Stack to the reference image.
     ops1 = ops.copy()
     ops1['nonrigid'] = True
-    zstack = register_stack_to_ref(zstack, target_image, ops1)
-    return zstack
+    zstack, best_plane = register_stack_to_ref(zstack, target_image, ops1)
+    return zstack, best_plane
 
 
 def extract_zprofiles(

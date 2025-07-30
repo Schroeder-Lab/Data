@@ -36,12 +36,11 @@ database = pd.read_csv(
 
 # %% run over data base
 for i in range(len(database)):
-    # Goes through the pandas dataframe called database created above and
-    # if True in the column "Process", the processing continues.
     if database.loc[i]["Process"]:
         # TODO (SS): get rid of try/except
         try:
             print("reading directories" + str(database.loc[i]))
+            # Get relevant directory paths.
             (
                 suite2p_directory,
                 zstackPath,
@@ -50,22 +49,22 @@ for i in range(len(database)):
             ) = read_csv_produce_directories(
                 database.loc[i], s2pDir, zstackDir, metadataDir
             )
-            # Converts and places the planes to be ignored in an array that
-            # is at least 1-dimensional.
+            # Disregard imaging planes that user wants to ignore ( e.g., fly-back plane when using piezo as z-actuator).
             ignorePlanes = np.atleast_1d(
                 np.array(database.loc[i]["IgnorePlanes"]).astype(int)
             )
-            # Returns the ops dictionary.
+            # Load parameters that were used to process data with Suite2p.
             ops = get_ops_file(suite2p_directory)
             if pops["process_suite2p"]:
-
                 print("getting piezo data")
-                # Returns the movement of the piezo within one frame across the
-                # z-axis for all planes.
+                # Returns the movement of the piezo (in microns along depth, relative to top-most position of piezo
+                # trace) aligned to onset of each frame.
                 piezo = get_piezo_data(ops)
                 print("processing suite2p data")
                 # TODO (SS): get rid of try/except
                 try:
+                    # Call main processing function.
+                    # TODO: remove fc? function has no return value.
                     fc = process_s2p_directory(
                         suite2p_directory,
                         pops,
