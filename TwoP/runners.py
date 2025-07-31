@@ -1,27 +1,21 @@
-from matplotlib.colors import ListedColormap
-
-from suite2p.registration.zalign import compute_zpos
-from joblib import Parallel, delayed
-# import numpy as np
+import pickle
 import time
 import traceback
-import io
-import os
+
 import cv2
-import skimage.io
-import glob
-import pickle
-import scipy as sp
-import tifffile
-import re
-import warnings
-from TwoP.process_tiff import *
-from TwoP.preprocess_traces import *
-from Bonsai.extract_data import *
-from Bonsai.behaviour_protocol_functions import *
-from TwoP.general import *
-from user_defs import create_2p_processing_ops, directories_to_register
 import matplotlib.gridspec as gridspec
+import skimage.io
+import tifffile
+from joblib import Parallel, delayed
+from matplotlib.colors import ListedColormap
+from skimage import measure
+from suite2p.registration.zalign import compute_zpos
+
+from Bonsai.extract_data import *
+from TwoP.general import *
+from TwoP.preprocess_traces import *
+from TwoP.process_tiff import *
+from user_defs import create_2p_processing_ops
 
 
 def _process_s2p_singlePlane(
@@ -64,7 +58,7 @@ def _process_s2p_singlePlane(
     # TODO (SS): what happens if None is returned?
     if not (os.path.exists(os.path.join(currDir, "F.npy"))):
         return None
-    processed_path = os.path.join(saveDirectory, "2P_processed")
+    processed_path = os.path.join(saveDirectory, "2P_processed", f'plane{plane}')
     os.makedirs(processed_path, exist_ok=True)
 
     # TODO: we could add option to re-register each frame to the best matching slice in the Z stack, rather than
@@ -72,9 +66,9 @@ def _process_s2p_singlePlane(
     #  look quite different. Also, only 10 repeats of the same plane were collected. -> excuse not to do it
 
     # Load neural data.
-    F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T # (t, nROIs)
-    N = np.load(os.path.join(currDir, "Fneu.npy")).T # (t, nROIs)
-    isCell = np.load(os.path.join(currDir, "iscell.npy")) # (nROIs, 2)
+    F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T  # (t, nROIs)
+    N = np.load(os.path.join(currDir, "Fneu.npy")).T  # (t, nROIs)
+    isCell = np.load(os.path.join(currDir, "iscell.npy"))  # (nROIs, 2)
     stat = np.load(os.path.join(currDir, "stat.npy"), allow_pickle=True)
     ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
     # Only include ROIs curated cells.
@@ -97,7 +91,7 @@ def _process_s2p_singlePlane(
 
     # If Z stack was generated (and path to file provided), perform Z correction.
     if not (zstack_raw_path is None):
-        channel = ops["align_by_chan"] # imaging channel used for alignment
+        channel = ops["align_by_chan"]  # imaging channel used for alignment
         zstack_path = os.path.join(
             processed_path, f"zstack_plane{plane}_chan{channel}.tif"
         )
@@ -107,6 +101,8 @@ def _process_s2p_singlePlane(
         ops_zcorr["reg_file"] = os.path.join(currDir, "data.bin")
         # ops_zcorr["ops_path"] = os.path.join(currDir, "ops.npy")
         ops_zcorr['nonrigid'] = False
+        # TODO: add parameter to user_defs.py to specify block size for Z correction.
+        ops_zcorr['block_size'] = [min(32, ops['Ly']), min(128, ops['Lx'])]
 
         # Use reference image from the channel that was used for alignment.
         if channel == 1:
@@ -125,7 +121,7 @@ def _process_s2p_singlePlane(
                     ops_zcorr,
                     spacing=1,
                     piezo=np.vstack((piezo[:, plane:plane + 1],
-                                     np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
+                                     np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
                     target_image=ops['meanImg'],
                     channel=1,
                 )
@@ -141,7 +137,7 @@ def _process_s2p_singlePlane(
                 ops_zcorr,
                 spacing=1,
                 piezo=np.vstack((piezo[:, plane:plane + 1],
-                                 np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]],(1, 1)))),
+                                 np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
                 target_image=refImg,
                 channel=channel
             )
@@ -173,15 +169,16 @@ def _process_s2p_singlePlane(
         ztrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
             zcorr, 2, axis=0, mode='nearest'), axis=0)).astype(int)
         # Determine best reference depth.
-        if pops["zcorrect_reference"] == "first": # across first experiment
+        if pops["zcorrect_reference"] == "first":  # across first experiment
             reference_depth = np.nanmedian(ztrace[:ops['frames_per_folder'][0]]).astype(int)
-        else: # across all experiments
+        else:  # across all experiments
             reference_depth = np.nanmedian(ztrace).astype(int)
 
         # Correct ROI and neuropil traces for z motion.
         # TODO (SS): threshold should be a parameter in user_defs.py
         F_zcorrected, N_zcorrected = correct_zmotion(F, N, F_profiles, N_profiles, ztrace, reference_depth,
-                              ignore_faults=pops["remove_z_extremes"], frames_per_experiment=ops["frames_per_folder"])
+                                                     ignore_faults=pops["remove_z_extremes"],
+                                                     frames_per_experiment=ops["frames_per_folder"])
     else:
         # If no Z correction is performed (for example if no Z stack was given)
         # only the uncorrected delta F over F is considered.
@@ -254,14 +251,16 @@ def _process_s2p_singlePlane(
     }
 
     if pops["plot"]:
-        saveDirectoryPlot = os.path.join(saveDirectory, 'plots')
-        os.makedirs(saveDirectoryPlot, exist_ok=True)
+        plots_path = os.path.join(processed_path, 'plots')
+        os.makedirs(plots_path, exist_ok=True)
+        if not 'best_plane' in locals():
+            best_plane = np.load(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"))
 
         # For each plane:
         # (1) ROI masks (on black background)
         # Create a colormap: black for 0, then rainbow for ROIs
         n_rois = len(stat)
-        rainbow = plt.get_cmap('gist_rainbow', n_rois)
+        rainbow = plt.get_cmap('turbo', n_rois)
         colors = np.vstack(([0, 0, 0, 1], rainbow(np.arange(n_rois))))
         cmap = ListedColormap(colors)
         # Create a mask with ROIs numbered from 1 to n_rois.
@@ -270,17 +269,41 @@ def _process_s2p_singlePlane(
             ypix = roi['ypix'][~roi['overlap']]
             xpix = roi['xpix'][~roi['overlap']]
             mask[ypix, xpix] = n + 1
-        plt.figure(figsize=(15, 15))
-        plt.subplots_adjust(top=0.95)
+        plt.figure(figsize=(8, 8))
+        plt.subplots_adjust(top=0.98)
         plt.imshow(mask, cmap=cmap, vmin=0, vmax=n_rois)
         # Add ROI IDs as text labels in the center of each ROI
         for n, roi in enumerate(stat):
             y, x = roi['med']
             plt.text(x, y, str(n), color='white', fontsize=12, ha='center', va='center', fontweight='bold')
         plt.tight_layout()
-        plt.show()
+        plt.savefig(os.path.join(plots_path, '01_ROI_masks.jpg'), format='jpg', dpi=300)
 
-        # (2) ROI outlines on best matching slice in stack
+        # (2) ROI outlines on target image
+        plt.figure(figsize=(8, 8))
+        plt.imshow(refImg, cmap='gray', vmin=np.percentile(refImg, 5),
+                   vmax=np.percentile(refImg, 99.5))
+        for n in range(1, n_rois + 1):
+            mask_roi = (mask == n + 1).astype(np.uint8)
+            contours = measure.find_contours(mask_roi, 0.5)
+            for contour in contours:
+                plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_path, '02_ROI_masks_on_reference.jpg'), format='jpg', dpi=300)
+
+        # (3) ROI outlines on best matching slice in stack
+        zstack_plane = zstack[best_plane, :, :]
+        plt.figure(figsize=(8, 8))
+        plt.imshow(zstack_plane, cmap='gray', vmin=np.percentile(zstack_plane, 5),
+                   vmax=np.percentile(zstack_plane, 99.5))
+        for n in range(1, n_rois + 1):
+            mask_roi = (mask == n + 1).astype(np.uint8)
+            contours = measure.find_contours(mask_roi, 0.5)
+            for contour in contours:
+                plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_path, '02_ROI_masks_on_stack_plane.jpg'), format='jpg', dpi=300)
+
         # (3) Comparison between reference image and best matching slice in stack
 
         # TODO (SS): compare these profiles to Z profiles
@@ -377,7 +400,7 @@ def _process_s2p_singlePlane(
             manager.full_screen_toggle()
             plt.savefig(
                 os.path.join(
-                    saveDirectoryPlot,
+                    plots_path,
                     "Plane" + str(plane) + "Neuron" + str(i) + ".png",
                 ),
                 format="png",
@@ -385,7 +408,7 @@ def _process_s2p_singlePlane(
 
             with open(
                     os.path.join(
-                        saveDirectoryPlot,
+                        plots_path,
                         "Plane" + str(plane) + "Neuron" + str(i) + ".fig.pickle",
                     ),
                     "wb",
@@ -476,7 +499,7 @@ def _process_s2p_singlePlane(
 
             plt.savefig(
                 os.path.join(
-                    saveDirectoryPlot,
+                    plots_path,
                     "Plane" + str(plane) + "Neuron" + str(i) + "_zoom.png",
                 ),
                 format="png",
@@ -484,7 +507,7 @@ def _process_s2p_singlePlane(
 
             with open(
                     os.path.join(
-                        saveDirectoryPlot,
+                        plots_path,
                         "Plane"
                         + str(plane)
                         + "Neuron"
