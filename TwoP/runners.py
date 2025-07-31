@@ -4,17 +4,20 @@ import traceback
 
 import cv2
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import skimage.io
 import tifffile
 from joblib import Parallel, delayed
 from matplotlib.colors import ListedColormap
 from skimage import measure
 from suite2p.registration.zalign import compute_zpos
+import tkinter as tk
 
 from Bonsai.extract_data import *
 from TwoP.general import *
 from TwoP.preprocess_traces import *
 from TwoP.process_tiff import *
+import TwoP.plotting as myplt
 from user_defs import create_2p_processing_ops
 
 
@@ -61,6 +64,43 @@ def _process_s2p_singlePlane(
     processed_path = os.path.join(saveDirectory, "2P_processed", f'plane{plane}')
     os.makedirs(processed_path, exist_ok=True)
 
+    # Load suite2p parameters and ROI data.
+    isCell = np.load(os.path.join(currDir, "iscell.npy"))  # (nROIs, 2)
+    stat = np.load(os.path.join(currDir, "stat.npy"), allow_pickle=True)
+    stat = stat[isCell[:, 0].astype(bool)]
+    ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
+
+    # Determine location of each ROI in 3D, in units of microns. Depth is relative to the top-most position of the
+    # z-actuator (piezo).
+    cellLocs = np.zeros((len(stat), 3))
+    # First, determine depth.
+    ySpan = ops["Ly"]
+    for i, s in enumerate(stat):
+        # Determine relative Y position wihtin FOV.
+        relYpos = s["med"][0] / ySpan
+        # Determine position of actuator (piezo), which depends on relative Y position. (Scanning along X dimension is
+        # so fast that we can ignore it.)
+        piezoInd = int(np.round((piezo.shape[0] - 1) * relYpos))
+        zPos = piezo[piezoInd, plane]
+        cellLocs[i, :] = np.append(s["med"], zPos)
+
+    # Second, convert locations in horzontal plane from pixels to microns.
+    # TODO (SS): Put this into separate function, so it can be adapted more easily by user. Also add parameter to decide
+    #  whether to convert or not.
+    lastFile = ops['filelist'][-1]
+    tif = tifffile.TiffFile(lastFile)
+    customTifData = tif.pages[0].tags['Artist'].value
+    zoomFactor = int(re.findall('"scanZoomFactor": ([0-9])', customTifData)[0])
+    # TODO (SS): Define these values as user specific inputs.
+    zooms = [1, 1.5, 2, 4, 8, 16]
+    totalSize = [730, 490, 360, 180, 95, 50]
+    width = tif.pages[0].tags['ImageWidth'].value
+    length = tif.pages[0].tags['ImageLength'].value
+    zoomF = sp.interpolate.interp1d(zooms, totalSize)
+    currentTotalSize = zoomF(zoomFactor)
+    cellLocs[:, 0] = (cellLocs[:, 0] / length) * currentTotalSize
+    cellLocs[:, 1] = (cellLocs[:, 1] / width) * currentTotalSize
+
     # TODO: we could add option to re-register each frame to the best matching slice in the Z stack, rather than
     #  trusting the registration to the template image. BUT: zstack was collected at quite different time point and may
     #  look quite different. Also, only 10 repeats of the same plane were collected. -> excuse not to do it
@@ -68,13 +108,9 @@ def _process_s2p_singlePlane(
     # Load neural data.
     F = np.load(os.path.join(currDir, "F.npy"), allow_pickle=True).T  # (t, nROIs)
     N = np.load(os.path.join(currDir, "Fneu.npy")).T  # (t, nROIs)
-    isCell = np.load(os.path.join(currDir, "iscell.npy"))  # (nROIs, 2)
-    stat = np.load(os.path.join(currDir, "stat.npy"), allow_pickle=True)
-    ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
     # Only include ROIs curated cells.
     F = F[:, isCell[:, 0].astype(bool)]
     N = N[:, isCell[:, 0].astype(bool)]
-    stat = stat[isCell[:, 0].astype(bool)]
     # Remove bad frames.
     badFrames = ops['badframes']
     F[badFrames, :] = np.nan
@@ -103,6 +139,7 @@ def _process_s2p_singlePlane(
         ops_zcorr['nonrigid'] = False
         # TODO: add parameter to user_defs.py to specify block size for Z correction.
         ops_zcorr['block_size'] = [min(32, ops['Ly']), min(128, ops['Lx'])]
+        pix_per_micron = ops['Ly'] / currentTotalSize
 
         # Use reference image from the channel that was used for alignment.
         if channel == 1:
@@ -124,6 +161,7 @@ def _process_s2p_singlePlane(
                                      np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
                     target_image=ops['meanImg'],
                     channel=1,
+                    sigma=(2, 2 * pix_per_micron, 2 * pix_per_micron)
                 )
                 # Save registered Z stack in the specified or default saveDir.
                 skimage.io.imsave(zstack_functional_path, zstack_functional)
@@ -139,7 +177,8 @@ def _process_s2p_singlePlane(
                 piezo=np.vstack((piezo[:, plane:plane + 1],
                                  np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
                 target_image=refImg,
-                channel=channel
+                channel=channel,
+                sigma=(1, 1 * pix_per_micron, 1 * pix_per_micron)
             )
             skimage.io.imsave(zstack_path, zstack)
             np.save(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"), best_plane)
@@ -208,37 +247,6 @@ def _process_s2p_singlePlane(
     # TODO: decide whether to divide by constant of changing F0.
     dF = get_delta_F_over_F(F_ncorrected, F0)
 
-    # Determine location of each ROI in 3D, in units of microns. Depth is relative to the top-most position of the
-    # z-actuator (piezo).
-    cellLocs = np.zeros((len(stat), 3))
-    # First, determine depth.
-    ySpan = ops["Ly"]
-    for i, s in enumerate(stat):
-        # Determine relative Y position wihtin FOV.
-        relYpos = s["med"][0] / ySpan
-        # Determine position of actuator (piezo), which depends on relative Y position. (Scanning along X dimension is
-        # so fast that we can ignore it.)
-        piezoInd = int(np.round((piezo.shape[0] - 1) * relYpos))
-        zPos = piezo[piezoInd, plane]
-        cellLocs[i, :] = np.append(s["med"], zPos)
-
-    # Second, convert locations in horzontal plane from pixels to microns.
-    # TODO (SS): Put this into separate function, so it can be adapted more easily by user. Also add parameter to decide
-    #  whether to convert or not.
-    lastFile = ops['filelist'][-1]
-    tif = tifffile.TiffFile(lastFile)
-    customTifData = tif.pages[0].tags['Artist'].value
-    zoomFactor = int(re.findall('"scanZoomFactor": ([0-9])', customTifData)[0])
-    # TODO (SS): Define these values as user specific inputs.
-    zooms = [1, 1.5, 2, 4, 8, 16]
-    totalSize = [730, 490, 360, 180, 95, 50]
-    width = tif.pages[0].tags['ImageWidth'].value
-    length = tif.pages[0].tags['ImageLength'].value
-    zoomF = sp.interpolate.interp1d(zooms, totalSize)
-    currentTotalSize = zoomF(zoomFactor)
-    cellLocs[:, 0] = (cellLocs[:, 0] / length) * currentTotalSize
-    cellLocs[:, 1] = (cellLocs[:, 1] / width) * currentTotalSize
-
     # Places all the results in a dictionary (dF/F, Z corrected dF/F,
     # z profiles, z traces and the cell locations in X, Y and Z).
     results = {
@@ -255,6 +263,13 @@ def _process_s2p_singlePlane(
         os.makedirs(plots_path, exist_ok=True)
         if not 'best_plane' in locals():
             best_plane = np.load(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"))
+
+        # dpi = plt.rcParams['figure.dpi']
+        # screen_width, screen_height = myplt.get_screen_size()
+        # figsize = (screen_width / dpi, screen_height / dpi)
+        colors_paired = plt.get_cmap('Paired')
+        colors_set1 = plt.get_cmap('Set1')
+        n_frames = np.cumsum(ops['frames_per_folder'])
 
         # For each plane:
         # (1) ROI masks (on black background)
@@ -276,180 +291,147 @@ def _process_s2p_singlePlane(
         for n, roi in enumerate(stat):
             y, x = roi['med']
             plt.text(x, y, str(n), color='white', fontsize=12, ha='center', va='center', fontweight='bold')
+        plt.title('ROI Masks')
         plt.tight_layout()
         plt.savefig(os.path.join(plots_path, '01_ROI_masks.jpg'), format='jpg', dpi=300)
+        plt.close()
 
         # (2) ROI outlines on target image
+        # Normalize image to [0, 1]
+        refImg_norm = (refImg - np.min(refImg)) / np.ptp(refImg)
         plt.figure(figsize=(8, 8))
-        plt.imshow(refImg, cmap='gray', vmin=np.percentile(refImg, 5),
-                   vmax=np.percentile(refImg, 99.5))
+        plt.imshow(refImg, cmap='gray')
         for n in range(1, n_rois + 1):
             mask_roi = (mask == n + 1).astype(np.uint8)
             contours = measure.find_contours(mask_roi, 0.5)
             for contour in contours:
                 plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
+        plt.title('ROI Masks on Reference Image')
         plt.tight_layout()
         plt.savefig(os.path.join(plots_path, '02_ROI_masks_on_reference.jpg'), format='jpg', dpi=300)
+        plt.close()
 
         # (3) ROI outlines on best matching slice in stack
         zstack_plane = zstack[best_plane, :, :]
+        # Normalize image to [0, 1]
+        zstack_norm = (zstack_plane - np.min(zstack_plane)) / np.ptp(zstack_plane)
         plt.figure(figsize=(8, 8))
-        plt.imshow(zstack_plane, cmap='gray', vmin=np.percentile(zstack_plane, 5),
-                   vmax=np.percentile(zstack_plane, 99.5))
+        plt.imshow(zstack_plane, cmap='gray')
         for n in range(1, n_rois + 1):
             mask_roi = (mask == n + 1).astype(np.uint8)
             contours = measure.find_contours(mask_roi, 0.5)
             for contour in contours:
                 plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
+        plt.title('ROI Masks on Best Matching Slice in Stack')
         plt.tight_layout()
-        plt.savefig(os.path.join(plots_path, '02_ROI_masks_on_stack_plane.jpg'), format='jpg', dpi=300)
+        plt.savefig(os.path.join(plots_path, '03_ROI_masks_on_stack_plane.jpg'), format='jpg', dpi=300)
+        plt.close()
 
-        # (3) Comparison between reference image and best matching slice in stack
+        # (4) Comparison between reference image and best matching slice in stack
+        # Stack into RGB: Red = zstack_plane, Green = refImg, Blue = 0
+        rgb = np.zeros((*zstack_plane.shape, 3))
+        rgb[..., 0] = zstack_norm  # Red
+        rgb[..., 1] = refImg_norm  # Green
+        plt.figure(figsize=(8, 8))
+        plt.imshow(rgb)
+        plt.title('Reference Image (green) vs Best Matching Slice in Stack (red)')
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_path, '04_reference_vs_stack_plane.jpg'), format='jpg', dpi=300)
+        plt.close()
 
         # TODO (SS): compare these profiles to Z profiles
-        z_F_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
-        z_N_quartiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
-        for p in np.unique(ztrace):
-            z_F_quartiles[p, :] = np.percentile(F[ztrace == p, :], 25, axis=0)
-            z_N_quartiles[p, :] = np.percentile(N[ztrace == p, :], 25, axis=0)
 
         # For each ROI:
-        for i in range(dF.shape[-1]):
+        os.makedirs(os.path.join(plots_path, 'ROIs'), exist_ok=True)
+        for i in range(n_rois):
             # (A) Plot all data (complete time traces).
-            fig = plt.figure(1, figsize=(12, 6))
-            gs = gridspec.GridSpec(10, 10)
-            gs.update(wspace=0.2, hspace=0.2)
+            fig = plt.figure()
+            plt.get_current_fig_manager().window.wm_state('zoomed')
+            gs = gridspec.GridSpec(4, 10)
 
             # (1) Z profile from ROI and neuropil masks, and low values of F and N traces recorded at different depths
-            xtr_subplot = fig.add_subplot(gs[0:10, 0:1])
+            xtr_subplot = fig.add_subplot(gs[0:5, 0:1])
             if not (F_profiles is None) and not (ztrace is None):
-                plt.plot(F_profiles[:, i], range(F_profiles.shape[0]))
+                plt.plot(F_profiles[:, i], range(F_profiles.shape[0]), color=colors_paired(1))
+                plt.plot(N_profiles[:, i], range(N_profiles.shape[0]), color=colors_paired(7))
+                # Compare profiles to fluorescence values measured at different depths during experiment
+                z_F_prctiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
+                z_N_prctiles = np.ones((zstack.shape[0], F.shape[1])) * np.nan
+                for p in np.unique(ztrace):
+                    z_F_prctiles[p, :] = np.percentile(F[ztrace == p, :], pops['f0_percentile'], axis=0)
+                    z_N_prctiles[p, :] = np.percentile(N[ztrace == p, :], pops['f0_percentile'], axis=0)
+                plt.plot(z_F_prctiles[:, i], range(z_F_prctiles.shape[0]), color=colors_paired(0), linewidth=3)
+                plt.plot(z_N_prctiles[:, i], range(z_N_prctiles.shape[0]), color=colors_paired(6), linewidth=3)
                 plt.legend(
-                    ["Z profile"],
-                    # bbox_to_anchor=(1.01, 1),
-                    loc="upper left"
+                    ['F(stack)', 'N(stack)', 'F(recording)', 'N(recording)'],
+                    loc="upper left",
+                    bbox_to_anchor=(-1.1, 1)
                 )
-                plt.xlabel("fluorescence")
-                plt.ylabel("depth")
+                plt.axhline(reference_depth, color="k", linewidth=3)
+                plt.ylim(0, F_profiles.shape[0])
                 plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(ztrace), c="green")
-                plt.axhline(np.nanmax(ztrace), c="red")
-                plt.axhline(np.nanmin(ztrace), c="blue")
-                plt.text(0, np.nanmedian(ztrace), 'Median',
-                         color='green', fontsize=10, va='bottom')
-                plt.text(0, np.nanmax(ztrace), 'Maximum',
-                         color='red', fontsize=10, va='bottom')
-                plt.text(0, np.nanmin(ztrace), 'Minimum',
-                         color='blue', fontsize=10, va='bottom')
-                plt.xlim(0, max(F_profiles[:, i]))
+                plt.xlabel("Fluorescence")
+                plt.ylabel("Depth")
 
             # (2) z trace of plane
-            xtr_subplot = fig.add_subplot(gs[8:10, 1:10])
+            xtr_subplot = fig.add_subplot(gs[0:1, 1:10])
             if ztrace is not None:
-                plt.plot(ztrace)
+                plt.plot(ztrace, color=(0.5, 0.5, 0.5))
                 plt.gca().invert_yaxis()
-                plt.axhline(np.nanmedian(ztrace), c="green")
-                plt.legend(
-                    ["Z trace"],
-                    # bbox_to_anchor=(1.01, 1),
-                    loc="upper right"
-                )
-                plt.xlabel("time (frames)")
-                plt.tick_params(axis='y', labelright=True, labelleft=False)
+                plt.axhline(reference_depth, color="k", linewidth=3)
+                [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
                 plt.xlim(0, ztrace.shape[0])
+                plt.gca().set_xticklabels([])
+                plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
+                plt.title('Z-trace')
 
             # (3) Raw and z-motion corrected ROI and neuropil traces
-            xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
-            plt.plot(F[:, i], "b")
-            plt.plot(N[:, i], "r")
+            xtr_subplot = fig.add_subplot(gs[1:2, 1:10])
+            plt.plot(F[:, i], color=colors_paired(1))
+            plt.plot(N[:, i], color=colors_paired(7))
+            plt.plot(F_zcorrected[:, i], color=colors_paired(0))
+            plt.plot(N_zcorrected[:, i], color=colors_paired(6))
             plt.legend(
-                ["Fluorescence", "Neuropil"],
-                # bbox_to_anchor=(1.01, 1),
+                ["F(raw)", "N(raw)", "F(z-corrected)", "N(z-corrected)"],
                 loc="upper right",
+                bbox_to_anchor=(1.11, 1)
             )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
+            [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+            plt.xlim(0, F.shape[0])
+            plt.gca().set_xticklabels([])
+            plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             # (4) Neuropil-corrected ROI traces and F0
-            xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
-            plt.plot(F_ncorrected[:, i], "k")
-            plt.plot(F0[:, i], "b", linewidth=4, zorder=10)
+            xtr_subplot = fig.add_subplot(gs[2:3, 1:10])
+            plt.plot(F_ncorrected[:, i], color=colors_paired(1))
+            plt.plot(F0[:, i], color=colors_paired(2), linewidth=4)
             plt.legend(
-                ["Corrected F", "F0"],
-                # bbox_to_anchor=(1.01, 1),
+                ["F(n-pil corr.)", "F0"],
                 loc="upper right",
+                bbox_to_anchor=(1.11, 1)
             )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
+            [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+            plt.xlim(0, F.shape[0])
+            plt.gca().set_xticklabels([])
+            plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             # (5) dF/F
-            xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
-            plt.plot(dF[:, i], "b", linewidth=3)
+            xtr_subplot_df = fig.add_subplot(gs[3:4, 1:10])
+            plt.plot(dF[:, i], color=colors_paired(3))
             plt.legend(
                 ["dF/F"],
-                # bbox_to_anchor=(1.01, 1),
                 loc="upper right",
+                bbox_to_anchor=(1.11, 1)
             )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF.shape[0])
+            [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+            plt.xlim(0, F.shape[0])
+            plt.xlabel('Time (frames)')
+            plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
-            manager = plt.get_current_fig_manager()
-            manager.full_screen_toggle()
-            plt.savefig(
-                os.path.join(
-                    plots_path,
-                    "Plane" + str(plane) + "Neuron" + str(i) + ".png",
-                ),
-                format="png",
-            )
+            fig.suptitle(f"ROI {i}", fontsize=20, fontweight='bold')
 
-            with open(
-                    os.path.join(
-                        plots_path,
-                        "Plane" + str(plane) + "Neuron" + str(i) + ".fig.pickle",
-                    ),
-                    "wb",
-            ) as file:
-                pickle.dump(fig, file)
-            # Print Part
-            # f, ax = plt.subplot_mosaic(plotArrangement)
-            # ax["f"].plot(F[1:500, i], "b")
-            # ax["f"].plot(N[1:500, i], "r")
-            # ax["f"].legend(
-            #     ["Fluorescence", "Neuropil"],
-            #     bbox_to_anchor=(1.01, 1),
-            #     loc="upper left",
-            # )
-            # ax["corr"].plot(F_ncorrected[1:500, i], "k")
-            # ax["corr"].plot(F0[1:500, i], "b", linewidth=4)
-            # ax["corr"].legend(
-            #     ["Corrected F", "F0"],
-            #     bbox_to_anchor=(1.01, 1),
-            #     loc="upper left",
-            # )
-            # ax["zcorr"].plot(dF[1:500, i], "b", linewidth=3)
-            # ax["zcorr"].plot(Fcz[1:500, i], "k", alpha=0.3)
-            # ax["zcorr"].legend(
-            #     ["dF/F", "dF/F z-zcorrected"],
-            #     bbox_to_anchor=(1.01, 1),
-            #     loc="upper left",
-            # )
-            # ax["zcorr"].set_xlabel("time (frames)")
-            # if not zTrace is None:
-            #     ax["trace"].plot(zTrace[1:500])
-            #     ax["trace"].legend(
-            #         ["Z trace"], bbox_to_anchor=(1.01, 1), loc="upper left"
-            #     )
-            # if not zprofiles is None:
-            #     ax["profile"].plot(zprofiles[:, i], range(zprofiles.shape[0]))
-            #     ax["profile"].legend(
-            #         ["Z profile"], bbox_to_anchor=(1.01, 1), loc="upper left"
-            #     )
-            #     ax["profile"].set_xlabel("fluorescence")
-            #     ax["profile"].set_xlabel("depth")
+            plt.savefig(os.path.join(plots_path, 'ROIs', f"ROI{str(i).zfill(4)}.jpg"), format='jpg', dpi=300)
+            plt.close()
 
             # (B) Plot traces in a zoomed-in view (first 500 frames).
             plt.close()
