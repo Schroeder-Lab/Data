@@ -190,7 +190,7 @@ def register_stack_to_ref(zstack, refImg, ops):
 
 
 def register_zstack(
-    tiff_path, ops, spacing=1, piezo=None, target_image=None, channel=1
+    tiff_path, ops, spacing=1, piezo=None, target_image=None, channel=1, sigma=None
 ):
     """
     Loads tiff file containing imaged z-stack, aligns all frames to each other,
@@ -246,6 +246,10 @@ def register_zstack(
 
     # Registers planes of Z stack to each other.
     zstack = register_zstack_frames(zstack, ops)
+
+    # Smooth zstack with 3D Gaussian filter.
+    if sigma is not None:
+        zstack = sp.ndimage.gaussian_filter(zstack, sigma=sigma, mode='nearest')
 
     # Unless there is no piezo trace, the Z stack is resliced according to the
     # piezo movement. The frames are acquired using fast imaging

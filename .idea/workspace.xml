@@ -5,7 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Started plots of z-correction">
+      <change afterPath="$PROJECT_DIR$/TwoP/plotting.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TwoP/process_tiff.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/process_tiff.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TwoP/runners.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/runners.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -16,15 +18,15 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Python Script" />
         <option value="Setup Script" />
+        <option value="Python Script" />
       </list>
     </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="main" />
+        <entry key="$PROJECT_DIR$" value="main-archive-20250715" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -223,17 +225,6 @@
     <MESSAGE value="Z-motion correction based on z-profile and z-trace." />
     <MESSAGE value="Started plots of z-correction" />
     <option name="LAST_COMMIT_MESSAGE" value="Started plots of z-correction" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
-          <line>226</line>
-          <option name="timeStamp" value="59" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Data$main_preprocess.coverage" NAME="main_preprocess Coverage Results" MODIFIED="1753031104911" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TwoP" />
