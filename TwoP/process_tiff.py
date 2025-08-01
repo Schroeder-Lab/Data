@@ -1,6 +1,3 @@
-"""Pre-process tiff files."""
-
-
 import os
 
 import numpy as np

@@ -1,24 +1,20 @@
-import pickle
 import time
 import traceback
 
 import cv2
 import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
 import skimage.io
 import tifffile
 from joblib import Parallel, delayed
 from matplotlib.colors import ListedColormap
 from skimage import measure
 from suite2p.registration.zalign import compute_zpos
-import tkinter as tk
 
 from Bonsai.extract_data import *
 from TwoP.general import *
 from TwoP.preprocess_traces import *
 from TwoP.process_tiff import *
 from user_defs import create_2p_processing_ops
-
 
 zoom_window = (0, 5000)
 
@@ -224,8 +220,8 @@ def _process_s2p_singlePlane(
         # only the uncorrected delta F over F is considered.
         F_zcorrected = F
         N_zcorrected = N
-        zstack = np.nan
-        zcorr = np.nan
+        zstack = None
+        zcorr = None
 
     fs = ops["fs"]
     # Perform neuropil correction.
@@ -570,29 +566,13 @@ def process_s2p_directory(
     ).item()
 
     isBoutons = ('selected_plane' in ops.keys())
-    # Loads the number of planes into a variable.
-    # Creates an array with the plane range.
+
+    # Determine planes to be processed (previously analyzed with suite2p).
     planeRange = [int(re.findall(r'plane(\d+)', s)[0]) for s in planeDirs]
-    # TODO (SS) OLD: planeRange = np.arange(len(planeDirs))
-    # Removes the ignored plane (if specified) from the plane range array.
+    # Ignore planes if specified.
     if isBoutons or ignorePlanes is None:
         ignorePlanes = []
-    # TODO (SS) OLD:
-    # else:
-    #     ignorePlanes = [i for i, s in enumerate(planeDirs) if int(
-    #         re.findall(r'plane|\d+', s)[-1]) in ignorePlanes]
-
     planeRange = np.delete(planeRange, ignorePlanes)
-    # TODO (SS) OLD:
-    # # find what plane directories exist and match piezo plane number to them
-    # # TODO (SS): Consider not deleting any planes from piezoTraces
-    # if not (len(ignorePlanes) == 0):
-    #     # TODO (SS): if planeDirs does not contain plane0 but ignorePlanes does, the 1st plane will be ignored
-    #     planeRange = np.delete(planeRange, ignorePlanes)
-    #     repPlanes = [int(re.findall(r'plane|\d+', s)[-1]) for s in planeDirs]
-    #     piezoTraces = piezoTraces[:, repPlanes] if not (
-    #         isBoutons) else piezoTraces[:, ops['selected_plane']]
-
     # Determine the absolute time before processing.
     preTime = time.time()
 
@@ -605,23 +585,14 @@ def process_s2p_directory(
 
     # not a bouton recording proceed normally
     if not isBoutons:
-        # Processes the 2P data for the planes specified in the plane range.
-        # This gives a list of dictionaries with all the planes.
-        # Refer to the function for a more thorough description.
-        # results = Parallel(n_jobs=jobnum, verbose=5)(
-        #     delayed(_process_s2p_singlePlane)(
-        #         pops, planeDirs[plane], zstackPath, saveDirectory, piezo, plane
-        #     )
-        #     for plane in planeRange
-        # )
+        # Process specified planes. Return list with results for each plane. If no data for plane at planeRange[i]
+        # exists (output from suite2p), results[i] will be None.
         results = [
             _process_s2p_singlePlane(
                 pops, planeDirs[plane], zstackPath, saveDirectory, piezo, plane
             )
             for plane in planeRange
         ]
-        # signalList = _process_s2p_singlePlane(planeDirs,zstackPath,saveDirectory,piezoTraces[:,0],1)
-        # Determines the absolute time after processing.
     # bouton recording
     else:
         p = ops['selected_plane']
@@ -631,59 +602,41 @@ def process_s2p_directory(
             )
             for p in [0]
         )
-
-    # If plotting: ztraces of all planes.
-
     postTime = time.time()
     print("Processing took: " + str(postTime - preTime) + " ms")
 
-    # TODO: only create planes, the rest is already in results.
-    # Collect results from all the planes.
-    planes = np.array([])
-    signalList = []
-    signalLocs = []
-    zTraces = []
-    zProfiles = []
-    zCorrs = []
-    cellIds = []
-    for i in range(len(results)):
-        if not (results[i] is None):
-            zCorrs.append(results[i]["zCorr_stack"])
-            zTraces.append(results[i]["zTrace"])
-            zProfiles.append(results[i]["zProfiles"])
-            signalList.append(results[i]["dff"])
-            signalLocs.append(results[i]["locs"])
-            cellIds.append(results[i]["cellId"])
-            res = signalList[i]
-            planes = np.append(planes, np.ones(res.shape[1]) * planeRange[i]) if not isBoutons else np.append(
-                planes, np.ones(res.shape[1]) * ops['selected_plane'])
-    # Clip all signals the same length (to the shortest signal).
-    minLength = np.inf
-    for i in range(len(signalList)):
-        minLength = np.min((signalList[i].shape[0], minLength))
-    for i in range(len(signalList)):
-        signalList[i] = signalList[i][: int(minLength), :]
-        if not zTraces[i] is None:
-            zTraces[i] = zTraces[i][: int(minLength)]
-            zCorrs[i] = zCorrs[i][: int(minLength)]
-    # TODO: Do this when saving.
-    # Combine all results into arrays.
-    signals = np.hstack(signalList)
-    locs = np.vstack(signalLocs)
-    zProfile = np.hstack(zProfiles)
-    zTrace = np.vstack(zTraces)
-    zCorrs = np.swapaxes(np.dstack(zCorrs).T, 1, 2)
-    cellIds = np.hstack(cellIds)
+    # TODO: If plotting: ztraces of all planes.
 
-    # TODO: change naming.
-    # Saves the results as individual npy files.
-    np.save(os.path.join(saveDirectory, "calcium.dff.npy"), signals)
-    np.save(os.path.join(saveDirectory, "rois.planes.npy"), planes)
-    np.save(os.path.join(saveDirectory, "rois.id.npy"), cellIds)
-    np.save(os.path.join(saveDirectory, "rois.xyz.npy"), locs)
-    np.save(os.path.join(saveDirectory, "rois.zProfiles.npy"), zProfile.T)
-    np.save(os.path.join(saveDirectory, "planes.zTrace"), zTrace)
-    np.save(os.path.join(saveDirectory, "planes.zcorrelation"), zCorrs)
+    # Identify planes for which no data was found.
+    ind_valid_planes = [i for i, res in enumerate(results) if res is not None]
+    # Clip all signals the same length (to the shortest signal), and create vector with plane indices for each ROI.
+    minLength = np.inf
+    for i in ind_valid_planes:
+        minLength = np.min((results[i]['dff'].shape[0], minLength)).astype(int)
+    planes = np.array([])
+    for i in ind_valid_planes:
+        results[i]['dff'] = results[i]['dff'][: minLength, :]
+        if not results[i]['zTrace'] is None:
+            results[i]['zTrace'] = results[i]['zTrace'][: minLength]
+            results[i]['zCorr_stack'] = results[i]['zCorr_stack'][: minLength]
+        # TODO: check this is correct for boutons.
+        planes = np.append(planes, np.ones((len(results[i]['cellId']), 1)) * planeRange[i])
+
+    # TODO: check that all matrices have the correct shape.
+    # Save results.
+    np.save(os.path.join(saveDirectory, "2pPlanes.zCorrelations"),
+            np.stack([results[i]['zCorr_stack'] for i in ind_valid_planes], axis=0))
+    np.save(os.path.join(saveDirectory, "2pPlanes.zTraces"),
+            np.stack([results[i]['zTrace'] for i in ind_valid_planes], axis=0))
+    np.save(os.path.join(saveDirectory, "2pRois.zProfiles.npy"),
+            np.vstack([results[i]['zProfiles'].T for i in ind_valid_planes]))
+    np.save(os.path.join(saveDirectory, "2pCalcium.dff.npy"),
+            np.hstack([results[i]['dff'] for i in ind_valid_planes]))
+    np.save(os.path.join(saveDirectory, "2pRois.xyz.npy"),
+            np.vstack([results[i]['locs'] for i in ind_valid_planes]))
+    np.save(os.path.join(saveDirectory, "2pRois.ids.npy"),
+            np.vstack([results[i]['cellId'].T for i in ind_valid_planes]))
+    np.save(os.path.join(saveDirectory, "2pRois.2pPlanes.npy"), planes)
 
 
 def process_metadata_directory(

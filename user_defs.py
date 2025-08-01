@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Nov  3 09:35:05 2022
-
-@author: LABadmin
-"""
 from suite2p import default_ops
 import pandas as pd
 import pathlib

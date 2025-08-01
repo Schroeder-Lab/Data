@@ -1,4 +1,3 @@
-"""Pre-process calcium traces extracted from tiff files."""
 import numpy as np
 import scipy as sp
 from TwoP.general import linear_analytical_solution

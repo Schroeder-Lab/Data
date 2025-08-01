@@ -1,9 +1,9 @@
+import matplotlib
+
 from TwoP.runners import *
 from user_defs import *
 
-import matplotlib
 matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 
 # %% load directories and processing ops
 
@@ -36,60 +36,44 @@ database = pd.read_csv(
 
 # %% run over data base
 for i in range(len(database)):
-    if database.loc[i]["Process"]:
-        # TODO (SS): get rid of try/except
-        try:
-            print("reading directories" + str(database.loc[i]))
-            # Get relevant directory paths.
-            (
-                suite2p_directory,
-                zstackPath,
-                metadataDirectory,
-                saveDirectory,
-            ) = read_csv_produce_directories(
-                database.loc[i], s2pDir, zstackDir, metadataDir
-            )
-            # Disregard imaging planes that user wants to ignore ( e.g., fly-back plane when using piezo as z-actuator).
-            ignorePlanes = np.atleast_1d(
-                np.array(database.loc[i]["IgnorePlanes"]).astype(int)
-            )
-            # Load parameters that were used to process data with Suite2p.
-            ops = get_ops_file(suite2p_directory)
-            if pops["process_suite2p"]:
-                print("getting piezo data")
-                # Returns the movement of the piezo (in microns along depth, relative to top-most position of piezo
-                # trace) aligned to onset of each frame.
-                piezo = get_piezo_data(ops)
-                print("processing suite2p data")
-                # TODO (SS): get rid of try/except
-                try:
-                    # Call main processing function.
-                    # TODO: remove fc? function has no return value.
-                    fc = process_s2p_directory(
-                        suite2p_directory,
-                        pops,
-                        piezo,
-                        zstackPath,
-                        saveDirectory=saveDirectory,
-                        ignorePlanes=ignorePlanes,
-                        debug=pops["debug"],
-                    )
-                except Exception:
-                    print("Could not process due to errors, moving to next batch.")
-                    print(traceback.format_exc())
-            if pops["process_bonsai"]:
-                print("reading bonsai data")
-                process_metadata_directory(
-                    metadataDirectory, ops, pops, saveDirectory
-                )
+    if not database.loc[i]["Process"]:
+        continue
 
-        except Exception:
-            print("Could not process due to errors, moving to next batch.")
-            print(traceback.format_exc())
-        plt.close('all')
-    # if False in the column "Process", the processing of those experiments is
-    # skipped.
-    else:
-        print("skipping " + str(database.loc[i]))
+    print("reading directories" + str(database.loc[i]))
+    # Get relevant directory paths.
+    (
+        suite2p_directory,
+        zstackPath,
+        metadataDirectory,
+        saveDirectory,
+    ) = read_csv_produce_directories(
+        database.loc[i], s2pDir, zstackDir, metadataDir
+    )
+    # Disregard imaging planes that user wants to ignore ( e.g., fly-back plane when using piezo as z-actuator).
+    ignorePlanes = np.atleast_1d(
+        np.array(database.loc[i]["IgnorePlanes"]).astype(int)
+    )
+    # Load parameters that were used to process data with Suite2p.
+    ops = get_ops_file(suite2p_directory)
+    if pops["process_suite2p"]:
+        print("getting piezo data")
+        # Returns the movement of the piezo (in microns along depth, relative to top-most position of piezo
+        # trace) aligned to onset of each frame.
+        piezo = get_piezo_data(ops)
+        print("processing suite2p data")
+        # Call main processing function.
+        process_s2p_directory(
+            suite2p_directory,
+            pops,
+            piezo,
+            zstackPath,
+            saveDirectory=saveDirectory,
+            ignorePlanes=ignorePlanes,
+            debug=pops["debug"],
+        )
 
-    # %%
+    if pops["process_bonsai"]:
+        print("reading bonsai data")
+        process_metadata_directory(
+            metadataDirectory, ops, pops, saveDirectory
+        )
