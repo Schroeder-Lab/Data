@@ -9,3 +9,4 @@ joblib==1.5.1
 numba==0.60.0
 scikit-learn==1.6.1
 natsort==8.4.0
+scikit-image==0.24.0

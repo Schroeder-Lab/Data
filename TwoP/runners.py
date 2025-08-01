@@ -17,8 +17,10 @@ from Bonsai.extract_data import *
 from TwoP.general import *
 from TwoP.preprocess_traces import *
 from TwoP.process_tiff import *
-import TwoP.plotting as myplt
 from user_defs import create_2p_processing_ops
+
+
+zoom_window = (0, 5000)
 
 
 def _process_s2p_singlePlane(
@@ -169,7 +171,7 @@ def _process_s2p_singlePlane(
                 zstack_functional = skimage.io.imread(zstack_functional_path)
         # If Z stack not saved yet, register and reslice raw Z Stack and determine correlations with movie frames.
         if not (os.path.exists(zstack_path)):
-            # TODO (SS): spacing should be parameter in user_defs.py
+            # TODO (SS): spacing and sigma should be parameter in user_defs.py
             (zstack, best_plane) = register_zstack(
                 zstack_raw_path,
                 ops_zcorr,
@@ -178,7 +180,7 @@ def _process_s2p_singlePlane(
                                  np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
                 target_image=refImg,
                 channel=channel,
-                sigma=(1, 1 * pix_per_micron, 1 * pix_per_micron)
+                sigma=(0.75, 0.75 * pix_per_micron, 0.75 * pix_per_micron)
             )
             skimage.io.imsave(zstack_path, zstack)
             np.save(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"), best_plane)
@@ -192,7 +194,6 @@ def _process_s2p_singlePlane(
         else:
             if channel == 1:
                 zstack = skimage.io.imread(zstack_path)
-            # TODO (SS): load correct plane specific zcorr
             zcorr = np.load(os.path.join(processed_path, f"zcorr_plane{plane}.npy"))
 
         # If we used the non-funciton channel (2) for alignment, we now need to use the registered Z stack of the
@@ -201,7 +202,7 @@ def _process_s2p_singlePlane(
             zstack = zstack_functional
         # Determine Z profiles for each ROI and their neuropil.
         # TODO (SS): smoothing_factor should be a parameter in user_defs.py
-        F_profiles, N_profiles = extract_zprofiles(currDir, zstack, smoothing_factor=0.5, abs_zero=pops["absZero"])
+        F_profiles, N_profiles = extract_zprofiles(currDir, zstack, smoothing_factor=None, abs_zero=pops["absZero"])
 
         # For each frame, determine which slice in the Z stack it matches best.
         # TODO (SS): sigma should be a parameter in user_defs.py
@@ -264,11 +265,7 @@ def _process_s2p_singlePlane(
         if not 'best_plane' in locals():
             best_plane = np.load(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"))
 
-        # dpi = plt.rcParams['figure.dpi']
-        # screen_width, screen_height = myplt.get_screen_size()
-        # figsize = (screen_width / dpi, screen_height / dpi)
         colors_paired = plt.get_cmap('Paired')
-        colors_set1 = plt.get_cmap('Set1')
         n_frames = np.cumsum(ops['frames_per_folder'])
 
         # For each plane:
@@ -338,8 +335,6 @@ def _process_s2p_singlePlane(
         plt.tight_layout()
         plt.savefig(os.path.join(plots_path, '04_reference_vs_stack_plane.jpg'), format='jpg', dpi=300)
         plt.close()
-
-        # TODO (SS): compare these profiles to Z profiles
 
         # For each ROI:
         os.makedirs(os.path.join(plots_path, 'ROIs'), exist_ok=True)
@@ -434,73 +429,96 @@ def _process_s2p_singlePlane(
             plt.close()
 
             # (B) Plot traces in a zoomed-in view (first 500 frames).
-            plt.close()
-            fig = plt.figure(1, figsize=(12, 6))
-            gs = gridspec.GridSpec(10, 10)
-            gs.update(wspace=0.2, hspace=0.2)
+            fig = plt.figure()
+            plt.get_current_fig_manager().window.wm_state('zoomed')
+            gs = gridspec.GridSpec(4, 10)
 
-            # (1) z trace of plane
+            # (1) Z profile from ROI and neuropil masks, and low values of F and N traces recorded at different depths
+            xtr_subplot = fig.add_subplot(gs[0:5, 0:1])
+            if not (F_profiles is None) and not (ztrace is None):
+                valid = np.where(np.isfinite(z_F_prctiles[:, i]))[0]
+                plt.plot(z_F_prctiles[valid, i], valid, color=colors_paired(0), linewidth=3)
+                plt.plot(z_N_prctiles[valid, i], valid, color=colors_paired(6), linewidth=3)
+                plt.plot(F_profiles[valid, i], valid, color=colors_paired(1), linewidth=3)
+                plt.plot(N_profiles[valid, i], valid, color=colors_paired(7), linewidth=3)
+                plt.legend(
+                    ['F(recording)', 'N(recording)', 'F(stack)', 'N(stack)'],
+                    loc="upper left",
+                    bbox_to_anchor=(-1.1, 1)
+                )
+                plt.axhline(reference_depth, color="k", linewidth=3)
+                plt.gca().invert_yaxis()
+                plt.xlabel("Fluorescence")
+                plt.ylabel("Depth")
 
-            # (2) Raw and z-motion corrected ROI and neuropil traces
-            xtr_subplot = fig.add_subplot(gs[0:2, 1:10])
-            plt.plot(F[:500, i], "b")
-            plt.plot(N[:500, i], "r")
+            # (2) z trace of plane
+            xtr_subplot = fig.add_subplot(gs[0:1, 1:10])
+            if ztrace is not None:
+                plt.plot(np.arange(zoom_window[0], zoom_window[1]), ztrace[zoom_window[0]:zoom_window[1]],
+                         color=(0.5, 0.5, 0.5))
+                plt.gca().invert_yaxis()
+                plt.axhline(reference_depth, color="k", linewidth=3)
+                [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+                plt.xlim(zoom_window[0], zoom_window[1])
+                plt.gca().set_xticklabels([])
+                plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
+                plt.title('Z-trace')
+
+            # (3) Raw and z-motion corrected ROI and neuropil traces
+            xtr_subplot = fig.add_subplot(gs[1:2, 1:10])
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), F[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(1))
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), N[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(7))
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), F_zcorrected[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(0))
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), N_zcorrected[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(6))
             plt.legend(
-                ["Fluorescence", "Neuropil"],
+                ["F(raw)", "N(raw)", "F(z-corrected)", "N(z-corrected)"],
                 loc="upper right",
+                bbox_to_anchor=(1.11, 1)
             )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF[:500].shape[0])
+            [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+            plt.xlim(zoom_window[0], zoom_window[1])
+            plt.gca().set_xticklabels([])
+            plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             # (4) Neuropil-corrected ROI traces and F0
-            xtr_subplot = fig.add_subplot(gs[2:4, 1:10])
-            plt.plot(F_ncorrected[:500, i], "k")
-            plt.plot(F0[:500, i], "b", linewidth=4, zorder=10)
+            xtr_subplot = fig.add_subplot(gs[2:3, 1:10])
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), F_ncorrected[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(1))
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), F0[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(2), linewidth=4)
             plt.legend(
-                ["Corrected F", "F0"],
+                ["F(n-pil corr.)", "F0"],
                 loc="upper right",
+                bbox_to_anchor=(1.11, 1)
             )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF[:500].shape[0])
+            [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+            plt.xlim(zoom_window[0], zoom_window[1])
+            plt.gca().set_xticklabels([])
+            plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             # (5) dF/F
-            xtr_subplot_df = fig.add_subplot(gs[4:6, 1:10])
-            plt.plot(dF[:500, i], "b", linewidth=3)
+            xtr_subplot_df = fig.add_subplot(gs[3:4, 1:10])
+            plt.plot(np.arange(zoom_window[0], zoom_window[1]), dF[zoom_window[0]:zoom_window[1], i],
+                     color=colors_paired(3))
             plt.legend(
                 ["dF/F"],
                 loc="upper right",
+                bbox_to_anchor=(1.11, 1)
             )
-            plt.xticks([])
-            plt.tick_params(axis='y', labelright=True, labelleft=False)
-            plt.xlim(0, dF[:500].shape[0])
+            [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
+            plt.xlim(zoom_window[0], zoom_window[1])
+            plt.xlabel('Time (frames)')
+            plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
-            manager = plt.get_current_fig_manager()
-            manager.full_screen_toggle()
+            fig.suptitle(f"ROI {i} (zoom-in)", fontsize=20, fontweight='bold')
 
-            plt.savefig(
-                os.path.join(
-                    plots_path,
-                    "Plane" + str(plane) + "Neuron" + str(i) + "_zoom.png",
-                ),
-                format="png",
-            )
+            plt.savefig(os.path.join(plots_path, 'ROIs', f"ROI{str(i).zfill(4)}_zoomed.jpg"), format='jpg', dpi=300)
+            plt.close()
 
-            with open(
-                    os.path.join(
-                        plots_path,
-                        "Plane"
-                        + str(plane)
-                        + "Neuron"
-                        + str(i)
-                        + "_zoom.fig.pickle",
-                    ),
-                    "wb",
-            ) as file:
-                pickle.dump(fig, file)
-
-            plt.close("all")
     return results
 
 
