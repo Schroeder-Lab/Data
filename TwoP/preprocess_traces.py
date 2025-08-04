@@ -225,10 +225,9 @@ def get_F0(
     # Determine prctl_F percentile of fluorescence traces in rolling window.
     window_size = int(round(fs * window_size))
     Fc_pd = pd.DataFrame(Fc)
+    Fc_pd = Fc_pd.rolling(round(window_size / 2), min_periods=1, center=True).quantile(prctl_F * 0.01)
     F0 = np.array(
-        Fc_pd.rolling(window_size, min_periods=1, center=True).quantile(
-            prctl_F * 0.01
-        )
+        Fc_pd.rolling(window=window_size * 5, win_type='gaussian', center=True, min_periods=1).mean(std=window_size)
     )
     return F0
 
