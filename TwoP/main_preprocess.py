@@ -1,9 +1,12 @@
 import matplotlib
+matplotlib.use('Qt5Agg')
+# matplotlib.use('TkAgg')
 
 from TwoP.runners import *
 from user_defs import *
 
-matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+plt.rcParams.update({'font.size': 6})
 
 # %% load directories and processing ops
 

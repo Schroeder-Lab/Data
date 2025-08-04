@@ -4,6 +4,7 @@ import traceback
 import cv2
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import numpy as np
 import skimage.io
 import tifffile
 from joblib import Parallel, delayed
@@ -18,6 +19,8 @@ from TwoP.process_tiff import *
 from user_defs import create_2p_processing_ops
 
 zoom_window = (0, 5000)
+# TODO: make this a parameter in user_defs.py
+stack_step = 5
 
 
 def process_s2p_singlePlane(
@@ -166,6 +169,7 @@ def process_s2p_singlePlane(
                 skimage.io.imsave(zstack_functional_path, zstack_functional)
             else:
                 zstack_functional = skimage.io.imread(zstack_functional_path)
+
         # If Z stack not saved yet, register and reslice raw Z Stack and determine correlations with movie frames.
         if not (os.path.exists(zstack_path)):
             # TODO (SS): spacing and sigma should be parameter in user_defs.py
@@ -181,16 +185,45 @@ def process_s2p_singlePlane(
             )
             skimage.io.imsave(zstack_path, zstack)
             np.save(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"), best_plane)
-            _, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
-            np.save(os.path.join(processed_path, f"zcorr_plane{plane}.npy"), zcorr)
-        # If Z stack was created but correlations were not, compute correlations.
-        elif not os.path.exists(os.path.join(processed_path, f"zcorr_plane{plane}.npy")):
-            zstack = skimage.io.imread(zstack_path)
-            _, zcorr = compute_zpos(zstack, ops_zcorr, ops_zcorr['reg_file'])
-        # If Z stack and correlations were saved, load them.
         else:
-            if channel == 1:
-                zstack = skimage.io.imread(zstack_path)
+            zstack = skimage.io.imread(zstack_path)
+            best_plane = np.load(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"))
+
+        # If Z correlations were not saved yet, compute correlations.
+        if not os.path.exists(os.path.join(processed_path, f"zcorr_plane{plane}.npy")):
+            range_stack = np.arange(max(best_plane - stack_step, 0), min(best_plane + stack_step + 1, zstack.shape[0]))
+            range_total = range_stack.copy()
+            zcorr = np.ones((zstack.shape[0], F.shape[0])) * np.nan
+            while True:
+                zstack_in_range = zstack[range_stack, :, :]
+                # For each frame, determine which slice in the Z stack it matches best.
+                # TODO (SS): sigma should be a parameter in user_defs.py
+                _, zcorr_in_range = compute_zpos(zstack_in_range, ops_zcorr, ops_zcorr['reg_file'])
+                zcorr[range_stack, :] = zcorr_in_range
+                ztrace = np.nanargmax(
+                    sp.ndimage.gaussian_filter1d(
+                        zcorr[range_total,:], 2, axis=0, mode='nearest'),
+                    axis=0).astype(int)
+                ztrace = range_total[ztrace]
+                range_stack = np.array([], dtype=int)
+                # TODO: exclude first frames per experiment
+                first_frames = np.concatenate((np.zeros(1, dtype=int), np.cumsum(ops['frames_per_folder'])[:-1]))
+                ztrace_excluded = np.delete(ztrace, first_frames)
+                if np.any(ztrace == np.min(range_total)):
+                    range_stack = np.concatenate(
+                        (range_stack,
+                         np.arange(max(0, np.min(range_total) - stack_step), np.min(range_total))))
+                if np.any(ztrace == np.max(range_total)):
+                    range_stack = np.concatenate(
+                        (range_stack,
+                         np.arange(np.max(range_total) + 1,
+                                   min(zstack.shape[0], np.max(range_total) + stack_step + 1))))
+                if range_stack.size > 0:
+                    range_total = np.union1d(range_total, range_stack)
+                else:
+                    break
+            np.save(os.path.join(processed_path, f"zcorr_plane{plane}.npy"), zcorr)
+        else:
             zcorr = np.load(os.path.join(processed_path, f"zcorr_plane{plane}.npy"))
 
         # If we used the non-funciton channel (2) for alignment, we now need to use the registered Z stack of the
@@ -201,10 +234,6 @@ def process_s2p_singlePlane(
         # TODO (SS): smoothing_factor should be a parameter in user_defs.py
         F_profiles, N_profiles = extract_zprofiles(currDir, zstack, smoothing_factor=None, abs_zero=pops["absZero"])
 
-        # For each frame, determine which slice in the Z stack it matches best.
-        # TODO (SS): sigma should be a parameter in user_defs.py
-        ztrace = (np.nanargmax(sp.ndimage.gaussian_filter1d(
-            zcorr, 2, axis=0, mode='nearest'), axis=0)).astype(int)
         # Determine best reference depth.
         if pops["zcorrect_reference"] == "first":  # across first experiment
             reference_depth = np.nanmedian(ztrace[:ops['frames_per_folder'][0]]).astype(int)
@@ -212,7 +241,6 @@ def process_s2p_singlePlane(
             reference_depth = np.nanmedian(ztrace).astype(int)
 
         # Correct ROI and neuropil traces for z motion.
-        # TODO (SS): threshold should be a parameter in user_defs.py
         F_zcorrected, N_zcorrected = correct_zmotion(F, N, F_profiles, N_profiles, ztrace, reference_depth,
                                                      ignore_faults=pops["remove_z_extremes"],
                                                      frames_per_experiment=ops["frames_per_folder"])
@@ -259,8 +287,6 @@ def process_s2p_singlePlane(
     if pops["plot"]:
         plots_path = os.path.join(processed_path, 'plots')
         os.makedirs(plots_path, exist_ok=True)
-        if not 'best_plane' in locals():
-            best_plane = np.load(os.path.join(processed_path, f"bestPlane_plane{plane}.npy"))
 
         colors_paired = plt.get_cmap('Paired')
         n_frames = np.cumsum(ops['frames_per_folder'])
@@ -287,7 +313,6 @@ def process_s2p_singlePlane(
             plt.text(x, y, str(n), color='white', fontsize=12, ha='center', va='center', fontweight='bold')
         plt.title('ROI Masks')
         plt.tight_layout()
-        plt.show()
         plt.savefig(os.path.join(plots_path, '01_ROI_masks.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -303,7 +328,6 @@ def process_s2p_singlePlane(
                 plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
         plt.title('ROI Masks on Reference Image')
         plt.tight_layout()
-        plt.show()
         plt.savefig(os.path.join(plots_path, '02_ROI_masks_on_reference.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -320,7 +344,6 @@ def process_s2p_singlePlane(
                 plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
         plt.title('ROI Masks on Best Matching Slice in Stack')
         plt.tight_layout()
-        plt.show()
         plt.savefig(os.path.join(plots_path, '03_ROI_masks_on_stack_plane.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -333,7 +356,6 @@ def process_s2p_singlePlane(
         plt.imshow(rgb)
         plt.title('Reference Image (green) vs Best Matching Slice in Stack (red)')
         plt.tight_layout()
-        plt.show()
         plt.savefig(os.path.join(plots_path, '04_reference_vs_stack_plane.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -341,8 +363,7 @@ def process_s2p_singlePlane(
         os.makedirs(os.path.join(plots_path, 'ROIs'), exist_ok=True)
         for i in range(n_rois):
             # (A) Plot all data (complete time traces).
-            fig = plt.figure()
-            plt.get_current_fig_manager().window.wm_state('zoomed')
+            fig = plt.figure(figsize=(19.2, 9.76))
             gs = gridspec.GridSpec(4, 10)
 
             # (1) Z profile from ROI and neuropil masks, and low values of F and N traces recorded at different depths
@@ -361,7 +382,7 @@ def process_s2p_singlePlane(
                 plt.legend(
                     ['F(stack)', 'N(stack)', 'F(recording)', 'N(recording)'],
                     loc="upper left",
-                    bbox_to_anchor=(-1.1, 1)
+                    bbox_to_anchor=(-1.9, 1)
                 )
                 plt.axhline(reference_depth, color="k", linewidth=3)
                 plt.ylim(0, F_profiles.shape[0])
@@ -388,9 +409,9 @@ def process_s2p_singlePlane(
             plt.plot(F_zcorrected[:, i], color=colors_paired(0))
             plt.plot(N_zcorrected[:, i], color=colors_paired(6))
             plt.legend(
-                ["F(raw)", "N(raw)", "F(z-corrected)", "N(z-corrected)"],
+                ["F(raw)", "N(raw)", "F(z-corr.)", "N(z-corr.)"],
                 loc="upper right",
-                bbox_to_anchor=(1.11, 1)
+                bbox_to_anchor=(1.21, 1)
             )
             [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
             plt.xlim(0, F.shape[0])
@@ -402,9 +423,9 @@ def process_s2p_singlePlane(
             plt.plot(F_ncorrected[:, i], color=colors_paired(1))
             plt.plot(F0[:, i], color=colors_paired(2), linewidth=4)
             plt.legend(
-                ["F(n-pil corr.)", "F0"],
+                ["F(Npil corr.)", "F0"],
                 loc="upper right",
-                bbox_to_anchor=(1.11, 1)
+                bbox_to_anchor=(1.21, 1)
             )
             [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
             plt.xlim(0, F.shape[0])
@@ -417,7 +438,7 @@ def process_s2p_singlePlane(
             plt.legend(
                 ["dF/F"],
                 loc="upper right",
-                bbox_to_anchor=(1.11, 1)
+                bbox_to_anchor=(1.21, 1)
             )
             [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
             plt.xlim(0, F.shape[0])
@@ -425,14 +446,13 @@ def process_s2p_singlePlane(
             plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             fig.suptitle(f"ROI {i}", fontsize=20, fontweight='bold')
-            plt.show()
+            plt.subplots_adjust(right=0.85)
 
             plt.savefig(os.path.join(plots_path, 'ROIs', f"ROI{str(i).zfill(4)}.jpg"), format='jpg', dpi=300)
             plt.close()
 
             # (B) Plot traces in a zoomed-in view (first 500 frames).
-            fig = plt.figure()
-            plt.get_current_fig_manager().window.wm_state('zoomed')
+            fig = plt.figure(figsize=(19.2, 9.76))
             gs = gridspec.GridSpec(4, 10)
 
             # (1) Z profile from ROI and neuropil masks, and low values of F and N traces recorded at different depths
@@ -446,7 +466,7 @@ def process_s2p_singlePlane(
                 plt.legend(
                     ['F(recording)', 'N(recording)', 'F(stack)', 'N(stack)'],
                     loc="upper left",
-                    bbox_to_anchor=(-1.1, 1)
+                    bbox_to_anchor=(-1.9, 1)
                 )
                 plt.axhline(reference_depth, color="k", linewidth=3)
                 plt.gca().invert_yaxis()
@@ -479,7 +499,7 @@ def process_s2p_singlePlane(
             plt.legend(
                 ["F(raw)", "N(raw)", "F(z-corrected)", "N(z-corrected)"],
                 loc="upper right",
-                bbox_to_anchor=(1.11, 1)
+                bbox_to_anchor=(1.21, 1)
             )
             [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
             plt.xlim(zoom_window[0], zoom_window[1])
@@ -495,7 +515,7 @@ def process_s2p_singlePlane(
             plt.legend(
                 ["F(n-pil corr.)", "F0"],
                 loc="upper right",
-                bbox_to_anchor=(1.11, 1)
+                bbox_to_anchor=(1.21, 1)
             )
             [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
             plt.xlim(zoom_window[0], zoom_window[1])
@@ -509,7 +529,7 @@ def process_s2p_singlePlane(
             plt.legend(
                 ["dF/F"],
                 loc="upper right",
-                bbox_to_anchor=(1.11, 1)
+                bbox_to_anchor=(1.21, 1)
             )
             [plt.axvline(x, color="k", linewidth=1) for x in n_frames]
             plt.xlim(zoom_window[0], zoom_window[1])
@@ -517,6 +537,7 @@ def process_s2p_singlePlane(
             plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             fig.suptitle(f"ROI {i} (zoom-in)", fontsize=20, fontweight='bold')
+            plt.subplots_adjust(right=0.85)
 
             plt.savefig(os.path.join(plots_path, 'ROIs', f"ROI{str(i).zfill(4)}_zoomed.jpg"), format='jpg', dpi=300)
             plt.close()
@@ -603,7 +624,7 @@ def process_s2p_directory(
     else:
         p = ops['selected_plane']
         results = Parallel(n_jobs=jobnum, verbose=5)(
-            delayed(_process_s2p_singlePlane)(
+            delayed(process_s2p_singlePlane)(
                 pops, list([planeDirs[-1]]), zstackPath, saveDirectory, piezo[:, p].reshape(-1, 1), p
             )
             for p in [0]

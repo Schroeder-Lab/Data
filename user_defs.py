@@ -88,7 +88,8 @@ def create_2p_processing_ops():
         "debug": True,
         "plot": True,
         "f0_percentile": 8,
-        "f0_window": 300,
+        # "f0_window": 300,
+        "f0_window": 60,
         "Npil_f0_window": 60,
         # "zcorrect_mode": "Stack",
         "zcorrect_reference": "first", # "first" or "median"
