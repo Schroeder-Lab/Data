@@ -3,6 +3,7 @@ import traceback
 
 import cv2
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import skimage.io
 import tifffile
 from joblib import Parallel, delayed
@@ -19,7 +20,7 @@ from user_defs import create_2p_processing_ops
 zoom_window = (0, 5000)
 
 
-def _process_s2p_singlePlane(
+def process_s2p_singlePlane(
         pops, currDir, zstack_raw_path, saveDirectory, piezo, plane
 ):
     """
@@ -156,10 +157,10 @@ def _process_s2p_singlePlane(
                     ops_zcorr,
                     spacing=1,
                     piezo=np.vstack((piezo[:, plane:plane + 1],
-                                     np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
+                                     np.reshape(piezo[0:1, (plane + 1) % piezo.shape[1]], (1, 1)))),
                     target_image=ops['meanImg'],
                     channel=1,
-                    sigma=(2, 2 * pix_per_micron, 2 * pix_per_micron)
+                    sigma=(0.75, 0.75 * pix_per_micron, 0.75 * pix_per_micron)
                 )
                 # Save registered Z stack in the specified or default saveDir.
                 skimage.io.imsave(zstack_functional_path, zstack_functional)
@@ -173,7 +174,7 @@ def _process_s2p_singlePlane(
                 ops_zcorr,
                 spacing=1,
                 piezo=np.vstack((piezo[:, plane:plane + 1],
-                                 np.reshape(piezo[0:1, plane + 1 % piezo.shape[1]], (1, 1)))),
+                                 np.reshape(piezo[0:1, (plane + 1) % piezo.shape[1]], (1, 1)))),
                 target_image=refImg,
                 channel=channel,
                 sigma=(0.75, 0.75 * pix_per_micron, 0.75 * pix_per_micron)
@@ -286,6 +287,7 @@ def _process_s2p_singlePlane(
             plt.text(x, y, str(n), color='white', fontsize=12, ha='center', va='center', fontweight='bold')
         plt.title('ROI Masks')
         plt.tight_layout()
+        plt.show()
         plt.savefig(os.path.join(plots_path, '01_ROI_masks.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -301,6 +303,7 @@ def _process_s2p_singlePlane(
                 plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
         plt.title('ROI Masks on Reference Image')
         plt.tight_layout()
+        plt.show()
         plt.savefig(os.path.join(plots_path, '02_ROI_masks_on_reference.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -317,6 +320,7 @@ def _process_s2p_singlePlane(
                 plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
         plt.title('ROI Masks on Best Matching Slice in Stack')
         plt.tight_layout()
+        plt.show()
         plt.savefig(os.path.join(plots_path, '03_ROI_masks_on_stack_plane.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -329,6 +333,7 @@ def _process_s2p_singlePlane(
         plt.imshow(rgb)
         plt.title('Reference Image (green) vs Best Matching Slice in Stack (red)')
         plt.tight_layout()
+        plt.show()
         plt.savefig(os.path.join(plots_path, '04_reference_vs_stack_plane.jpg'), format='jpg', dpi=300)
         plt.close()
 
@@ -420,6 +425,7 @@ def _process_s2p_singlePlane(
             plt.tick_params(axis='y', right=True, labelleft=False, labelright=True)
 
             fig.suptitle(f"ROI {i}", fontsize=20, fontweight='bold')
+            plt.show()
 
             plt.savefig(os.path.join(plots_path, 'ROIs', f"ROI{str(i).zfill(4)}.jpg"), format='jpg', dpi=300)
             plt.close()
@@ -588,7 +594,7 @@ def process_s2p_directory(
         # Process specified planes. Return list with results for each plane. If no data for plane at planeRange[i]
         # exists (output from suite2p), results[i] will be None.
         results = [
-            _process_s2p_singlePlane(
+            process_s2p_singlePlane(
                 pops, planeDirs[plane], zstackPath, saveDirectory, piezo, plane
             )
             for plane in planeRange
