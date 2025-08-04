@@ -139,3 +139,4 @@ Ephys/preprocess.csv
 Ephys/user_defs_ephys.py
 
 workspace.xml
+/preprocess.csv

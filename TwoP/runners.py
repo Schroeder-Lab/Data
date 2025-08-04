@@ -225,6 +225,12 @@ def process_s2p_singlePlane(
             np.save(os.path.join(processed_path, f"zcorr_plane{plane}.npy"), zcorr)
         else:
             zcorr = np.load(os.path.join(processed_path, f"zcorr_plane{plane}.npy"))
+            range_total = np.where(~np.isnan(zcorr).any(axis=1))[0]
+            ztrace = np.nanargmax(
+                sp.ndimage.gaussian_filter1d(
+                    zcorr[range_total, :], 2, axis=0, mode='nearest'),
+                axis=0).astype(int)
+            ztrace = range_total[ztrace]
 
         # If we used the non-funciton channel (2) for alignment, we now need to use the registered Z stack of the
         # functional channel (1) to correct the recorded calcium traces.
@@ -275,13 +281,14 @@ def process_s2p_singlePlane(
 
     # Places all the results in a dictionary (dF/F, Z corrected dF/F,
     # z profiles, z traces and the cell locations in X, Y and Z).
+    # TODO: check that cellIDs are correctly returned.
     results = {
         "zCorr_stack": zcorr,
         "zTrace": ztrace,
         "zProfiles": F_profiles,
         "dff": dF,
         "locs": cellLocs,
-        "cellId": np.where(isCell[0, :].astype(bool))[0],
+        "cellId": np.where(isCell[:, 0].astype(bool))[0],
     }
 
     if pops["plot"]:
