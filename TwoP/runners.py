@@ -60,7 +60,6 @@ def process_s2p_singlePlane(
         - Cell locations in Y, X and Z: np.array[no. of ROIs, 3]
 
     """
-    # TODO (SS): what happens if None is returned?
     if not (os.path.exists(os.path.join(currDir, "F.npy"))):
         return None
     processed_path = os.path.join(saveDirectory, "2P_processed", f'plane{plane}')
@@ -71,6 +70,9 @@ def process_s2p_singlePlane(
     stat = np.load(os.path.join(currDir, "stat.npy"), allow_pickle=True)
     stat = stat[isCell[:, 0].astype(bool)]
     ops = np.load(os.path.join(currDir, "ops.npy"), allow_pickle=True).item()
+
+    if len(stat) == 0:
+        return None
 
     # Determine location of each ROI in 3D, in units of microns. Depth is relative to the top-most position of the
     # z-actuator (piezo).

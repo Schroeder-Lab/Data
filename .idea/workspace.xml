@@ -4,11 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Bug fixes">
+    <list default="true" id="bf6310d4-549d-4983-98fc-60c8565bbdee" name="Default Changelist" comment="Bug fixes + introduced global save directory">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TwoP/main_preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/main_preprocess.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TwoP/runners.py" beforeDir="false" afterPath="$PROJECT_DIR$/TwoP/runners.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/user_defs.py" beforeDir="false" afterPath="$PROJECT_DIR$/user_defs.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,7 +63,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "Python.main_preprocess.executor": "Run",
+    "Python.main_preprocess.executor": "Debug",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
@@ -174,7 +171,7 @@
       <workItem from="1753776038557" duration="28841000" />
       <workItem from="1754061440208" duration="3319000" />
       <workItem from="1754317824584" duration="13102000" />
-      <workItem from="1754389179257" duration="7718000" />
+      <workItem from="1754389179257" duration="8561000" />
     </task>
     <task id="LOCAL-00001" summary="Corrected import statements.&#10;Added TODOs">
       <option name="closed" value="true" />
@@ -288,7 +285,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754334475050</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="Bug fixes + introduced global save directory">
+      <option name="closed" value="true" />
+      <created>1754402114030</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1754402114030</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -320,7 +325,8 @@
     <MESSAGE value="More efficient computations of z_correlations + making figures" />
     <MESSAGE value="Changed calculation of F0" />
     <MESSAGE value="Bug fixes" />
-    <option name="LAST_COMMIT_MESSAGE" value="Bug fixes" />
+    <MESSAGE value="Bug fixes + introduced global save directory" />
+    <option name="LAST_COMMIT_MESSAGE" value="Bug fixes + introduced global save directory" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -335,10 +341,20 @@
           <line>657</line>
           <option name="timeStamp" value="17" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/TwoP/process_tiff.py</url>
+          <line>306</line>
+          <option name="timeStamp" value="18" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/TwoP/runners.py</url>
+          <line>240</line>
+          <option name="timeStamp" value="19" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Data$main_preprocess.coverage" NAME="main_preprocess Coverage Results" MODIFIED="1754394853662" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TwoP" />
+    <SUITE FILE_PATH="coverage/Data$main_preprocess.coverage" NAME="main_preprocess Coverage Results" MODIFIED="1754402168428" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/TwoP" />
   </component>
 </project>
