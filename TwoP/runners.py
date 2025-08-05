@@ -288,7 +288,7 @@ def process_s2p_singlePlane(
         "zProfiles": F_profiles,
         "dff": dF,
         "locs": cellLocs,
-        "cellId": np.where(isCell[:, 0].astype(bool))[0],
+        "cellId": np.where(isCell[:, 0].astype(bool))[0].reshape(-1, 1)
     }
 
     if pops["plot"]:
@@ -639,8 +639,6 @@ def process_s2p_directory(
     postTime = time.time()
     print("Processing took: " + str(postTime - preTime) + " ms")
 
-    # TODO: If plotting: ztraces of all planes.
-
     # Identify planes for which no data was found.
     ind_valid_planes = [i for i, res in enumerate(results) if res is not None]
     # Clip all signals the same length (to the shortest signal), and create vector with plane indices for each ROI.
@@ -656,6 +654,22 @@ def process_s2p_directory(
         # TODO: check this is correct for boutons.
         planes = np.append(planes, np.ones((len(results[i]['cellId']), 1)) * planeRange[i])
 
+    # TODO: If plotting: ztraces of all planes.
+    if pops["plot"]:
+        plot_path = os.path.join(saveDirectory, '2P_processed', 'plots')
+        os.makedirs(plot_path, exist_ok=True)
+        plt.figure(figsize=(15, 6))
+        plt.plot(np.stack([results[i]['zTrace'] for i in ind_valid_planes], axis=1))
+        plt.gca().invert_yaxis()
+        plt.legend(
+            planeRange[ind_valid_planes].astype(str)
+        )
+        plt.xlabel('Time (frames)')
+        plt.ylabel('Depth (um)')
+        plt.title('Z-traces of all planes')
+        plt.savefig(os.path.join(plot_path, "zTraces_allPlanes.jpg"), format='jpg', dpi=300)
+        plt.close()
+
     # TODO: check that all matrices have the correct shape.
     # Save results.
     np.save(os.path.join(saveDirectory, "2pPlanes.zCorrelations"),
@@ -669,7 +683,7 @@ def process_s2p_directory(
     np.save(os.path.join(saveDirectory, "2pRois.xyz.npy"),
             np.vstack([results[i]['locs'] for i in ind_valid_planes]))
     np.save(os.path.join(saveDirectory, "2pRois.ids.npy"),
-            np.vstack([results[i]['cellId'].T for i in ind_valid_planes]))
+            np.vstack([results[i]['cellId'] for i in ind_valid_planes]))
     np.save(os.path.join(saveDirectory, "2pRois.2pPlanes.npy"), planes)
 
 
@@ -1033,7 +1047,7 @@ def process_metadata_directory(
         )
 
 
-def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
+def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir, saveDir):
     """
     Gets all the base directories (suite2p, z Stack, metadata, save directory)
     and composes these directories for each experiment.
@@ -1049,7 +1063,6 @@ def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
             - Date
             - Zstack
             - IgnorePlanes
-            - SaveDir
             - Process
     s2pDir : string
         Filepath to the Suite2P processed folder. For more details on what this
@@ -1078,16 +1091,13 @@ def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
         specified, will be saved in the suite2p folder.
 
     """
-    # The data from each  dataEntry column is placed into variables.
     name = dataEntry.Name
     date = dataEntry.Date
     zstack = dataEntry.Zstack
-    saveDirectory = dataEntry.SaveDir
-    process = dataEntry.Process
 
     # Joins suite2p directory with the name and the date.
     s2pDirectory = os.path.join(s2pDir, name, date, "suite2p")
-    saveDirectory = os.path.join(saveDirectory, name, date)
+    saveDirectory = os.path.join(saveDir, name, date)
 
     # If this path doesn't exist, returns a ValueError.
     if not os.path.exists(s2pDirectory):
@@ -1098,7 +1108,6 @@ def read_csv_produce_directories(dataEntry, s2pDir, zstackDir, metadataDir):
     # or a NaN).
     if (type(zstack) is float) and (np.isnan(zstack)):
         zstackPath = None
-        zstackDirectory = None
     else:
         # Creates the Z Stack directory.
         zstackDirectory = os.path.join(zstackDir, name, date, str(zstack))

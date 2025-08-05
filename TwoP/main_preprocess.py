@@ -18,6 +18,7 @@ csvDir = dirs["dataDefFile"]
 s2pDir = dirs["preprocessedDataDir"]
 zstackDir = dirs["zstackDir"]
 metadataDir = dirs["metadataDir"]
+saveDir = dirs["saveDir"]
 pops = create_2p_processing_ops()
 
 # %% read database
@@ -31,7 +32,6 @@ database = pd.read_csv(
         "Date": str,
         "Zstack": str,
         "IgnorePlanes": str,
-        "SaveDir": str,
         "Process": bool,
     },
 )
@@ -50,7 +50,7 @@ for i in range(len(database)):
         metadataDirectory,
         saveDirectory,
     ) = read_csv_produce_directories(
-        database.loc[i], s2pDir, zstackDir, metadataDir
+        database.loc[i], s2pDir, zstackDir, metadataDir, saveDir
     )
     # Disregard imaging planes that user wants to ignore ( e.g., fly-back plane when using piezo as z-actuator).
     ignorePlanes = np.atleast_1d(
