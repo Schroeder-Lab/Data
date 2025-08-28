@@ -1,9 +1,9 @@
 import time
 import traceback
-
-import cv2
-import matplotlib.gridspec as gridspec
+# import cv2
+import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 import skimage.io
 import tifffile
@@ -17,6 +17,12 @@ from TwoP.general import *
 from TwoP.preprocess_traces import *
 from TwoP.process_tiff import *
 from user_defs import create_2p_processing_ops
+
+
+matplotlib.use('Qt5Agg')
+# matplotlib.use('TkAgg')
+plt.rcParams.update({'font.size': 6})
+
 
 zoom_window = (0, 5000)
 # TODO: make this a parameter in user_defs.py
@@ -1203,3 +1209,49 @@ def read_directory_dictionary(dataEntry, s2pDirectory):
         dataPaths.append(os.path.join(s2pDirectory, str(e)))
 
     return dataPaths
+
+
+def preprocess(config, definitions):
+    # %% run over definitions
+    for i in range(len(definitions)):
+        if not definitions.loc[i]["Process"]:
+            continue
+
+        print("reading directories" + str(definitions.loc[i]))
+        # Get relevant directory paths.
+        (
+            suite2p_directory,
+            zstackPath,
+            metadataDirectory,
+            saveDirectory,
+        ) = read_csv_produce_directories(
+            definitions.loc[i], s2pDir, zstackDir, metadataDir, saveDir
+        )
+        # Disregard imaging planes that user wants to ignore ( e.g., fly-back plane when using piezo as z-actuator).
+        ignorePlanes = np.atleast_1d(
+            np.array(definitions.loc[i]["IgnorePlanes"]).astype(int)
+        )
+        # Load parameters that were used to process data with Suite2p.
+        ops = get_ops_file(suite2p_directory)
+        if pops["process_suite2p"]:
+            print("getting piezo data")
+            # Returns the movement of the piezo (in microns along depth, relative to top-most position of piezo
+            # trace) aligned to onset of each frame.
+            piezo = get_piezo_data(ops)
+            print("processing suite2p data")
+            # Call main processing function.
+            process_s2p_directory(
+                suite2p_directory,
+                pops,
+                piezo,
+                zstackPath,
+                saveDirectory=saveDirectory,
+                ignorePlanes=ignorePlanes,
+                debug=pops["debug"],
+            )
+
+        if pops["process_bonsai"]:
+            print("Reading bonsai data")
+            process_metadata_directory(
+                metadataDirectory, ops, pops, saveDirectory
+            )

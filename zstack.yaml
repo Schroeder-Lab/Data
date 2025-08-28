@@ -1,0 +1,20 @@
+method: zstack
+
+definitions: "../preprocess_neurons.csv"
+
+directories:
+  suite2p_data: "Z:/ProcessedData"
+  zstacks: "Z:/RawData"
+  output: "D:/Data/2P_processed"
+
+delta_F:
+  absolute_zero: -19520
+  F0_percentile: 8
+  F0_window: 60 # in seconds
+  plot: True
+
+z_correction:
+  reference: first
+  remove_outliers: True
+
+
