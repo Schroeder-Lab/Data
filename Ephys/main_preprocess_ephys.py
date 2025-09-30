@@ -42,6 +42,7 @@ database = pd.read_csv(
         "Name": str,
         "Date": str,
         "Experiments": str, 
+        "EphysExp":str,
         "SaveDir": str,
         "Sync": bool,
         "Process": bool

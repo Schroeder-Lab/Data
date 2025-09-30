@@ -399,12 +399,13 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
     name = dataEntry.Name
     date = dataEntry.Date
     experiments = dataEntry.Experiments
+    ephysexp = dataEntry.EphysExp
     saveDirectory = dataEntry.SaveDir
     sync = dataEntry.Sync
     process = dataEntry.Process
 
     # Joins ephys directory with the name and the date.
-    ephysDirectory = os.path.join(metadataDir, name, date, f'{name}_{date}_g0',
+    ephysDirectory = os.path.join(metadataDir, name, date, ephysexp, f'{name}_{date}_g0',
                                   f'{name}_{date}_g0_imec0')
 
     # If this path doesn't exist, returns a ValueError.
@@ -424,7 +425,7 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
 
     if not type(saveDirectory) is str:
         
-        saveDirectory = os.path.join(preprocessedDataDir, name, date)
+        saveDirectory = os.path.join(preprocessedDataDir, name, date, ephysexp)
         preprocessedDirectory = saveDirectory
         
         if not os.path.isdir(saveDirectory):
@@ -432,7 +433,7 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
        
     else:
         
-        preprocessedDirectory =  os.path.join(preprocessedDataDir, name, date)
+        preprocessedDirectory =  os.path.join(preprocessedDataDir, name, date, ephysexp)
         
         saveDirectory = os.path.join(saveDirectory, "PreprocessedFiles")
         

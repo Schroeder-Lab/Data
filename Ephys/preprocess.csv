@@ -1,3 +1,2 @@
-﻿Name,Date,Experiments,SaveDir,Sync,Process
-FG006,2023-11-10,"4",,FALSE,TRUE
-
+﻿Name,Date,Experiments,EphysExp,SaveDir,Sync,Process
+FG009,2024-06-01,"2",exp01,C:\Users\Florencia\Desktop\FG009_2024-06-01,FALSE,TRUE
