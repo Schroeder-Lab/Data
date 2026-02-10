@@ -477,6 +477,7 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
         
         preprocessedDirectory =  os.path.join(preprocessedDataDir, name, date, ephysexp)
         
+        saveDirectory = os.path.join(saveDirectory, name, date, ephysexp)
         
         if not os.path.isdir(saveDirectory):
             os.makedirs(saveDirectory)     
