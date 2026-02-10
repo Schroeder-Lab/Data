@@ -263,65 +263,107 @@ def process_metadata_directory_ephys(
                 vfile =  glob.glob(os.path.join(di, "VideoBottom*.avi"))[0]  # body
                 video2 = cv2.VideoCapture(vfile)
 
-                #TODO: detect if there is an interval at the begining of session/ corrupted videos?
-
                 # number of frames
                 nframes1 = int(video1.get(cv2.CAP_PROP_FRAME_COUNT))
                 nframes2 = int(video2.get(cv2.CAP_PROP_FRAME_COUNT))
+                
+                if nframes1 <= 0 or nframes2 <= 0:
+                    raise ValueError("VideoCapture failed or frame count is zero.")
 
                 # 1) chek if the difference in pulses or TTL is 1 or 0, in case of one discard the last element 
                 # 2) Higher diference than 1, Check manually what happened, pass
                 # 3) 
-    
-                if len(cam1times) < nframes1:
-                    if (nframes1 - len(cam1times)) < 65:
-                        if (nframes1 - len(cam1times)) == 1:
-                            cam1times = np.append(cam1times, np.nan)
+                
+                print('FACE Camera times:' , len(cam1times))
+                print('FACE N frames:' , nframes1)
+                
+                if (len(cam1times) - nframes1) == 0:
+                    faceTimes.append(cam1times)
+                
+                else:
+                    if len(cam1times) < nframes1:
+                        
+                        plt.figure()
+                        plt.plot(at[:5000],camera1[:5000])
+                        plt.show()
+                        
+                        
+                        if (cam1times[0] - at[0]) > 3:
+                            added = np.full((nframes1 - len(cam1times)), np.nan)
+                            cam1times = np.append(cam1times, added)
                             faceTimes.append(cam1times)
-                        else:    
+                            print('FACE: Sync with gap at the begin. Corrected')
+                        
+                        elif (nframes1 - len(cam1times)) < 65:
                             added = np.full((nframes1 - len(cam1times)), np.nan)
                             cam1times = np.append(added, cam1times)
                             faceTimes.append(cam1times)
-                            print(f'''Extreme correction performed (FG003 cases).''')
-                else:
-                    if (len(cam1times) - nframes1) == 1:
-                        cam1times = cam1times[:-1]
-                        faceTimes.append(cam1times)
-                    elif (len(cam1times) - nframes1) == 0:
-                        faceTimes.append(cam1times)
-                    else:
-                        print(f'''More than 1 extra TTL pulses than frames in face 
-                              camera from {di}. Check data.''')
+                            print(f'FACE: Extreme correction performed (FG003 cases).')
+                        
+                        else:
+                            cam1times = np.full(nframes1, np.nan)
+                            faceTimes.append(cam1times)
+                            print('FACE: Not corrected, completed with np.nan')
+                        
+                    elif len(cam1times) > nframes1:
+                        
+                        plt.figure()
+                        plt.plot(at[:5000],camera1[:5000])
+                        plt.show()
+                        
+                        if (cam1times[0] - at[0]) > 3:
+                            remove = len(cam1times) - nframes1
+                            cam1times = cam1times[:-remove]
+                            faceTimes.append(cam1times)
+                            print('FACE: Sync with gap at the begin. Corrected')
+                        
+                        else:
+                            cam1times = np.full(nframes1, np.nan)
+                            faceTimes.append(cam1times)
+                            print('FACE: Not corrected, completed with np.nan')
                 
-                if len(cam2times) < nframes2:
-                    if (nframes2 - len(cam2times)) <65:
-                        if (nframes2 - len(cam2times)) <= 2:
+                print('BODY Camera times:' , len(cam2times))
+                print('BODY N frames:' , nframes2)
+                
+                if (len(cam2times) - nframes2) == 0:
+                    bodyTimes.append(cam2times)
+                
+                else:
+                    if len(cam2times) < nframes2:
+                
+                        if (cam2times[0] - at[0]) > 3:
                             added = np.full((nframes2 - len(cam2times)), np.nan)
                             cam2times = np.append(cam2times, added)
                             bodyTimes.append(cam2times)
-                        else:         
-                            added = np.full((nframes2 - len(cam2times)-1), np.nan)
+                            print('BODY: Sync with gap at the begin. Corrected')
+                            print('')
+                        
+                        elif (nframes2 - len(cam2times)) < 65:
+                            added = np.full((nframes2 - len(cam2times)), np.nan)
                             cam2times = np.append(added, cam2times)
-                            cam2times = np.append(cam2times, np.nan)
                             bodyTimes.append(cam2times)
-                            print(f'''Extreme correction performed (FG003 cases).''')
-                else:
-                    if (len(cam2times) - nframes2) == 1:
-                        cam2times = cam2times[:-1]
-                        bodyTimes.append(cam2times)
-                    elif (len(cam2times) - nframes2) == 0:
-                        bodyTimes.append(cam2times)
-                    else:
-                        print(f'''More than 1 extra TTL pulses than frames in body 
-                              camera from {di}. Check data.''')
-                        # Adds the face times to the faceTimes list.
-                        # faceTimes.append(cam1times)
-                        # Adds the body times to the bodyTimes list.
-                        # bodyTimes.append(cam2times)
-                   
-                        # except:
-                        #     print("Error in arduino processing in directory: " + di)
-                        #     print(traceback.format_exc())
+                            print(f'BODY: Extreme correction performed (FG003 cases).')
+                        
+                        else:
+                            cam2times = np.full(nframes2, np.nan)
+                            bodyTimes.append(cam2times)
+                            print('BODY: Not corrected, completed with np.nan')
+                            print('')
+                    
+                    elif len(cam2times) > nframes2:
+                    
+                        if (cam2times[0] - at[0]) > 3:
+                            remove = len(cam2times) - nframes2
+                            cam2times = cam2times[:-remove]
+                            bodyTimes.append(cam2times)
+                            print('BODY: Sync with gap at the begin. Corrected')
+                            print('')
+                        else:
+                            cam2times = np.full(nframes2, np.nan)
+                            bodyTimes.append(cam2times)
+                            print('BODY: Not corrected, completed with np.nan')
+                            print('')
+                
             except:
                     print("Error in camera processing in directory: " + di)
                     print(traceback.format_exc())
@@ -435,7 +477,6 @@ def read_csv_produce_directories_ephys(dataEntry, metadataDir, preprocessedDataD
         
         preprocessedDirectory =  os.path.join(preprocessedDataDir, name, date, ephysexp)
         
-        saveDirectory = os.path.join(saveDirectory, "PreprocessedFiles")
         
         if not os.path.isdir(saveDirectory):
             os.makedirs(saveDirectory)     
