@@ -1,0 +1,8 @@
+datasets: "C:\dev\workspaces\SchroederLab\depth-for-2p\preprocess_neurons.csv"
+
+directories:
+  raw: 'Z:\RawData\{Name}\{Date}'
+  suite2p: 'Z:\ProcessedData\{Name}\{Date}\suite2p'
+  output: 'D:\Data\Bonsai\{Name}\{Date}'
+
+

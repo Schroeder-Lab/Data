@@ -13,31 +13,13 @@ Remember to set create_ops_boutton_registration for the options that suit your r
 Set  get_sparsenoise_info with only one session and the save directory 
 
 """
-
-
-from TwoP.runners import read_directory_dictionary
+from TwoP.main_metadata import process_metadata_directory
 from user_defs import (
     define_directories,
     create_sparse_registration,
     get_sparsenoise_info,
 )
-import numpy as np
-import pandas as pd
-import time
-import os
-import shutil
-from suite2p.registration import register, rigid, bidiphase
 from suite2p.io import tiff_to_binary, BinaryFile
-from suite2p import io
-from suite2p import default_ops
-from tifffile import imread
-import matplotlib.pyplot as plt
-from natsort import natsorted
-import imp
-from suite2p import default_ops
-from suite2p.registration import utils, rigid
-from suite2p import run_s2p
-from TwoP.registration_defs import *
 from TwoP.runners import *
 
 
