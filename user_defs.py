@@ -1,16 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Nov  3 09:35:05 2022
-
-@author: LABadmin
-"""
 from suite2p import default_ops
 import pandas as pd
 import pathlib
 import os
 
-# define directories # Change to a different file
-
+# TODO (SS): check which functions are used.
 
 def define_directories():
     """
@@ -20,8 +13,8 @@ def define_directories():
 
     Returns
     -------
-    csvDir : str ["YourDirectoryPath\preprocess.csv"]
-        The preprocess csv file location and name. Ths file has to contain the following information:
+    dataDefFile : str ["YourDirectoryPath\preprocess.csv"]
+        The preprocess csv file location and name. The file has to contain the following information:
            - Name of the Animal.
            - Date of the experiment (YYYY-MM-DD).
            - ZStack directory number (within each experiment, which folder contains the Z stack).
@@ -30,9 +23,9 @@ def define_directories():
            - Whether to process the specified experiment or not (TRUE or FALSE).
            Please also have a look at the example csv on GitHub (named example_preprocess.csv)
 
-    s2pDir : str ["YourDirectoryPath"]
+    preprocessedDataDir : str ["YourDirectoryPath"]
         The main directory where the suite2p folders are located; The assumed folder structure for the
-        subfolders in this directory is: s2pDir\\[animal]\\[date]\\suite2p\\[folders for each plane]\\
+        subfolders in this directory is: preprocessedDataDir\\[animal]\\[date]\\suite2p\\[folders for each plane]\\
             The folders for each plane have to contain these files:
             - Registered movie in the form of a binary file (data.bin). Make sure this is
               present as it is IMPORTANT FOR Z STACK REGISTRATION but bear in mind it is a very large file.
@@ -41,7 +34,6 @@ def define_directories():
             - The iscell file which indicates whether an ROI was classified as a cell or not (iscell.npy).
             - The ops file which indicates all the suite2p input settings specified by the user (ops.npy).
             - The stat file which indicates all the suite2p metadata (such as ROI locations in XY plane) (stat.npy).
-
 
     zstackDir : str ["YourDirectoryPath"]
         The main folder where the zStack is located. IMPORTANT Z STACK REGISTRATION
@@ -63,28 +55,13 @@ def define_directories():
     """
 
     directoryDb = {
-        # "D:\\dlc.csv",  # "D:\\preprocess.csv",
-        # "D:\\fitting_all.csv",  # "D:\\preprocessBoutons.csv",
-        # "D:\\dlc.csv",  # "D:\\fitting_all.csv",  # "D:\\preprocess.csv",
-        # "D:\\preprocess.csv",  # "D:\\preprocessZCorrTest.csv",
-
-        "dataDefFile": "D:\\preprocess_Z.csv",  # "D:\\fitting_all.csv",
-        # "dataDefFile":  "D:\\preprocessTmp.csv",#"D:\\preprocessZCorrTest.csv",  # "D:\\fitting_all.csv",
-
-        # "Z:\\ProcessedData\\",  # "D:\\Test\\",
-        # "Z:\\ProcessedData\\",  # "Z:\\ProcessedData\\",
-        # "Z:\\ProcessedData\\",
-        # r"D:\\ZcorrectionTest\\BoutonsCorrected\\",
-        # "Z:\\ProcessedData\\",
-        # "preprocessedDataDir": r"D:\LongitudinalTest",  # "Z:\\ProcessedData\\",
-        # "D:\\ZcorrectionTest\\NeuronsRed\\",
-        "preprocessedDataDir":"Z:\\ProcessedData\\", #"D:\ZcorrectionTest\\Neurons",
+        "dataDefFile": "../preprocess.csv",
+        "preprocessedDataDir": "Z:\\ProcessedData\\",
         "zstackDir": "Z:\\RawData\\",
-        "metadataDir":   "Z:\\RawData\\"  #   # "D:\\Test\\" #", # "D:\\"
+        "metadataDir": "Z:\\RawData\\",
+        "saveDir": "D:\\Data\\2P_processed"
     }
-    return (
-        directoryDb  # dataDefFile, preprocessedDataDir, zstackDir, metadataDir
-    )
+    return directoryDb
 
 
 def create_2p_processing_ops():
@@ -110,11 +87,13 @@ def create_2p_processing_ops():
     """
     pops = {
         "debug": True,
-        "plot": False,
+        "plot": True,
         "f0_percentile": 8,
-        "f0_window": 300,
+        # "f0_window": 300,
+        "f0_window": 60,
         "Npil_f0_window": 60,
-        "zcorrect_mode": "Stack",
+        # "zcorrect_mode": "Stack",
+        "zcorrect_reference": "first", # "first" or "median"
         "remove_z_extremes": True,
         "process_suite2p": True,
         "process_bonsai": False,
@@ -187,6 +166,7 @@ def create_ops_boutton_registration(filePath, saveDir=None):
 
     return ops
 
+
 def create_ops_neuron_registration(filePath, saveDir=None):
     ops = default_ops()
     ops["data_path"] = filePath[1:]
@@ -232,11 +212,12 @@ def create_ops_neuron_registration(filePath, saveDir=None):
     ops["spatial_scale"] = 1
     ops["threshold_scaling"] = 1.5
     ops["high_pass"] = 50
-    
+
     ops["fs"] = 7.4925
     ops["spikedetect"] = 0
 
     return ops
+
 
 def create_sparse_registration(filePath, saveDir=None):
     ops = default_ops()
@@ -293,9 +274,10 @@ def create_fitting_ops():
         # "save_dir": r"C:\\OneDrive\\OneDrive - University of Sussex\\PreprocessedData\\fitting1\\fitting_new\\",
         # "processed files": "Z:\\ProcessedData\\",
         # "fitting_list": [r"E:\\fitting_all_neurons.csv"],
-        "save_dir": "D:\\fitting_test_Contrast\\Modified",#"D:\\fittingPupilTest\\",#r"D:\\fitting_test_Contrast\\Modified",#,#r,r"D:\\fittingNE"
+        "save_dir": "D:\\fitting_test_Contrast\\Modified",
+        # "D:\\fittingPupilTest\\",#r"D:\\fitting_test_Contrast\\Modified",#,#r,r"D:\\fittingNE"
         "processed files": "Z:\\ProcessedData",
-        "fitting_list":["D:\\fitting_all.csv"],#, ["D:\\fittingNE.csv"]
+        "fitting_list": ["D:\\fitting_all.csv"],  # , ["D:\\fittingNE.csv"]
 
         # how to classify trials can be: "running"/"pupil"/"pupil-stationary"
         "classification": "running",
@@ -304,7 +286,7 @@ def create_fitting_ops():
         "fitTf": True,
         "fitSf": True,
         "fitContrast": True,
-        #regular or modified
+        # regular or modified
         "contrastType": 'modified',
         "runOn": True,
         "runOff": True,
@@ -473,9 +455,6 @@ def directories_to_register():
         #     "Experiments": [2, 3, 4, 5],
         # },
 
-
-
-
         # {
         #     "Name": "Memphis",
         #     "Date": "2023-10-05",
@@ -491,12 +470,6 @@ def directories_to_register():
         #     "Date": "2023-11-07",
         #     "Experiments": [1, 2, 3],
         # },
-
-
-
-
-
-
 
         # {
         #     "Name": "Styx",
@@ -519,15 +492,11 @@ def directories_to_register():
         #     "Experiments": [2, 3, 4, 5, 6],
         # },
 
-
-
         # {
         #     "Name": "Styx",
         #     "Date": "2024-02-20",
         #     "Experiments": [2, 3, 4, 5, 6, 7, 8],
         # },
-
-
 
         # {
         #     "Name": "Styx",
@@ -540,15 +509,11 @@ def directories_to_register():
         #     "Experiments": [2, 3, 4, 5, 6, 7],
         # },
 
-
-
         # {
         #     "Name": "Stereopes",
         #     "Date": "2024-01-29",
         #     "Experiments": [2, 4, 5, 6, 7],
         # },
-
-
 
         # {
         #     "Name": "Stereopes",
@@ -613,76 +578,75 @@ def directories_to_register():
         {
             "Name": "SS123",
             "Date": "2024-08-22",
-            "Experiments": [1,2,3],
+            "Experiments": [1, 2, 3],
         },
         {
             "Name": "SS123",
             "Date": "2024-08-28",
-            "Experiments": [2,3],
+            "Experiments": [2, 3],
         },
         {
             "Name": "SS123",
             "Date": "2024-09-05",
-            "Experiments": [2,3],
+            "Experiments": [2, 3],
         },
         {
             "Name": "SS123",
             "Date": "2024-09-12",
-            "Experiments": [2,3,4],
+            "Experiments": [2, 3, 4],
         },
         {
             "Name": "SS123",
             "Date": "2024-09-13",
-            "Experiments": [1,2,3],
+            "Experiments": [1, 2, 3],
         },
         {
             "Name": "SS123",
             "Date": "2024-09-19",
-            "Experiments": [2,3,4],
+            "Experiments": [2, 3, 4],
         },
 
     ]
     dirDefs = [
-         {
-             "Name": "SS131",
-             "Date": "2025-02-04 A",
-             "Experiments": [2],
-         },
-         
-         ##DONE
-          {
-              "Name": "SS131",
-              "Date": "2025-02-04 B",
-              "Experiments": [4],
-          },
-          {
-              "Name": "SS131",
-              "Date": "2025-02-04 C",
-              "Experiments": [6],
-          },
-          {
-              "Name": "SS131",
-              "Date": "2025-02-04 D",
-              "Experiments": [8],
-          },
-          {
-              "Name": "SS131",
-              "Date": "2025-02-04 E",
-              "Experiments": [10],
-          },
-          {
-              "Name": "SS131",
-              "Date": "2025-02-05 A",
-              "Experiments": [1,2,3,4],
-          },
-          {
-              "Name": "SS131",
-              "Date": "2025-02-05 B",
-              "Experiments": [6,7,8],
-          },         
-         
-         
-         ]
+        {
+            "Name": "SS131",
+            "Date": "2025-02-04 A",
+            "Experiments": [2],
+        },
+
+        ##DONE
+        {
+            "Name": "SS131",
+            "Date": "2025-02-04 B",
+            "Experiments": [4],
+        },
+        {
+            "Name": "SS131",
+            "Date": "2025-02-04 C",
+            "Experiments": [6],
+        },
+        {
+            "Name": "SS131",
+            "Date": "2025-02-04 D",
+            "Experiments": [8],
+        },
+        {
+            "Name": "SS131",
+            "Date": "2025-02-04 E",
+            "Experiments": [10],
+        },
+        {
+            "Name": "SS131",
+            "Date": "2025-02-05 A",
+            "Experiments": [1, 2, 3, 4],
+        },
+        {
+            "Name": "SS131",
+            "Date": "2025-02-05 B",
+            "Experiments": [6, 7, 8],
+        },
+
+    ]
 
     return pd.DataFrame(dirDefs)
 

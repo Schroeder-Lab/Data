@@ -17,7 +17,7 @@ from suite2p.registration import utils, rigid
 from suite2p import run_s2p
 
 import contextlib
-from Data.TwoP.runners import read_directory_dictionary
+from TwoP.runners import read_directory_dictionary
 from suite2p.io import tiff_to_binary, BinaryFile  # BinaryRWFile
 from suite2p.io.utils import init_ops
 import glob
@@ -26,7 +26,7 @@ from os import path
 import os
 import shutil
 
-from Data.user_defs import *
+from user_defs import *
 
 import pandas as pd
 

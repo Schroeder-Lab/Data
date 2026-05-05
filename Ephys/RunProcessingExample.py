@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 import scipy as sp
 
 
+
 # s2pDirectory = 'D:\\Suite2Pprocessedfiles\\Hedes\\2022-03-23\\suite2p\\plane1\\'
 s2pDirectory = "D:\\Suite2Pprocessedfiles\\SS113\\2022-07-11\\suite2p\\plane1\\"
 # zstackPath = 'Z:\\RawData\\SS113\\2022-07-11\\4\\file_00001_00001.tif'

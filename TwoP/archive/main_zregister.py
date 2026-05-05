@@ -13,8 +13,8 @@ from zregister_function import *
 from registration_defs import *
 from joblib import Parallel, delayed
 from zregister_function import *
-from Data.user_defs import *
-from Data.user_defs import directories_to_register
+from user_defs import *
+from user_defs import directories_to_register
 import pandas as pd
 import traceback
 
