@@ -728,11 +728,9 @@ def get_piezo_data(ops):
     return planePiezo
 
 
-def process_stimulus(titles, directory, frameChanges):
-    # go to first column, where the name of the protocol should appear
-    results = stimulus_prcoessing_dictionary[titles[0][0]](
-        directory, frameChanges)
-    return results
+def process_stimulus(titles, directory):
+    results, num_trials, protocol = stimulus_processing_dictionary[titles](directory)
+    return results, num_trials, protocol
 
 
 def save_stimuli(saveDirectory, stimulusTypes, stimulusProps):

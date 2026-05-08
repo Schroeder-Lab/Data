@@ -1,11 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Jan 12 09:51:58 2024
-
-@author: liad0
-"""
 import numpy as np
-from Bonsai.log_extraction_functions import get_stimulus_info, get_sparse_noise
+from Bonsai_TwoP.log_extraction_functions import get_stimulus_info, get_sparse_noise
 import glob
 import os
 import warnings
@@ -107,50 +101,28 @@ def stimulus_sparse(directory, frameChanges):
             }
 
 
-def stimulus_gratings(directory, frameChanges):
-
-    # Gets the identity of the stimuli (see function for
-    # further details).
+def stimulus_gratings(directory):
     stimProps = get_stimulus_info(directory)
-    # Gets the start times of each stimulus.
-    st = frameChanges[::2].reshape(-1, 1).copy()
-    # Gets the end times  of each stimulus.
-    et = frameChanges[1::2].reshape(-1, 1).copy()
-
-    # Checks if number of frames and stimuli match (if not, there
-    # could have been an issue with the photodiode, check if there
-    # are irregular frames in the photodiode trace).
-    if len(stimProps) != len(st):
-        # raise ValueError(
-        #     "Number of frames and stimuli do not match. Skpping"
-        # )
-        warnings.warn("Number of frames and stimuli do not match")
-        if (len(et) == len(stimProps)):
-            warnings.warn(
-                "Assuming there was a false photodiode rise in the beginning, but check!")
-            st = frameChanges[1::2].reshape(-1, 1).copy()
-            # Gets the end times  of each stimulus.
-            et = frameChanges[2::2].reshape(-1, 1).copy()
-    # Adds the start and end times from above to the respective
-    # lists.
 
     if "Reward" in stimProps.columns:
-        reward = np.array(
-            [x in "True" for x in np.array(stimProps.Reward)]).reshape(-1, 1).astype(bool).copy()
+        reward = np.array([value == "True" for value in stimProps.Reward], dtype=bool).reshape(-1, 1).copy()
     else:
-        reward = np.ones_like(st) * np.nan
+        reward = None
 
-    return {"gratings.startTime.npy": st,
-            "gratings.endTime.npy": et,
-            "gratings.direction.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
-            "gratings.spatialF.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-            "gratings.temporalF.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-            "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
-            "gratings.reward.npy": reward,
-            "gratingsExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
-            # TODO: check if this is usefull; should add same line to gratings
-            "gratingsExp.description.npy": "Gratings",
-            }
+    result = {
+        "grating.directions.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+        "grating.spatialFrequencies.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "grating.temporalFrequencies.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "grating.contrasts.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "gratingExp.description.npy": "Gratings"
+    }
+
+    if reward is not None:
+        result["grating.reward.npy"] = reward
+
+    num_trials = len(stimProps)
+
+    return result, num_trials, "grating"
 
 
 def stimulus_gratingsLuminance(directory, frameChanges):
@@ -513,7 +485,7 @@ def stimulus_classificationExtended(directory, frameChanges):
             }
     
 
-stimulus_prcoessing_dictionary = {
+stimulus_processing_dictionary = {
     "Gratings": stimulus_gratings,
     "GratingsReward": stimulus_gratings_reward,
     "Circles": stimulus_circles,

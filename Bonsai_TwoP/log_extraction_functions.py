@@ -15,8 +15,6 @@ from TwoP.general import get_file_in_directory
 
 def get_stimulus_info(filePath, props=None):
     """
-
-
     Parameters
     ----------
     filePath : str
@@ -32,67 +30,33 @@ def get_stimulus_info(filePath, props=None):
         props and their values.
 
     """
-    # Gets the experimental details from the props file
+    # Get stimulus variables from props file (if not provided).
     if props is None:
         dirs = glob.glob(os.path.join(filePath, "props*.csv"))
         if len(dirs) == 0:
             print("ERROR: no props file given")
             return None
 
-        props = np.loadtxt(dirs[0], delimiter=",", dtype=str)
-        props = props[1:]
+        props = np.loadtxt(dirs[0], delimiter=",", dtype=str)[1:]
+
     props = np.atleast_1d(props)
-    # Gets the log file which contains all the parameters for each stimulus
-    # presentation.
+
+    # Gets recorded data from the log file.
     logPath = glob.glob(os.path.join(filePath, "Log*"))
-    if len(logPath) == 0:
+    if not logPath:
         return None
-    logPath = logPath[
-        0
-    ]  # Gets the first log file in case there's more than 1.
-    # Creates a dictionary for the stimulus properties.
+    logPath = logPath[0]
+
+    # Gets the values for each stimulus repetition for all the parameters.
     StimProperties = {}
-    # for p in range(len(props)):
-    #     StimProperties[props[p]] = []
-
-    searchTerm = ""
-    # Finds the different parameters defined in the props file.
-    for p in range(len(props)):
-        searchTerm += props[p] + "=([a-zA-Z0-9_.-]*)"
-
-        if p < len(props) - 1:
-            searchTerm += "|"
-    # Reads the log csv file.
     with open(logPath, newline="") as csvfile:
         allLog = csvfile.read()
-    # Gets the values for each stimulus repetition for all the parameters.
-    for p in range(len(props)):
-        m = re.findall(props[p] + "=([.-a-zA-Z0-9_\\\\]*)", allLog)
-        # Appends the list of each parameter into a dictionary.
-        if len(m) > 0:
-            StimProperties[props[p]] = m
-    #         # #         stimProps[props[p]] = a[p]
-    #         # #     StimProperties.append(stimProps)
 
-    # with open(logPath, newline='') as csvfile:
-    #     reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
-    #     for row in reader:
-    #         # m = re.findall(props[p]+'=(\d*)', row[np.min([len(row)-1,p])])
-    #         m = re.findall(searchTerm, str(row))
-    #         if (len(m)>0):
-    #             StimProperties.append(m)
-    #         # a = []
-    #         # for p in range(len(props)):
-    #         #     # m = re.findall(props[p]+'=(\d*)', row[np.min([len(row)-1,p])])
-    #         #     m = re.findall(props[p]+'=([a-zA-Z0-9_.-]*)', row[np.min([len(row)-1,p])])
-    #         #     if (len(m)>0):
-    #         #         # a.append(m[0])
-    #         #         StimProperties[props[p]].append(m[0])
-    #         # # if (len(a)>0):
-    #         # #     stimProps = {}
-    #         # #     for p in range(len(props)):
-    #         # #         stimProps[props[p]] = a[p]
-    #         # #     StimProperties.append(stimProps)
+    for prop in props:
+        matches = re.findall(prop + r"=([.-a-zA-Z0-9_\\\\]*)", allLog)
+        if matches:
+            StimProperties[prop] = matches
+
     # Returns a pandas dataframe of the stimulus properties dictionary.
     return pd.DataFrame(StimProperties)
 
