@@ -1,4 +1,4 @@
-datasets: "C:\dev\workspaces\SchroederLab\depth-for-2p\preprocess_neurons.csv"
+datasets: 'C:\dev\workspaces\SchroederLab\depth-for-2p\preprocess_neurons.csv'
 
 directories:
   raw: 'Z:\RawData\{Name}\{Date}'

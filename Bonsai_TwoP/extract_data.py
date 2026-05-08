@@ -10,20 +10,13 @@ import scipy as sp
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error
 import os
-from TwoP.general import *
-from TwoP.general import get_file_in_directory
-from Bonsai.behaviour_protocol_functions import *
+from scipy.signal import correlate, correlation_lags
 
-"""Pre-process data recorded with Bonsai."""
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Apr 13 09:26:53 2022
-
-@author: Liad J. Baruchin
-"""
+from TwoP import general
+from Bonsai_TwoP.behaviour_protocol_functions import *
 
 
-def get_nidaq_channels(niDaqFilePath, numChannels=None, plot=False):
+def get_nidaq_channels(niDaqFilePath, sampling_rate, numChannels=None, plot=False):
     """
     Gets the nidaq channels.
 
@@ -51,16 +44,16 @@ def get_nidaq_channels(niDaqFilePath, numChannels=None, plot=False):
             print("ERROR: no channel file and no channel number given")
             return None
         channels = np.loadtxt(dirs[0], delimiter=",", dtype=str)
+        channels = np.array([s.lower() for s in channels])
         if len(channels.shape) > 0:
             numChannels = len(channels)
-            nidaqSignals = dict.fromkeys(channels, None)
         else:
             numChannels = 1
-            nidaqSignals = {str(channels): None}
     else:
         channels = range(numChannels)
+
     # Gets the actual nidaq file and extract the data from it.
-    niDaqFilePath = get_file_in_directory(niDaqFilePath, "NidaqInput")
+    niDaqFilePath = general.get_file_in_directory(niDaqFilePath, "NidaqInput")
     niDaq = np.fromfile(niDaqFilePath, dtype=np.float64)
     if int(len(niDaq) % numChannels) == 0:
         niDaq = np.reshape(niDaq, (int(len(niDaq) / numChannels), numChannels))
@@ -71,17 +64,19 @@ def get_nidaq_channels(niDaqFilePath, numChannels=None, plot=False):
         niDaq = np.reshape(
             niDaq[:lastGoodEntry], (correctDuration, numChannels)
         )
+
     # Option to plot the channels.
     if plot:
         f, ax = plt.subplots(max(2, numChannels), sharex=True)
         for i in range(numChannels):
             ax[i].plot(niDaq[:, i])
-    nidaqTime = np.arange(niDaq.shape[0]) / 1000
+
+    nidaqTime = (np.arange(niDaq.shape[0]) / sampling_rate).reshape(-1, 1)
 
     return niDaq, channels, nidaqTime
 
 
-def assign_frame_time(frameClock, th=0.5, fs=1000, plot=False):
+def assign_frame_time(frameClock: np.ndarray, time: np.ndarray, th=0.5, plot=False):
     """
     Assigns a time in s to a frame time.
 
@@ -103,142 +98,170 @@ def assign_frame_time(frameClock, th=0.5, fs=1000, plot=False):
         Frame start times (s).
 
     """
-    # Frame times
-    # pkTimes,_ = sp.signal.find_peaks(-frameClock,threshold=th)
-    # pkTimes = np.where(frameClock<th)[0]
-    # fdif = np.diff(pkTimes)
-    # longFrame = np.where(fdif==1)[0]
-    # pkTimes = np.delete(pkTimes,longFrame)
-    # recordingTimes = np.arange(0,len(frameClock),0.001)
-    # frameTimes = recordingTimes[pkTimes]
-    # threshold = 0.5
 
-    # Gets the timepoints where the frame clock signal is above a certain
-    # threshold.
-    pkTimes = np.where(np.diff(frameClock > th, prepend=False, axis=0))[0]
-    # pkTimes = np.where(np.diff(np.array(frameClock > 0).astype(int),prepend=False)>0)[0]
-    # Option to plot the frame clock and the times.
+    # Gets the timepoints where the frame clock crosses a certain threshold.
+    idx_upward = np.diff((frameClock > th).astype(int), prepend=0, axis=0) > 0
+    time_upward = time[idx_upward]
+
     if plot:
         f, ax = plt.subplots(1)
-        ax.plot(frameClock)
-        ax.plot(pkTimes, np.ones(len(pkTimes)) * np.min(frameClock), "r*")
+        ax.plot(time, frameClock)
+        ax.plot(time_upward, np.ones(len(time_upward)) * th, "r*")
         ax.set_xlabel("time (ms)")
         ax.set_ylabel("Amplitude (V)")
-    # Returns the frame start times in s.
-    return pkTimes[::2] / fs
+
+    return time_upward
 
 
-def detect_photodiode_changes(
-    photodiode,
-    plot=False,
-    kernel=10,
-    upThreshold=0.2,
-    downThreshold=0.4,
-    fs=1000,
-    waitTime=10000,
-):
+def detect_photodiode_changes(photodiode, time, plot_folder: str="", kernel=10, upper_threshold=0.7,
+                              lower_threshold=0.3, wait_time=10):
     """
-    The function detects photodiode changes using a 'Schmitt Trigger', that is,
-    by detecting the signal going up at an earlier point than the signal going
-    down,the signal is filtered and smoothed to prevent nosiy bursts distorting
-    the detection.
+    Detects time points when the photodiode signal crosses thresholds.
 
     Parameters
     ----------
     photodiode : np.array[frames]
         The signal of the photodiode from the nidaq.
+    time : np.array[frames]
+        Time vector in seconds, same length as photodiode.
     kernel : int
-        The kernel for median filtering, The default is 10.
-    upThreshold : float
-        The lower limit for the photodiode signal. The default is 0.2.
-    downThreshold : float
-        The upper limit for the photodiode signal. The default is 0.4.
-    fs: int
-        The frequency of acquisiton. The default is 1000.
-    plot: plt plot
+        The kernel for median filtering. The default is 10.
+    upper_threshold : float
+        Fractional upper threshold (0-1). Downward crossings through this are detected. The default is 0.7.
+    lower_threshold : float
+        Fractional lower threshold (0-1). Upward crossings through this are detected. The default is 0.3.
+    plot_folder: bool
         Plot to inspect. The default is False.
-    waitTime: float
-        The delay time until protocol start. The default is 5000.
+    wait_time: float
+        The wait time in seconds. The default is 10.
 
     Returns
     -------
-    np.array[frames]
-        Photoiode changes (s); up to the user to decide what on and off mean.
+    crossings_up : np.array
+        Upward crossing times (s).
+    crossings_down : np.array
+        Downward crossing times (s).
     """
 
-    # b,a = sp.signal.butter(1, lowPass, btype='low', fs=fs)
+    # Median-filter the photodiode signal.
+    signal_filtered = sp.signal.medfilt(photodiode[:, 0], kernel_size=int(kernel // 2) * 2 + 1)
 
-    sigFilt = photodiode.copy()
-    # sigFilt = sp.signal.filtfilt(ba,photodiode)
-    # Creates the convolving window of the kernel size specified.
-    w = np.ones(kernel) / kernel
-    # sigFilt = sp.signal.medfilt(sigFilt,kernel)
-    # Smoothes the photodiode signal.
-    sigFilt = np.convolve(sigFilt[:, 0], w, mode="same")
-    sigFilt_raw = sigFilt.copy()
-    sigFilt_diff = np.diff(sigFilt)  # TODO: NOT used, remove.
+    # Scale thresholds to signal range.
+    signal_max = np.max(signal_filtered)
+    signal_min = np.min(signal_filtered)
+    threshold_upper = signal_min + (signal_max - signal_min) * upper_threshold
+    threshold_lower = signal_min + (signal_max - signal_min) * lower_threshold
 
-    # Gets the max and min signal amplitude.
-    maxSig = np.max(sigFilt)
-    minSig = np.min(sigFilt)
+    # Convert wait_time from seconds to sample index.
+    wait_time_idx = np.searchsorted(time.flat, wait_time)
 
-    # Gets the mean and standard deviation values during the wait time.
-    mean_waitTime = np.nanmean(sigFilt[:waitTime])
-    std_waitTime = np.nanstd(sigFilt[:waitTime])
+    # Detect upward crossings through lower_threshold (signal goes low -> high).
+    crossings_up_idx = np.where(np.diff((signal_filtered > threshold_lower).astype(int), prepend=0) > 0)[0]
+    crossings_up_idx = crossings_up_idx[crossings_up_idx >= wait_time_idx]
 
-    # Sets the upper and lower threshold.
-    thresholdU = (maxSig - minSig) * upThreshold
-    thresholdD = (maxSig - minSig) * downThreshold
-    threshold = (maxSig - minSig) * 0.5
+    # Detect downward crossings through upper_threshold (signal goes high -> low).
+    crossings_down_idx = np.where(np.diff((signal_filtered > threshold_upper).astype(int), prepend=0) < 0)[0]
+    crossings_down_idx = crossings_down_idx[crossings_down_idx >= wait_time_idx]
 
-    # Finds threshold crossings. #TODO: remove unused variables.
-    uBaselineCond = sigFilt > (mean_waitTime + 1 * std_waitTime)
-    uThresholdCond = sigFilt > thresholdU
-    dBaselineCond = sigFilt > (mean_waitTime + 1 * std_waitTime)
-    dThresholdCond = sigFilt > thresholdD
-    crossingsU = np.where(
-        np.diff(np.array(uThresholdCond).astype(int), prepend=False) > 0
-    )[0]
-    crossingsD = np.where(
-        np.diff(np.array(dThresholdCond).astype(int), prepend=False) < 0
-    )[0]
-    crossingsU = np.delete(crossingsU, np.where(crossingsU < waitTime)[0])
-    crossingsD = np.delete(crossingsD, np.where(crossingsD < waitTime)[0])
-    crossings = np.sort(np.unique(np.hstack((crossingsU, crossingsD))))
+    # Collect first crossings
+    combined = np.hstack([crossings_up_idx, crossings_down_idx])
+    crossings_first = np.min(combined) if len(combined) > 0 else time.shape[0]
 
-    # For the first crosssing might be an issue detecting change if the
-    # entire baseline is over threshold. Looks for the first that is over it
-    # or under it, and add them if they appear before the first detected change.
-    changeInd = np.where(sigFilt > mean_waitTime + std_waitTime)[0]
-    changeInd = changeInd[changeInd >= waitTime]
-    if (
-        (len(changeInd) > 0)
-        and (changeInd[0] < crossings[0])
-        and (crossingsD[0] < crossingsU[0])
-    ):
-        crossings = np.append(changeInd[0], crossings)
+    # --- Early crossings (after wait_time, before any other crossings, opposite threshold) ---
+    # If signal starts below threshold_upper at wait_time: the first event may be a downward
+    # crossing of threshold_lower, which belongs to crossings_down.
+    early_crossings_down_idx = np.where(np.diff((signal_filtered > threshold_lower).astype(int), prepend=0) < 0)[0]
+    early_crossings_down_idx = early_crossings_down_idx[
+        (wait_time_idx <= early_crossings_down_idx) & (early_crossings_down_idx < crossings_first)
+        ]
+    # If signal starts low (below threshold_lower) at wait_time: the first event will be an upward
+    # crossing of threshold_upper (not threshold_lower), which belongs to crossings_up.
+    early_crossings_up_idx = np.where(np.diff((signal_filtered > threshold_upper).astype(int), prepend=0) > 0)[0]
+    early_crossings_up_idx = early_crossings_up_idx[
+        (wait_time_idx <= early_crossings_up_idx) & (early_crossings_up_idx < crossings_first)
+        ]
+    crossings_up_idx = np.hstack([early_crossings_up_idx, crossings_up_idx])
+    crossings_down_idx = np.hstack([early_crossings_down_idx, crossings_down_idx])
 
-    # changeInd = np.where(sigFilt < thresholdD)[0]
-    # changeInd = changeInd[changeInd >= waitTime]
-    # if (
-    #     (len(changeInd) > 0)
-    #     and (changeInd[0] < crossings[0])
-    #     and (crossingsD[0] > crossingsU[0])
-    # ):
-    #     crossings = np.append(changeInd[0], crossings)
-    # Option to plot the photodiode signal withe the detected changes.
-    if plot:
-        f, ax = plt.subplots(1, 1, sharex=True)
-        ax.plot(photodiode, label="photodiode raw")
-        ax.plot(sigFilt_raw, label="photodiode filtered")
-        ax.plot(crossings, np.ones(len(crossings)) * threshold, "g*")
-        ax.hlines([thresholdU], 0, len(photodiode), "k")
-        ax.hlines([thresholdD], 0, len(photodiode), "k")
-        # ax.plot(st,np.ones(len(crossingsD))*threshold,'r*')
-        ax.legend()
-        ax.set_xlabel("time (ms)")
-        ax.set_ylabel("Amplitude (V)")
-    return crossings / fs
+    # Check that crossings_up_idx and crossings_down_idx alternate.
+    # We collect indices from the original arrays that violate alternation.
+    all_crossings_idx = np.hstack([crossings_up_idx, crossings_down_idx])
+    all_labels = np.hstack([
+        np.ones(len(crossings_up_idx), dtype=int),  # 1 -> up
+        np.zeros(len(crossings_down_idx), dtype=int),  # 0 -> down
+    ])
+    all_idx = np.hstack([np.arange(len(crossings_up_idx)), np.arange(len(crossings_down_idx))])
+
+    # Sort by crossing index to get chronological order.
+    order = np.argsort(all_crossings_idx)
+    sorted_labels = all_labels[order]
+    sorted_idx = all_idx[order]
+
+    # Find violations of alternating labels
+    label_diffs = np.diff(sorted_labels)
+    violations = np.where(label_diffs == 0)[0]
+
+    # Remove violating crossings (1st crossing in same direction); store trial index of violation
+    violation_up = []
+    violation_down = []
+    for i in violations:
+        if sorted_labels[i] == 0:  # 2 downward crossings in a row
+            violation_down.append(sorted_idx[i])
+        else:  # 2 upward crossings in a row
+            violation_up.append(sorted_idx[i])
+
+    violation_down = np.array(violation_down, dtype=int)
+    deleted_down = crossings_down_idx[violation_down]
+    crossings_down_idx = np.delete(crossings_down_idx, violation_down)
+    violation_up = np.array(violation_up, dtype=int)
+    deleted_up = crossings_up_idx[violation_up]
+    crossings_up_idx = np.delete(crossings_up_idx, violation_up)
+
+    # Correct indices for deletions
+    violation_up = violation_up - np.arange(len(violation_up))
+    violation_down = violation_down - np.arange(len(violation_down))
+
+    # Convert indices back to time values.
+    crossings_up = time[crossings_up_idx]
+    crossings_down = time[crossings_down_idx]
+    violation_up = time[crossings_up_idx[violation_up]]
+    violation_down = time[crossings_down_idx[violation_down]]
+
+    if os.path.isdir(plot_folder):
+        f = os.path.join(plot_folder, "photodiode_violations")
+        os.makedirs(f, exist_ok=True)
+
+        for i in range(len(violation_up)):
+            idx = deleted_up[i] + np.arange(-10000, 10000)
+            idx = idx[(idx >= 0) & (idx < len(time))]  # keep valid indices
+
+            plt.figure(figsize=(16,8))
+            plt.plot(time[idx], signal_filtered[idx], label="photodiode filtered")
+            plt.plot(violation_up[i], threshold_lower, "g^", label="upward crossing")
+            plt.plot(time[deleted_up[i]], threshold_lower, "ro", label="deleted crossing")
+            plt.axhline(threshold_upper, color="k", linestyle="-")
+            plt.axhline(threshold_lower, color="k", linestyle="-")
+            plt.legend()
+            plt.xlabel("time (s)")
+            plt.savefig(os.path.join(f, f"violation_up_{i}.png"))
+            plt.close()
+
+        for i in range(len(violation_down)):
+            idx = deleted_down[i] + np.arange(-10000, 10000)
+            idx = idx[(idx >= 0) & (idx < len(time))]  # keep valid indices
+
+            plt.figure(figsize=(16,8))
+            plt.plot(time[idx], signal_filtered[idx], label="photodiode filtered")
+            plt.plot(violation_down[i], threshold_upper, "gv", label="downward crossing")
+            plt.plot(time[deleted_down[i]], threshold_upper, "ro", label="deleted crossing")
+            plt.axhline(threshold_upper, color="k", linestyle="-")
+            plt.axhline(threshold_lower, color="k", linestyle="-")
+            plt.legend()
+            plt.xlabel("time (s)")
+            plt.savefig(os.path.join(f, f"violation_down_{i}.png"))
+            plt.close()
+
+    return crossings_up, crossings_down, violation_up, violation_down
 
 
 def detect_wheel_move(
@@ -392,7 +415,7 @@ def get_log_entry(filePath, entryString):
 
 
 # @jit(forceobj=True)
-def get_arduino_data(arduinoDirectory, plot=False):
+def get_arduino_data(arduinoDirectory, sampling_rate, plot=False):
     """
     Retrieves the arduino data, regularises it (getting rid of small intervals)
     Always assumes last entry is the timepoints.
@@ -411,34 +434,63 @@ def get_arduino_data(arduinoDirectory, plot=False):
 
     """
     # Gets the arduino file.
-    arduinoFilePath = get_file_in_directory(arduinoDirectory, "ArduinoInput")
+    arduinoFilePath = general.get_file_in_directory(arduinoDirectory, "ArduinoInput")
     # Loads the arduino data.
     csvChannels = np.loadtxt(arduinoFilePath, delimiter=",")
-    # arduinoTime = csvChannels[:,-1]
-    # Calculates the arduino time.
-    # arduinoTime = np.arange(csvChannels.shape[0]) / 1000
-    # arduinoTimeDiff = np.diff(arduinoTime,prepend=True)
-    # normalTimeDiff = np.where(arduinoTimeDiff>-100)[0]
-    # csvChannels = csvChannels[normalTimeDiff,:]
-    # # convert time to second (always in ms)
-    arduinoTime = csvChannels[:, -1]/1000
+    # convert time to second (always in ms)
+    arduinoTime = (csvChannels[:, -1] / sampling_rate).reshape(-1, 1)
 
     # Starts arduino time at zero.
     arduinoTime -= arduinoTime[0]
-    csvChannels = csvChannels[
-        :, :-1
-    ]  # Takes all channels except the timepoints.
+    # Takes all channels except the timepoints.
+    csvChannels = csvChannels[:, :-1]
     numChannels = csvChannels.shape[1]  # Gets number of channels.
     if plot:  # Option to plot all channels.
         f, ax = plt.subplots(numChannels, sharex=True)
         for i in range(numChannels):
             ax[i].plot(arduinoTime, csvChannels[:, i])
+
+    # Gets the names of each channel from the channel csv file.
     dirs = glob.glob(os.path.join(arduinoDirectory, "arduinoChannels*.csv"))
     if len(dirs) == 0:
         channelNames = []
-    else:  # Gets the names of each channel from the channel csv file.
+    else:
         channelNames = np.loadtxt(dirs[0], delimiter=",", dtype=str)
+        channelNames = np.array([s.lower() for s in channelNames])
+
     return csvChannels, channelNames, arduinoTime
+
+
+def estimate_sync_lag_xcorr_fast(a, b):
+
+    a = np.asarray(a, float)
+    b = np.asarray(b, float)
+
+    da = np.diff(a, axis=0)
+    db = np.diff(b, axis=0)
+
+    da = (da - da.mean()) / da.std()
+    db = (db - db.mean()) / db.std()
+
+    corr = correlate(db, da, mode="full", method="fft")
+    lags = correlation_lags(len(db), len(da), mode="full")
+
+    pulse_shift = int(lags[np.argmax(corr)])
+    i0 = max(0, -pulse_shift)
+    i1 = min(len(a), len(b) - pulse_shift)
+
+    a_matched = a[i0:i1]
+    b_matched = b[i0 + pulse_shift : i1 + pulse_shift]
+
+    # Least-squares: b = m*a + n
+    A = np.column_stack([a_matched, np.ones(i1 - i0)])
+    result = np.linalg.lstsq(A, b_matched, rcond=None)
+    factor, lag = result[0]
+
+    residuals = result[1]
+    mse = float(residuals[0]) / (i1 - i0) if len(residuals) > 0 else np.nan
+
+    return factor, lag, mse
 
 
 # @jit((numba.b1, numba.b1, numba.double, numba.double,numba.int8))
@@ -475,116 +527,42 @@ def arduino_delay_compensation(
     niTick = np.round(nidaqSync).astype(bool)
     ardTick = np.round(ardSync).astype(bool)
 
-    ardFreq = np.median(np.diff(ardTimes))
     # Gets where the ni sync signal changes.
-    niChange = np.where(np.diff(niTick, prepend=True) > 0)[0][:]
-
-    # Checks that the first state change is clear.
-    if (niChange[0] == 0) or (niChange[1] - niChange[0] > 50):
-        niChange = niChange[
-            1:
-        ]  # takes the second time point as the true start.
-    # Gets the times for the changes.
+    niChange = np.where(np.diff(niTick, prepend=False) > 0)[0]
     niChangeTime = niTimes[niChange]
-    # Gets the how long each change lasts.
-    niChangeDuration = np.round(np.diff(niChangeTime), 4)
-    # Normalises the duration of the change.
-    niChangeDuration_norm = (
-        niChangeDuration - np.mean(niChangeDuration)
-    ) / np.std(niChangeDuration)
-    # Does the same as above for the arduino.
-    ardChange = np.where(np.diff(ardTick, prepend=True) > 0)[0][:]
-    # Checks that first state change is clear.
-    if ardChange[0] == 0:
-        ardChange = ardChange[1:]
+
+    # Gets where the arduino sync signal changes.
+    ardChange = np.where(np.diff(ardTick, prepend=False) > 0)[0]
     ardChangeTime = ardTimes[ardChange]
-    ardChangeDuration = np.round(np.diff(ardChangeTime), 4)
-    # niChangeTime = np.append(niChangeTime,np.zeros_like(ardChangeTime))
-    ardChangeDuration_norm = (
-        ardChangeDuration - np.mean(ardChangeDuration)
-    ) / np.std(ardChangeDuration)
 
-    newArdTimes = ardTimes.copy()
-    # reg = linear_model.LinearRegression()
+    factor, lag, mse = estimate_sync_lag_xcorr_fast(niChangeTime, ardChangeTime)
+    if mse > 0.01:
+        print(f"    WARNING: Large mismatch between NiDAQ and Arduino sync signals (MSE={mse:.4f}).")
 
-    mses = []
-    mse_prev = 10**4  # TODO: remove unused variable.
-    a_list = []
-    b_list = []
-    # a = []
-    # b = []
-    # passRange = min(batchSize,len(niChangeTime))#-len(ardChangeTime)
-    passRange = 100  # len(niChangeTime)
+    time_ard_sync = factor * ardChangeTime + lag
 
-    if passRange > 0:
-        # Compares the lengths of the nidaq and the arduino. In case the length
-        # between the two is different, performs linear regression and compares the
-        # first 100 times to see which ni time matches best with the arduino time.
-        for i in range(passRange):
-            # y = niChangeTime[i:]
-            # x = ardChangeTime[:len(y)]
-            y = niChangeDuration_norm[i:]
-            x = ardChangeDuration_norm[: len(y)]
-            y = y - y[0]
-            minTime = np.min([len(x), len(y)])
-            lenDif = len(x) - len(y)
-            x = x[:minTime]
-            y = y[:minTime]
-
-            if lenDif > 0:
-                x = x[:-lenDif]
-            a_, b_, mse = linear_analytical_solution(x, y)
-            mses.append(mse)
-            a_list.append(a_)
-            b_list.append(b_)
-
-            # stop when error starts to increase, to save time
-            # if (mse>=mse_prev):
-            #     break;
-            # mse_prev = mse
-        bestTime = np.argmin(mses[0:])
-        # bestTime = i-1
-        # Starts the ni time where it matches the arduino time most.
-        niChangeTime = niChangeTime[bestTime:]
-        # Gets the minimum length between the ni time and arduino time.
-        minTime = np.min([len(niChangeTime), len(ardChangeTime)])
-        maxOverlapTime = niChangeTime[minTime - 1]  # TODO: remove, not used.
-
-        # Only takes the ni and arduino change times until the min time.
-        niChangeTime = niChangeTime[:minTime]
-        ardChangeTime = ardChangeTime[:minTime]
-
-        # Gets the duration of each change (rounded to 4 decimal points).
-        ardChangeDuration = np.round(np.diff(ardChangeTime), 4)
-        niChangeDuration = np.round(np.diff(niChangeTime), 4)
-
-        # Checks the difference between the two and if the duration of each
-        # acquisition matches between them.
-        a = niChangeTime[0] - ardChangeTime[0]
-        b = np.median(niChangeDuration / ardChangeDuration)
-
-        lastPoint = 0
-        # Within this for loop, finds where there are misalignments due to
-        # potentially uneven acquisition of the signal and realigns it.
-        for i in range(0, len(ardChangeTime) + 1, batchSize):
-            if i >= len(ardChangeTime):
-                continue
-
-            x = ardChangeTime[i: np.min([len(ardChangeTime), i + batchSize])]
-            y = niChangeTime[i: np.min([len(ardChangeTime), i + batchSize])]
-
-            a, b, mse = linear_analytical_solution(x, y)
-
-            ind = np.where((newArdTimes >= lastPoint))[0]
-            newArdTimes[ind] = b * newArdTimes[ind] + a
-
-            ardChangeTime = ardChangeTime * b + a
-
-            lastPoint = (
-                ardChangeTime[np.min([len(ardChangeTime) - 1, i + batchSize])]
-                + 0.00001
-            )
-    return newArdTimes
+    #     lastPoint = 0
+    #     # Within this for loop, finds where there are misalignments due to
+    #     # potentially uneven acquisition of the signal and realigns it.
+    #     for i in range(0, len(ardChangeTime) + 1, batchSize):
+    #         if i >= len(ardChangeTime):
+    #             continue
+    #
+    #         x = ardChangeTime[i: np.min([len(ardChangeTime), i + batchSize])]
+    #         y = niChangeTime[i: np.min([len(ardChangeTime), i + batchSize])]
+    #
+    #         a, b, mse = linear_analytical_solution(x, y)
+    #
+    #         ind = np.where((newArdTimes >= lastPoint))[0]
+    #         newArdTimes[ind] = b * newArdTimes[ind] + a
+    #
+    #         ardChangeTime = ardChangeTime * b + a
+    #
+    #         lastPoint = (
+    #             ardChangeTime[np.min([len(ardChangeTime) - 1, i + batchSize])]
+    #             + 0.00001
+    #         )
+    return time_ard_sync
 
 
 def get_piezo_trace_for_plane(
