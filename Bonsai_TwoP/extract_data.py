@@ -474,10 +474,10 @@ def arduino_delay_compensation(
     ardChangeTime = ardTimes[ardChange]
 
     factor, lag, mse = estimate_sync_lag_xcorr_fast(niChangeTime, ardChangeTime)
-    if mse > 0.01:
+    if mse > 0.0001:
         print(f"    WARNING: Large mismatch between NiDAQ and Arduino sync signals (MSE={mse:.4f}).")
 
-    time_ard_sync = factor * ardChangeTime + lag
+    time_ard_sync = factor * ardTimes + lag
 
     #     lastPoint = 0
     #     # Within this for loop, finds where there are misalignments due to
