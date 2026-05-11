@@ -522,17 +522,17 @@ def save_stimuli(saveDirectory, stimulusTypes, stimulusProps):
             np.save(os.path.join(saveDirectory, f), np.vstack(props_df[f]))
 
 
-def get_recorded_video_times(di, searchTerms, cleanNames):
+def get_recorded_video_times(file_path, event_names, output_names):
     """
     Gets the recorded video times from the log files that bonsai is saving
 
     Parameters
     ----------
-    di : str
+    file_path : str
         The directory where the log file resides.
-    searchTerms : list (str)
+    event_names : list (str)
         The terms used to represent the different video recordings .Last has to be the Nidaq.
-    cleanNames : str
+    output_names : str
         A nicer names to use when logging the entries.
 
     Returns
@@ -540,109 +540,34 @@ def get_recorded_video_times(di, searchTerms, cleanNames):
     None.
 
     """
-    log = get_log_entry(di, searchTerms)
+    log = get_log_entry(file_path, event_names)
     log_df = pd.DataFrame(log)
 
-    # create rename dict
-    renameDict = {}
-    for i in range(len(searchTerms)):
-        renameDict[searchTerms[i]] = cleanNames[i]
-    log_df.rename(
-        columns=renameDict,
-        inplace=True,
-    )
+    # Rename columns from regex event names to desired output names.
+    rename_map = {event_names[i]: output_names[i] for i in range(len(event_names))}
+    log_df.rename(columns=rename_map, inplace=True)
+    ni_name = output_names[-1]
 
-    # change NI values
-    occurenceInds = log_df[cleanNames[-1]].index[
-        log_df[cleanNames[-1]].notna()
-    ]
-    a = log_df.loc[occurenceInds, cleanNames[-1]] = np.arange(
-        len(occurenceInds)
-    )
+    # Replace NI column non-NaN entries with sequential counters.
+    ni_occ_idx = log_df.index[log_df[ni_name].notna()]
+    log_df.loc[ni_occ_idx, ni_name] = np.arange(len(ni_occ_idx))
 
-    # vidLogEye = log_df["EyeVid"].values
-    # vidLogBody = log_df["BodyVid"].values
-    niLog = log_df[cleanNames[-1]].dropna().values
-    logFramesNi = np.zeros((len(niLog), 2)) * np.nan
-    for j in range(len(niLog)):
-        if not np.isnan(niLog[j]):
-            logFramesNi[j, 0] = int(niLog[j])  # niLog[j].split(",")[0]
-            logFramesNi[j, 1] = j
+    # Forward-fill NI values: each row gets the most recent NI value seen so far
+    ni_filled = log_df[ni_name].fillna(method='ffill')
+    n_ni = log_df[ni_name].max() + 1 if log_df[ni_name].notna().any() else 0
 
-    # check if name exists in log if not remove
-    removedNames = []
-    removedInds = []
-    for i in range(len(cleanNames)):
-        if (not cleanNames[i] in log_df.keys()):
-            removedNames.append(cleanNames[i])
-            removedInds.append(i)
-    for i in removedInds:
-        cleanNames.pop(i)
+    # Build output: for each non-NI stream, find preceding NI frame index
+    event_times = {}
+    for col_name in output_names[:-1]:
+        if col_name not in log_df.columns:
+            event_times[col_name] = np.ones(int(n_ni)) * np.nan
+            continue
 
-    # find the indeces where this movie gave a frame based on the search term
-    Inds = []
-    for i in range(len(cleanNames)):
-        if (cleanNames[i] in log_df.keys()):
-            Inds.append(
-                log_df[cleanNames[i]].index[log_df[cleanNames[i]].notna()])
-        else:
-            Inds.append(
-                log_df[cleanNames[1]].index[log_df[cleanNames[i]].notna()])
+        # Get NI value for each event occurrence
+        event_mask = log_df[col_name].notna()
+        event_times[col_name] = ni_filled[event_mask].values
 
-    #Inds = pd.array(Inds)
+    # Add NI stream itself
+    event_times[ni_name] = np.arange(int(n_ni))
 
-    # make smaller database without the other non Ni events
-    colNiTimes = {}
-    for i in range(len(Inds) - 1):
-        # removeInds = pd.Index([])
-        # mini_inds = np.setdiff1d(range(len(Inds) - 1), i)
-        # dropInds = pd.Index([], dtype=np.int64).append(
-        #     Inds[int(mini_inds)]
-        # )
-        # mini_df = log_df.drop(dropInds).reset_index()
-
-        # get ni frames
-        occurenceInds = log_df[cleanNames[i]].index[
-            log_df[cleanNames[i]].notna()
-        ]
-
-        logTimeValues = log_df.iloc[occurenceInds - 1][cleanNames[-1]].values
-
-        # go through cases where there was a video before or after that prevented
-        # registering the nidaq time. to take the surest time
-        for plus in [-1, -2, -3, -4, 1, 2, 3, 4]:
-            nanInds = np.where(logTimeValues.astype(str) == "nan")[0]
-            possibleOccurunce = occurenceInds.copy()
-            possibleOccurunce = possibleOccurunce[(
-                possibleOccurunce+plus) < (len(log_df)-1)]
-            logTimeValues_wherenan = log_df.iloc[possibleOccurunce +
-                                                 plus][cleanNames[-1]].values
-            lostFrames = len(logTimeValues) - len(logTimeValues_wherenan)
-            if (lostFrames > 0):
-                logTimeValues_wherenan = np.append(
-                    logTimeValues_wherenan, np.ones(lostFrames)*np.nan)
-            logTimeValues[nanInds] = logTimeValues_wherenan[nanInds]
-
-        # for nind in nanInds:
-        #     plus = 2
-        #     logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
-        #         cleanNames[-1]
-        #     ]
-        #     # carry on until finding the first that is not nan
-        #     while str(logTimeValues[nind]) == "nan":
-        #         plus += 1
-        #         logTimeValues[nind] = mini_df.iloc[occurenceInds[nind] + plus][
-        #             cleanNames[-1]
-        #         ]
-        logFrames = logTimeValues
-        # logFrames = np.zeros(len(logTimeValues)) * np.nan
-        # for j in range(len(logTimeValues)):
-        #     if type(logTimeValues[j]) == str:
-        #         # logFrames[j] = logTimeValues[j].split(",")[0]
-        #         logFrames[j] =
-
-        colNiTimes[cleanNames[i]] = logFrames
-    colNiTimes[cleanNames[-1]] = logFramesNi[:, 0]
-    for r in removedNames:
-        colNiTimes[r] = np.ones(len(logTimeValues))*np.nan
-    return colNiTimes
+    return event_times
