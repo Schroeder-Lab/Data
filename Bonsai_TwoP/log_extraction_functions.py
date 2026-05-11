@@ -42,23 +42,35 @@ def get_stimulus_info(filePath, props=None):
     props = np.atleast_1d(props)
 
     # Gets recorded data from the log file.
-    logPath = glob.glob(os.path.join(filePath, "Log*"))
-    if not logPath:
+    log_paths = glob.glob(os.path.join(filePath, "Log*"))
+    if not log_paths:
         return None
-    logPath = logPath[0]
 
-    # Gets the values for each stimulus repetition for all the parameters.
-    StimProperties = {}
-    with open(logPath, newline="") as csvfile:
-        allLog = csvfile.read()
+    # Build one regex per prop: prop=<value>
+    # Value chars follow your existing pattern.
+    patterns = {
+        prop: re.compile(rf"{re.escape(prop)}=([.\-a-zA-Z0-9_\\]*)")
+        for prop in props
+    }
 
-    for prop in props:
-        matches = re.findall(prop + r"=([.-a-zA-Z0-9_\\\\]*)", allLog)
-        if matches:
-            StimProperties[prop] = matches
+    rows = []
+    with open(log_paths[0], "r", newline="") as f:
+        for line_no, line in enumerate(f):
+            record = {"line": line_no}
+            all_found = True
 
-    # Returns a pandas dataframe of the stimulus properties dictionary.
-    return pd.DataFrame(StimProperties)
+            for prop, pat in patterns.items():
+                m = pat.search(line)
+                if m is None:
+                    all_found = False
+                    break
+                record[prop] = m.group(1)
+
+            if all_found:
+                rows.append(record)
+
+    # Stable column order: line first, then props in input order
+    return pd.DataFrame(rows, columns=["line", *props.tolist()])
 
 
 def get_sparse_noise(filePath, size=None):
