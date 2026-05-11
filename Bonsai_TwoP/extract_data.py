@@ -272,104 +272,52 @@ def detect_photodiode_changes(photodiode, time, plot_folder: str="", kernel=10, 
     return crossings_up, crossings_down, violation_up, violation_down
 
 
-def detect_wheel_move(
-    moveA, moveB, timestamps, rev_res=1024, total_track=59.847, plot=False
-):
+def detect_wheel_move(move_a, move_b, timestamps, rev_res=1024, total_track=59.847):
     """
-    Converts the rotary encoder data to velocity and distance travelled.
-    At the moment uses only moveA.
+    Converts rotary encoder data to velocity and distance travelled.
 
     Parameters
     ----------
-    moveA : np.array[frames]
-        The first channel of the rotary encoder.
-    moveB : np.array[frames]
-        The second channel of the rotary encoder..
-    timestamps : np.array[frames]
-        The timestamps associated with the frames.
+    move_a : np.ndarray
+        First channel of the rotary encoder.
+    move_b : np.ndarray
+        Second channel of the rotary encoder.
+    timestamps : np.ndarray
+        Timestamps associated with the frames.
     rev_res : int, optional
-        The rotary encoder resoution. The default is 1024.
-    total_track : TYPE, optional
-        The total length of the track. The default is 59.847.
-    plot : plt plot
-        Plot to inspect. The default is False.
+        Rotary encoder resolution (default: 1024).
+    total_track : float, optional
+        Total length of the track in cm (default: 59.847).
 
     Returns
     -------
-    velocity : np.array[frames]
-        Velocity[cm/s].
-    distance : np.array[frames]
-        Distance travelled [cm].
-
+    velocity : np.ndarray
+        Velocity in cm/s.
     """
+    # Normalize to binary signals
+    move_a = (move_a / np.max(move_a) > 0.5).astype(int)
+    move_b = (move_b / np.max(move_b) > 0.5).astype(int)
 
-    moveA = np.round(moveA / np.max(moveA)).astype(bool)
-    moveB = np.round(moveB / np.max(moveB)).astype(bool)
-    counterA = np.zeros(len(moveA))
-    counterB = np.zeros(len(moveB))
+    # # Detect rising edges in moveA
+    # rising_edges_a = np.where(np.diff(move_a, prepend=0) > 0)[0]
+    #
+    # # Determine direction: +1 if moveB is low, -1 if moveB is high
+    # counter = np.zeros(len(move_a))
+    # counter[rising_edges_a] = np.where(move_b[rising_edges_a] == 0, 1, -1)
 
-    # for older recordings
-    # check if signals are the same or delayed
-    similarity = np.sum(moveA == ~moveB)/len(moveB)
+    # Count rising edges
+    counter = np.cumsum(np.diff(move_a, prepend=0) > 0)
 
-    # Detects A move.
-    risingEdgeA = np.where(np.diff(moveA > 0, prepend=True))[0]
-    risingEdgeA = risingEdgeA[moveA[risingEdgeA] == 1]
-    risingEdgeA_B = moveB[risingEdgeA]
-    counterA[risingEdgeA[risingEdgeA_B == 0]] = 1
-    counterA[risingEdgeA[risingEdgeA_B == 1]] = -1
-
-    if (not (similarity > 0.9)):
-        # Detects B move.
-        risingEdgeB = np.where(np.diff(moveB > 0, prepend=True))[
-            0
-        ]  # np.diff(moveB)
-
-        risingEdgeB = risingEdgeB[moveB[risingEdgeB] == 1]
-        risingEdgeB_A = moveB[risingEdgeB]
-        counterA[risingEdgeB[risingEdgeB_A == 0]] = -1
-        counterA[risingEdgeB[risingEdgeB_A == 1]] = 1
-
-    # Gets how much one move means in distance travelled.
-
+    # Convert counts to distance
     dist_per_move = total_track / rev_res
-    # Gets th distance throughout the whole experiment.
-    instDist = counterA * dist_per_move
-    distance = np.cumsum(instDist)
-    # Prepares the windows used for converting the distance and counting the time.
-    averagingTime = int(np.round(1 / np.nanmedian(np.diff(timestamps))))
-    sumKernel = np.ones(averagingTime)
-    tsKernel = np.zeros(averagingTime)
-    tsKernel[0] = 1
-    tsKernel[-1] = -1
+    distance = counter * dist_per_move
 
-    # Taking the difference and
-    distDiff = np.diff(distance, prepend=True)
-    velocity = (
-        sp.ndimage.gaussian_filter1d(distDiff, averagingTime / 2)
-        * averagingTime
-    )
-    velocity[0] = np.nanmedian(velocity)
-    # if (plot):
-    #     f,ax = plt.subplots(3,1,sharex=True)
-    #     ax[0].plot(moveA)
-    #     # ax.plot(np.abs(ADiff))
-    #     ax[0].plot(Ast,np.ones(len(Ast)),'k*')
-    #     ax[0].plot(Aet,np.ones(len(Aet)),'r*')
-    #     ax[0].set_xlabel('time (ms)')
-    #     ax[0].set_ylabel('Amplitude (V)')
+    # Smooth velocity using Gaussian filter
+    dtime = np.nanmedian(np.diff(timestamps, axis=0))
+    sigma = int(0.5 / dtime)  # smooth across 0.5 s
+    velocity = sp.ndimage.gaussian_filter1d(np.diff(distance, prepend=distance[0]) / dtime, sigma=sigma)
 
-    #     ax[1].plot(distance)
-    #     ax[1].set_xlabel('time (ms)')
-    #     ax[1].set_ylabel('distance (mm)')
-
-    #     ax[2].plot(track)
-    #     ax[2].set_xlabel('time (ms)')
-    #     ax[2].set_ylabel('Move')
-
-    # movFirst = Amoves>Bmoves
-
-    return velocity, distance
+    return velocity
 
 
 def get_log_entry(filePath, entryString):
