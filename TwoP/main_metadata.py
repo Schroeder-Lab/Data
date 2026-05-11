@@ -352,50 +352,40 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         os.makedirs(output_folder)
 
     # Analyzed experiments
-    exp_folders = db["data_path"]
+    data_paths = db["data_path"]
 
     # Determine number of frames of each experiment.
     num_frames_exp = db["frames_per_folder"]
     # Gets how many planes were imaged.
     num_planes = db["nplanes"]
 
-    # Lists of outputs.
-    # Recordings times, rotary encoder times, camera times.
-    time_plane = []
-    wheelTimes = []
-    faceTimes = []
-    bodyTimes = []
-
-    # The velocity given by the rotary encoder information.
-    velocity = []
-
-    # lick spout data
-    licks = []
-    lickTimes = []
-
-    stimulusProps = []
-    stimulusTypes = []
-
-    exp_start = 0  # initialize time for experiment
-    for ind_exp, f_exp in enumerate(exp_folders):
+    for ind_exp, f_exp in enumerate(data_paths):
+        if ind_exp < 0:
+            continue
         exp = os.path.split(f_exp)[-1]
         print(f"  Experiment: {exp}")
 
-        folder = os.path.join(bonsai_folder, exp)
-        if not os.path.isdir(folder):
-            print(f"    WARNING: {folder} not found. Skipping whole dataset")
+        exp_folder = os.path.join(bonsai_folder, exp)
+        if not os.path.isdir(exp_folder):
+            print(f"    WARNING: {exp_folder} not found. Skipping whole dataset")
             return
 
+        exp_output_folder = os.path.join(output_folder, exp)
+        os.makedirs(exp_output_folder, exist_ok=True)
+
         # Load NiDAQ data.
-        nidaq, chans, time_nidaq = extract_data.get_nidaq_channels(f_exp, sampling_rate=NIDAQ_SAMPLINGRATE)
+        nidaq, chans_nidaq, time_nidaq = extract_data.get_nidaq_channels(exp_folder, sampling_rate=NIDAQ_SAMPLINGRATE)
+        np.save(os.path.join(exp_output_folder, "time_nidaq.npy"), time_nidaq)
 
         # Load Arduino data.
-        ardData, ardChans, time_arduino_unsynced = extract_data.get_arduino_data(f_exp, sampling_rate=ARDUINO_SAMPLINGRATE)
+        arduino, chans_arduino, time_arduino_unsynced = extract_data.get_arduino_data(exp_folder, sampling_rate=ARDUINO_SAMPLINGRATE)
 
         # Sync Arduino to NiDAQ time.
-        nidaqSync = nidaq[:, chans == "sync"][:, 0]
-        ardSync = ardData[:, ardChans == "sync"][:, 0]
-        time_arduino = extract_data.arduino_delay_compensation(nidaqSync, ardSync, time_nidaq, time_arduino_unsynced)
+        nidaq_sync = nidaq[:, chans_nidaq == "sync"][:, 0]
+        arduino_sync = arduino[:, chans_arduino == "sync"][:, 0]
+        time_arduino = extract_data.arduino_delay_compensation(nidaq_sync, arduino_sync, time_nidaq, time_arduino_unsynced)
+        np.save(os.path.join(exp_output_folder, "time_arduino.npy"), time_arduino)
+
         # Gets stimulus information.
         # Types: Gratings, Circles, Retinal, Spont
         properties_file = glob.glob(os.path.join(exp_folder, "props*.csv"))
@@ -428,20 +418,6 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
             save_path = os.path.join(exp_output_folder, key)
             np.save(save_path, np.asarray(value))
 
-        colNiTimes = extract_data.get_recorded_video_times(
-            f_exp,
-            logColNames,
-            ["EyeVid", "BodyVid", "NI"],
-        )
-        cam1Frames = colNiTimes["EyeVid"].astype(float) / 1000
-        cam2Frames = colNiTimes["BodyVid"].astype(float) / 1000
-        # Get actual video data
-        vfile = glob.glob(os.path.join(
-            f_exp, "Video[0-9]*.avi"))[0]  # eye
-        video1 = cv2.VideoCapture(vfile)
-        vfile = glob.glob(os.path.join(
-            f_exp, "Video[a-zA-Z]*.avi"))[0]  # body
-        video2 = cv2.VideoCapture(vfile)
         if protocol == "fullField":
             cycle = np.array(
                 ["On", "Off", "Grey", "ChirpF", "Grey", "ChirpC", "Grey",
@@ -465,36 +441,53 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         #     if mse > 0.0001:
         #         print(f"    WARNING: Large mismatch for stimulus times between photodiode and bonsai time stamps (MSE={mse:.4f}).")
 
+        # Get number of video frames
+        vfile = glob.glob(os.path.join(f_exp, "Video[0-9]*.avi"))[0]  # eye
+        video_eye = cv2.VideoCapture(vfile)
+        vfile = glob.glob(os.path.join(f_exp, "Video[a-zA-Z]*.avi"))[0]  # body
+        video_body = cv2.VideoCapture(vfile)
         # number of frames
-        nframes1 = int(video1.get(cv2.CAP_PROP_FRAME_COUNT))
-        nframes2 = int(video2.get(cv2.CAP_PROP_FRAME_COUNT))
-        # add time stamp buffer for unknown frames
-        addFrames1 = nframes1 - len(cam1Frames)
-        addFrames2 = nframes2 - len(cam2Frames)
+        nframes_eye = int(video_eye.get(cv2.CAP_PROP_FRAME_COUNT))
+        nframes_body = int(video_body.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        if nframes1 > len(cam1Frames):
-            c1f = np.ones(nframes1) * np.nan
-            c1f[: len(cam1Frames)] = cam1Frames
-            cam1Frames = c1f
-        if nframes2 > len(cam2Frames):
-            c2f = np.ones(nframes2) * np.nan
-            c2f[: len(cam2Frames)] = cam2Frames
-            cam2Frames = c2f
+        # Arduino data: extract video frame times.
+        camera_eye = arduino[:, chans_arduino == "camera1"][:, 0]
+        camera_body = arduino[:, chans_arduino == "camera2"][:, 0]
+        times_eye = extract_data.assign_frame_time(camera_eye, time_arduino, th=0.5, plot=False)
+        times_body = extract_data.assign_frame_time(camera_body, time_arduino, th=0.5, plot=False)
 
-        # Adds the face times to the faceTimes list.
-        faceTimes.append(cam1Frames + exp_start)
-        # Adds the body times to the bodyTimes list.
-        bodyTimes.append(cam2Frames + exp_start)
+        # Bonsai log: extract video frame times.
+        event_names = ["Video$", "Video,[0-9]*", "Analog*"]
+        if "Spont" in property_names[0]:
+            event_names = ["VideoFrame", "Video,[0-9]*", "NiDaq*"]
+        event_times = extract_data.get_recorded_video_times(
+            exp_folder, event_names, ["EyeVid", "BodyVid", "NI"])
+        times_eye_bonsai = event_times["EyeVid"].astype(float) / NIDAQ_SAMPLINGRATE
+        times_body_bonsai = event_times["BodyVid"].astype(float) / NIDAQ_SAMPLINGRATE
+
+        np.save(os.path.join(exp_output_folder, "eye.timestamps.npy"), times_eye)
+        np.save(os.path.join(exp_output_folder, "eye.timestamps_bonsai.npy"), times_eye_bonsai)
+        np.save(os.path.join(exp_output_folder, "eye.nframes.npy"), nframes_eye)
+
+        np.save(os.path.join(exp_output_folder, "body.timestamps.npy"), times_body)
+        np.save(os.path.join(exp_output_folder, "body.timestamps_bonsai.npy"), times_body_bonsai)
+        np.save(os.path.join(exp_output_folder, "body.nframes.npy"), nframes_body)
 
         # Times of imaged frames.
-        time_exp, plane_delays = extract_frametimes(
-            nidaq[:, chans == "frameclock"], time_nidaq, num_frames_exp[ind_exp], num_planes)
-        time_plane.append(time_exp + exp_start)
+        time_plane, plane_delays = extract_frametimes(
+            nidaq[:, chans_nidaq == "frameclock"], time_nidaq, num_frames_exp[ind_exp], num_planes)
+        np.save(os.path.join(exp_output_folder, "2pCalcium.timestamps.npy"), time_plane)
+        np.save(os.path.join(exp_output_folder, "2pPlanes.delay.npy"), plane_delays.reshape(-1, 1))
 
-        # Gets stimulus information.
-        propsFile = glob.glob(os.path.join(f_exp, "props*.csv"))
-        propTitles = np.loadtxt(propsFile[0], dtype=str, delimiter=",", ndmin=2).T[0]
-        stimulusResults, num_trials, protocol = extract_data.process_stimulus(propTitles[0], f_exp)
+        # Lick spout
+        if "lick" in chans_nidaq:
+            np.save(os.path.join(exp_output_folder, "spout.licks.npy"), nidaq[:, chans_nidaq == "lick"].reshape(-1, 1))
+
+        # Wheel movement.
+        movement1 = arduino[:, chans_arduino == "rotary1"][:, 0]
+        movement2 = arduino[:, chans_arduino == "rotary2"][:, 0]
+        velocity = extract_data.detect_wheel_move(movement1, movement2, time_arduino)
+        np.save(os.path.join(exp_output_folder, "wheel.velocity.npy"), velocity.reshape(-1, 1))
 
 
 def extract_stimulus_times(signal, time_nidaq, num_trials, protocol, plot_folder):
