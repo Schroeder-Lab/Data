@@ -76,13 +76,13 @@ def get_nidaq_channels(niDaqFilePath, sampling_rate, numChannels=None, plot=Fals
     return niDaq, channels, nidaqTime
 
 
-def assign_frame_time(frameClock: np.ndarray, time: np.ndarray, th=0.5, plot=False):
+def assign_frame_time(signal: np.ndarray, time: np.ndarray, th=0.5, plot=False):
     """
     Assigns a time in s to a frame time.
 
     Parameters
     ----------
-    frameClock : np.array[frames]
+    signal : np.array[frames]
         The signal of the frame clock from the nidaq.
     th : float, optional
         The threshold for the tick peaks.
@@ -98,16 +98,27 @@ def assign_frame_time(frameClock: np.ndarray, time: np.ndarray, th=0.5, plot=Fal
         Frame start times (s).
 
     """
-
+    signal_min = np.nanmin(signal)
+    signal_max = np.nanmax(signal)
+    threshold = signal_min + (signal_max - signal_min) * th
     # Gets the timepoints where the frame clock crosses a certain threshold.
-    idx_upward = np.diff((frameClock > th).astype(int), prepend=0, axis=0) > 0
+    idx_upward = np.diff((signal > threshold).astype(int), prepend=0, axis=0) > 0
     time_upward = time[idx_upward]
+
+    # Check whether signal is bimodal as expected from a TTL pulse
+    low = signal_min + (signal_max - signal_min) * 0.1
+    high = signal_min + (signal_max - signal_min) * 0.9
+    mid_band = (signal < low) | (signal > high)
+    frac_mid = np.mean(mid_band)
+    if frac_mid < 0.9:  # signal not bimodal -> TTL pulse not correctly recorded
+        time_upward = None
 
     if plot:
         f, ax = plt.subplots(1)
-        ax.plot(time, frameClock)
-        ax.plot(time_upward, np.ones(len(time_upward)) * th, "r*")
-        ax.set_xlabel("time (ms)")
+        ax.plot(time, signal)
+        ax.axhline(threshold, color="k", linestyle="-")
+        ax.plot(time_upward, np.ones(len(time_upward)) * threshold, "r^")
+        ax.set_xlabel("time (s)")
         ax.set_ylabel("Amplitude (V)")
 
     return time_upward
