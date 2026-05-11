@@ -420,9 +420,9 @@ def estimate_sync_lag_xcorr_fast(a, b):
     a_matched = a[i0:i1]
     b_matched = b[i0 + pulse_shift : i1 + pulse_shift]
 
-    # Least-squares: b = m*a + n
-    A = np.column_stack([a_matched, np.ones(i1 - i0)])
-    result = np.linalg.lstsq(A, b_matched, rcond=None)
+    # Least-squares: a = m*b + n
+    A = np.column_stack([b_matched, np.ones(i1 - i0)])
+    result = np.linalg.lstsq(A, a_matched, rcond=None)
     factor, lag = result[0]
 
     residuals = result[1]
