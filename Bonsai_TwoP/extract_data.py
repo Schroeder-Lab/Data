@@ -504,8 +504,8 @@ def arduino_delay_compensation(
 
 
 def process_stimulus(titles, directory):
-    results, num_trials, protocol = stimulus_processing_dictionary[titles](directory)
-    return results, num_trials, protocol
+    results, num_trials, protocol, time = stimulus_processing_dictionary[titles](directory)
+    return results, num_trials, protocol, time
 
 
 def save_stimuli(saveDirectory, stimulusTypes, stimulusProps):
