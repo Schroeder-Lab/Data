@@ -6,74 +6,25 @@ import warnings
 import pandas as pd
 
 
-def stimulus_circles(directory, frameChanges):
+def stimulus_circles(directory):
 
-    stimProps = get_stimulus_info(directory)
-    # Calculates the end of the final frame.
-    circle_et = np.append(
-        frameChanges[1::],
-        frameChanges[-1] + np.median(np.diff(frameChanges)),
-    )
+    stimuli = get_stimulus_info(directory)
 
-    circle_st = frameChanges
+    result = {
+        'circles.xPos.npy': stimuli.X.to_numpy().reshape(-1, 1).astype(float),
+        'circles.yPos.npy': stimuli.Y.to_numpy().reshape(-1, 1).astype(float),
+        'circles.diameters.npy': stimuli.Diameter.to_numpy().reshape(-1, 1).astype(float),
+        'circles.isWhite.npy': stimuli.White.to_numpy().reshape(-1, 1).astype(float)
+    }
 
-    # make sure no spurious signal is caught
-    durs = np.diff(circle_st)
-    if (durs[-1] > np.max(stimProps.Dur.astype(np.float64))*10):
-        circle_st = circle_st[:-1]
-        circle_et = circle_et[:-1]
+    num_trials = len(stimuli)
+    time_samples = stimuli.line.to_numpy().reshape(-1, 1).astype(float)
 
-    return {'circles.startTime.npy': circle_st.reshape(-1, 1).copy(),
-            'circles.endTime.npy': circle_et.reshape(-1, 1).copy(),
-            'circles.x.npy': stimProps.X.to_numpy().reshape(-1, 1).astype(float).copy(),
-            'circles.y.npy': stimProps.Y.to_numpy()
-            .reshape(-1, 1)
-            .astype(float)
-
-            .copy(), 'circles.diameter.npy': stimProps.Diameter.to_numpy()
-            .reshape(-1, 1)
-            .astype(float)
-            .copy(), 'circles.isWhite.npy': stimProps.White.to_numpy()
-            .reshape(-1, 1)
-            .astype(float)
-            .copy(), 'circles.duration.npy': stimProps.Dur.to_numpy()
-            .reshape(-1, 1)
-            .astype(float)
-            .copy(),
-            "circlesExp.intervals": [circle_st[0], circle_et[-1]]
-            }
+    return result, num_trials, "circles", time_samples
 
 
-def stimulus_classification(directory, frameChanges):
-    retinal_et = np.append(
-        frameChanges[1::],
-        frameChanges[-1] + (frameChanges[14] - frameChanges[13]),
-    )
-
-    retinal_st = frameChanges
-
-    retinal_stimType = np.empty(
-        (len(frameChanges), 1), dtype=object
-    )
-    retinal_stimType[12::13] = "Off"
-    retinal_stimType[0::13] = "On"
-    retinal_stimType[1::13] = "Off"
-    retinal_stimType[2::13] = "Grey"
-    retinal_stimType[3::13] = "ChirpF"
-    retinal_stimType[4::13] = "Grey"
-    retinal_stimType[5::13] = "ChirpC"
-    retinal_stimType[6::13] = "Grey"
-    retinal_stimType[7::13] = "Off"
-    retinal_stimType[8::13] = "Blue"
-    retinal_stimType[9::13] = "Off"
-    retinal_stimType[10::13] = "Green"
-    retinal_stimType[11::13] = "Off"
-
-    return {'fullField.startTime.npy': retinal_st.reshape(-1, 1).copy(),
-            "fullField.endTime.npy": retinal_et.reshape(-1, 1).copy(),
-            "fullField.stim.npy": retinal_stimType.copy(),
-            "fullFieldExp.intervals.npy": [retinal_st[0], retinal_et[-1]]
-            }
+def stimulus_classification(directory):
+    return {}, 10 * 13, "fullField", None
 
 
 def stimulus_sparse(directory, frameChanges):
@@ -102,27 +53,28 @@ def stimulus_sparse(directory, frameChanges):
 
 
 def stimulus_gratings(directory):
-    stimProps = get_stimulus_info(directory)
+    stimuli = get_stimulus_info(directory)
 
-    if "Reward" in stimProps.columns:
-        reward = np.array([value == "True" for value in stimProps.Reward], dtype=bool).reshape(-1, 1).copy()
+    if "Reward" in stimuli.columns:
+        reward = np.array([value == "True" for value in stimuli.Reward], dtype=bool).reshape(-1, 1).copy()
     else:
         reward = None
 
     result = {
-        "grating.directions.npy": stimProps.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
-        "grating.spatialFrequencies.npy": stimProps.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-        "grating.temporalFrequencies.npy": stimProps.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-        "grating.contrasts.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "grating.directions.npy": stimuli.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+        "grating.spatialFrequencies.npy": stimuli.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "grating.temporalFrequencies.npy": stimuli.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "grating.contrasts.npy": stimuli.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
         "gratingExp.description.npy": "Gratings"
     }
 
     if reward is not None:
         result["grating.reward.npy"] = reward
 
-    num_trials = len(stimProps)
+    num_trials = len(stimuli)
+    time_samples = stimuli.line.to_numpy().reshape(-1, 1).astype(float)
 
-    return result, num_trials, "grating"
+    return result, num_trials, "grating", time_samples
 
 
 def stimulus_gratingsLuminance(directory, frameChanges):
@@ -288,12 +240,12 @@ def stimulus_naturalImages(directory, frameChanges):
             }
 
 
-def stimulus_spont(directory, frameChanges):
-    return {"darkScreen.intervals": [frameChanges[0], frameChanges[-1]]}
+def stimulus_spont(directory):
+    return {}, 0, "darkScreen", None
 
 
-def stimulus_spont_grey(directory, frameChanges):
-    return {"greyScreen.intervals": [frameChanges[0], frameChanges[-1]]}
+def stimulus_spont_grey(directory):
+    return {}, 0, "greyScreen", None
 
 
 def stimulus_flicker(directory, frameChanges):
