@@ -239,9 +239,6 @@ def detect_photodiode_changes(photodiode, time, plot_folder: str="", kernel=10, 
     violation_down = time[crossings_down_idx[violation_down]]
 
     if os.path.isdir(plot_folder):
-        f = os.path.join(plot_folder, "photodiode_violations")
-        os.makedirs(f, exist_ok=True)
-
         for i in range(len(violation_up)):
             idx = deleted_up[i] + np.arange(-10000, 10000)
             idx = idx[(idx >= 0) & (idx < len(time))]  # keep valid indices
@@ -254,7 +251,7 @@ def detect_photodiode_changes(photodiode, time, plot_folder: str="", kernel=10, 
             plt.axhline(threshold_lower, color="k", linestyle="-")
             plt.legend()
             plt.xlabel("time (s)")
-            plt.savefig(os.path.join(f, f"violation_up_{i}.png"))
+            plt.savefig(os.path.join(plot_folder, f"photodd_violation_up_{i}.png"))
             plt.close()
 
         for i in range(len(violation_down)):
@@ -269,7 +266,7 @@ def detect_photodiode_changes(photodiode, time, plot_folder: str="", kernel=10, 
             plt.axhline(threshold_lower, color="k", linestyle="-")
             plt.legend()
             plt.xlabel("time (s)")
-            plt.savefig(os.path.join(f, f"violation_down_{i}.png"))
+            plt.savefig(os.path.join(plot_folder, f"photodd_violation_down_{i}.png"))
             plt.close()
 
     return crossings_up, crossings_down, violation_up, violation_down
