@@ -322,8 +322,6 @@ def detect_wheel_move(move_a, move_b, timestamps, rev_res=1024, total_track=59.8
 
 def get_log_entry(filePath, entryString):
     """
-
-
     Parameters
     ----------
     filePath : str
@@ -337,37 +335,21 @@ def get_log_entry(filePath, entryString):
         props and their values.
 
     """
-    rowN = 0
-    StimProperties = []
-    exactLogPath = glob.glob(os.path.join(filePath, "Log*.csv"))
-    if len(exactLogPath) == 0:
+    file = glob.glob(os.path.join(filePath, "Log*.csv"))
+    if len(file) == 0:
         return None
-    else:
-        filePath = exactLogPath[0]
 
-    with open(filePath, newline="") as csvfile:
-        reader = csv.reader(csvfile, delimiter=" ", quotechar="|")
+    data = []
+    with open(file[0], newline="") as csvfile:
+        for rowN, row in enumerate(csv.reader(csvfile, delimiter=" ", quotechar="|")):
+            full_row = "".join(row)
+            for pattern in entryString:
+                if re.findall(pattern, full_row):
+                    data.append({pattern: f"{rowN},{full_row}"})
 
-        for row in reader:
-            a = []
-            if "Video" in row[0]:
-                None
-            for p in range(len(entryString)):
-                # m = re.findall(props[p]+'=(\d*)', row[np.min([len(row)-1,p])])
-                fullRow = "".join(row)
-                m = re.findall(
-                    entryString[p], fullRow
-                )  # row[np.min([len(row) - 1, p])
+    data = pd.DataFrame(data)
 
-                if len(m) > 0:
-                    # a.append(str(rowN) + "," + row[np.min([len(row) - 1, p])])
-
-                    # if len(a) > 0:
-                    stimProps = {entryString[p]: str(rowN) + "," + fullRow}
-                    # stimProps[entryString[p]] = a[p]
-                    StimProperties.append(stimProps)
-            rowN += 1
-    return StimProperties
+    return data
 
 
 # @jit(forceobj=True)
