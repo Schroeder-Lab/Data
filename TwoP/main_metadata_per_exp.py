@@ -54,7 +54,7 @@ def make_incremental_log_path(log_dir: str, base_name: str = "main_metadata", ex
 
 
 def determine_durations(protocol, times_up, times_down):
-    if protocol == "grating":
+    if protocol == "gratings":
         starts = times_down
         n_pairs = min(len(times_down), len(times_up))
         duration = times_up[:n_pairs] - times_down[:n_pairs]
@@ -85,7 +85,7 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
     n_up = len(times_up)
     mismatch = False
 
-    if protocol == "grating":
+    if protocol == "gratings":
         mismatch = (n_down != num_trials) or (n_down != n_up)
     elif protocol in ("circles", "fullField"):
         mismatch = (n_down + n_up) != num_trials
@@ -191,7 +191,7 @@ def review_timing_with_user(stimulus_name, num_trials, times_up, times_down, tim
 
 
 def correct_times_stimuli(stimulus_name, times_up, times_down):
-    if stimulus_name == "grating":
+    if stimulus_name == "gratings":
         # Gratings start with black squares (times_down) and end with white square (times_up).
         # If number of starts and ends doesn't match, ignore the excess.
         if times_up[0] < times_down[0]:  # if photodiode goes up first, ignore those
@@ -224,7 +224,7 @@ def find_violation_trials(protocol, photodiode_up: np.ndarray, photodiode_down: 
         each violation time. Violations with no following entry are omitted.
     """
     indices = []
-    if protocol == "grating":
+    if protocol == "gratings":
         for vt in violation_up:
             candidates = np.where(photodiode_up > vt)[0]
             if len(candidates) > 0:
@@ -402,7 +402,7 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
                 os.path.join(output_folder, exp, "plots"))
 
             # Add photodiode-based timing results directly to stimulusResults
-            if protocol == "grating":
+            if protocol == "gratings":
                 times_stim = photodiode_down
                 stimuli[f"{protocol}.intervals.npy"] = np.column_stack((photodiode_down, photodiode_up))
             elif protocol in ("circles", "fullField"):

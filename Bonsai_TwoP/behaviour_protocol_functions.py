@@ -61,20 +61,20 @@ def stimulus_gratings(directory):
         reward = None
 
     result = {
-        "grating.directions.npy": stimuli.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
-        "grating.spatialFrequencies.npy": stimuli.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-        "grating.temporalFrequencies.npy": stimuli.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
-        "grating.contrasts.npy": stimuli.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
-        "gratingExp.description.npy": "Gratings"
+        "gratings.directions.npy": stimuli.Ori.to_numpy().reshape(-1, 1).astype(int).copy(),
+        "gratings.spatialFrequencies.npy": stimuli.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "gratings.temporalFrequencies.npy": stimuli.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "gratings.contrasts.npy": stimuli.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
+        "gratingsExp.description.npy": "Gratings"
     }
 
     if reward is not None:
-        result["grating.reward.npy"] = reward
+        result["gratings.reward.npy"] = reward
 
     num_trials = len(stimuli)
     time_samples = stimuli.line.to_numpy().reshape(-1, 1).astype(float)
 
-    return result, num_trials, "grating", time_samples
+    return result, num_trials, "gratings", time_samples
 
 
 def stimulus_gratingsLuminance(directory, frameChanges):
@@ -124,7 +124,6 @@ def stimulus_gratingsLuminance(directory, frameChanges):
             "gratings.luminance.npy": stimProps.Luminance.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
             "gratingsExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
-            # TODO: check if this is usefull; should add same line to gratings
             "gratingsExp.description.npy": "Gratings",
             }
 
@@ -163,7 +162,6 @@ def stimulus_Luminance(directory, frameChanges):
             "Luminance.endTime.npy": et.reshape(-1, 1).copy(),
             "Luminance.luminance.npy": stimProps.Lum.to_numpy().reshape(-1, 1).astype(float).copy(),
             "LuminanceExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
-            # TODO: check if this is usefull; should add same line to gratings
             "LuminanceExp.description.npy": "Luminance",
             }
 
@@ -208,7 +206,6 @@ def stimulus_gratings_reward(directory, frameChanges):
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
             "gratingsExp.intervals.npy": [st[0], et[-1]],
-            # TODO: check if this is usefull; should add same line to gratings
             "gratingsExp.description.npy": "Gratings",
             }
 
@@ -326,7 +323,6 @@ def stimulus_oddball(directory, frameChanges):
             "gratings.contrast.npy": stimProps.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
             "gratings.reward.npy": reward,
             "gratingsExp.intervals.npy": np.atleast_2d([st[0], et[-1]]).T,
-            # TODO: check if this is usefull; should add same line to gratings
             "gratingsExp.description.npy": 'Oddball'
             }
 
