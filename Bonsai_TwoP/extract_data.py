@@ -111,7 +111,7 @@ def assign_frame_time(signal: np.ndarray, time: np.ndarray, th=0.5, plot=False):
     mid_band = (signal < low) | (signal > high)
     frac_mid = np.mean(mid_band)
     if frac_mid < 0.9:  # signal not bimodal -> TTL pulse not correctly recorded
-        time_upward = None
+        time_upward = np.ones((0,1)) * np.nan
 
     if plot:
         f, ax = plt.subplots(1)

@@ -76,7 +76,7 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
     bad_duration_idx = np.where(bad_duration)[0]
     bad_duration_times = starts[bad_duration]
     if len(bad_duration_times) > 0:
-        print(f"  Duration > 0.1 s from median {med_duration:.6f} s (stimulus start times):")
+        print(f"  Outliers: duration > 0.1 s from median {med_duration:.6f} s:")
         print(f"    Times: {bad_duration_times.tolist() if len(bad_duration_times) else []}")
         print(f"    Indices: {bad_duration_idx.tolist() if len(bad_duration_idx) else []}")
     else:
@@ -123,14 +123,14 @@ def review_timing_with_user(stimulus_name, num_trials, times_up, times_down, tim
 
         # Plot current state
         plt.figure(figsize=(12, 4))
-        try:
-            manager = plt.get_current_fig_manager()
-            manager.window.wm_geometry("+2000+100")
-        except Exception:
-            try:
-                manager.window.setGeometry(2200, 100, 1200, 500)
-            except Exception:
-                pass
+        # try:
+        #     manager = plt.get_current_fig_manager()
+        #     manager.window.wm_geometry("+2000+100")
+        # except Exception:
+        #     try:
+        #         manager.window.setGeometry(2200, 100, 1200, 500)
+        #     except Exception:
+        #         pass
         plt.plot(time_nidaq, photodiode, color="0.2", lw=1, label="photodiode")
         if len(times_down):
             plt.plot(times_down, np.full(len(times_down), np.nanpercentile(photodiode, 70)), "rv", label="times_down")
@@ -141,7 +141,7 @@ def review_timing_with_user(stimulus_name, num_trials, times_up, times_down, tim
         plt.ylabel("photodiode")
         plt.legend(loc="best")
         plt.tight_layout()
-        plt.show(block=False)
+        # plt.show(block=False)
 
         print("\n--- Timing review ---")
         print("Entering debugger. Edit `times_down` and/or `times_up` as needed.")
@@ -340,7 +340,7 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
 
             stimuli[f"{protocol}.badTrials.npy"] = bad_trials
 
-        stimuli[f"{protocol}Exp.intervals.npy"] = np.atleast_2d([0, time_nidaq[-1,0]]).T
+        stimuli[f"recording.{protocol}_intervals.npy"] = np.atleast_2d([0, time_nidaq[-1,0]]).T
 
         # Save stimulus-related information
         for key, value in stimuli.items():
@@ -359,16 +359,6 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
             # Write one label per line (single-column CSV).
             csv_path = os.path.join(exp_output_folder, "fullField.stimNames.csv")
             np.savetxt(csv_path, stim_names.ravel(), fmt="%s", delimiter=",")
-
-        # # Sync stimulus times from Bonsai log file to stimulus times from photodiode
-        # if times_stim_bonsai is not None:
-        #     A = np.column_stack([times_stim_bonsai, np.ones_like(times_stim_bonsai)])
-        #     result = np.linalg.lstsq(A, times_stim, rcond=None)
-        #     bonsai_time_correction = result[0] # (a, b) so that a*bonsai_time+b is synced to time_nidaq
-        #     residuals = result[1]
-        #     mse = float(residuals[0]) / num_trials if len(residuals) > 0 else np.nan
-        #     if mse > 0.0001:
-        #         print(f"    WARNING: Large mismatch for stimulus times between photodiode and bonsai time stamps (MSE={mse:.4f}).")
 
         # Get number of video frames
         vfile = glob.glob(os.path.join(f_exp, "Video[0-9]*.avi"))[0]  # eye
@@ -391,8 +381,8 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
             event_names = ["VideoFrame", "Video,[0-9]*", "NiDaq*"]
         event_times = extract_data.get_recorded_video_times(
             exp_folder, event_names, ["EyeVid", "BodyVid", "NI"])
-        times_eye_bonsai = event_times["EyeVid"].astype(float) / NIDAQ_SAMPLINGRATE
-        times_body_bonsai = event_times["BodyVid"].astype(float) / NIDAQ_SAMPLINGRATE
+        times_eye_bonsai = event_times["EyeVid"].astype(float).reshape(-1,1) / NIDAQ_SAMPLINGRATE
+        times_body_bonsai = event_times["BodyVid"].astype(float).reshape(-1,1) / NIDAQ_SAMPLINGRATE
 
         np.save(os.path.join(exp_output_folder, "eye.timestamps.npy"), times_eye)
         np.save(os.path.join(exp_output_folder, "eye.timestamps_bonsai.npy"), times_eye_bonsai)
@@ -402,10 +392,12 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         np.save(os.path.join(exp_output_folder, "body.timestamps_bonsai.npy"), times_body_bonsai)
         np.save(os.path.join(exp_output_folder, "body.nframes.npy"), nframes_body)
 
+        np.save(os.path.join(exp_output_folder, "bonsai.ntimestamps.npy"), len(event_times["NI"]))
+
         # Times of imaged frames.
         time_plane, plane_delays = extract_frametimes(
             nidaq[:, chans_nidaq == "frameclock"], time_nidaq, num_frames_exp[ind_exp], num_planes)
-        np.save(os.path.join(exp_output_folder, "2pCalcium.timestamps.npy"), time_plane)
+        np.save(os.path.join(exp_output_folder, "2pCalcium.timestamps.npy"), time_plane.reshape(-1, 1))
         np.save(os.path.join(exp_output_folder, "2pPlanes.delay.npy"), plane_delays.reshape(-1, 1))
 
         # Lick spout
@@ -429,6 +421,7 @@ def extract_stimulus_times(signal, time_nidaq, num_trials, protocol, plot_folder
     photodiode_up, photodiode_down = correct_times_stimuli(protocol, photodiode_up, photodiode_down)
 
     # (3) Let user review data if problematic.
+    # NOTE: SET BREAKPOINT IN THIS FUNCTION!
     photodiode_up, photodiode_down, invalid_trials = review_timing_with_user(
         protocol, num_trials, photodiode_up, photodiode_down, time_nidaq,
         signal[:, 0])
@@ -451,9 +444,11 @@ def extract_frametimes(frameclock: ndarray, time: ndarray, num_frames: int, num_
 
     # Only consider times of first plane. Check whether number of time points matches number of imaged frames.
     time_plane = time_frames[::num_planes]
-    if len(time_plane) != num_frames:
+    if len(time_plane) - num_frames == 1:  # first plane is one frame longer than last plane -> ignore last frame
+        time_plane = time_plane[:-1]
+    elif len(time_plane) != num_frames:
         print(f"    WARNING: Number of frame times ({len(time_plane)}) does not match " +
-              "number of imaged frames ({num_frames}). Ignore excess times, or add extra.")
+              f"number of imaged frames ({num_frames}). Ignore excess times, or add extra.")
         if len(time_plane) > num_frames:
             time_plane = time_plane[:num_frames]
         else:
@@ -486,8 +481,6 @@ def preprocess(config: dict, datasets: pd.DataFrame):
     finally:
         log_file.close()
 
-    # TODO: add function to integrate information about atropine experiments
-
 
 if __name__ == "__main__":
     args = parse_args()
@@ -503,4 +496,4 @@ if __name__ == "__main__":
         exit(1)
     preprocess(conf, ds)
 
-
+# NOTE: ALWAYS PUT BREAKPOINT IN FUNCTION review_timing_with_user
