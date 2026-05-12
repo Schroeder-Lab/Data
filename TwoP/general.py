@@ -4,10 +4,13 @@ Created on Wed Aug 31 15:37:13 2022
 
 @author: LABadmin
 """
+import sys
 
 import numpy as np
 import glob
 import os
+
+import pandas as pd
 
 # -*- coding: utf-8 -*-
 """
@@ -117,3 +120,69 @@ def linear_analytical_solution(x, y, noIntercept=False):
         b = np.sum(x * y) / np.sum(x**2)
     mse = (np.sum((y - (a + b * x)) ** 2)) / n
     return a, b, mse
+
+
+class Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data):
+        for stream in self.streams:
+            stream.write(data)
+            stream.flush()
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+
+def make_logger(log_path: str):
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    log_file = open(log_path, "a", encoding="utf-8")
+    tee = Tee(sys.__stdout__, log_file)
+    return log_file, tee
+
+
+def make_incremental_log_path(log_dir: str, base_name: str = "main_metadata", ext: str = ".log.txt") -> str:
+    os.makedirs(log_dir, exist_ok=True)
+    i = 1
+    while True:
+        candidate = os.path.join(log_dir, f"{base_name}_{i:04d}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
+        i += 1
+
+
+def make_paths(dataset: pd.Series, directories: dict) -> dict:
+    """
+    Build paths for a single experiment row.
+
+    Parameters
+    ----------
+    dataset : pandas Series
+        A single row (experiment) from the preprocess DataFrame.
+    directories : dict
+        Base directories dictionary.
+
+    Returns
+    -------
+    dict
+        Paths for tiffs, suite2p, piezo, and output.
+    """
+    subject = str(dataset.Name)
+    date = str(dataset.Date)
+    paths = {
+        "raw": directories["raw"].format(Name=subject, Date=date),
+        "suite2p": directories["suite2p"].format(Name=subject, Date=date),
+        "output": directories["output"].format(Name=subject, Date=date),
+    }
+
+    if not os.path.exists(paths["suite2p"]):
+        paths["suite2p"] = None
+        print(
+            f"NOTE: Suite2p directory for {dataset['Name']} {dataset['Date']} not found. Skipping.\n\n"
+        )
+        return paths
+
+    os.makedirs(paths["output"], exist_ok=True)
+    return paths

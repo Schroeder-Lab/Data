@@ -1,56 +1,21 @@
 import glob
 import sys
 from contextlib import redirect_stdout, redirect_stderr
-from os import times, times_result
-
 import cv2
 import numpy as np
-
 import yaml
 import argparse
 import os
 import pandas as pd
 from numpy import bool, ndarray
-
 import matplotlib.pyplot as plt
-import pdb
 
 from Bonsai_TwoP import extract_data
-from TwoP import suite2p_compat
+from TwoP import suite2p_compat, general
 
 
 NIDAQ_SAMPLINGRATE = 1000
 ARDUINO_SAMPLINGRATE = 1000
-
-
-class Tee:
-    def __init__(self, *streams):
-        self.streams = streams
-
-    def write(self, data):
-        for stream in self.streams:
-            stream.write(data)
-            stream.flush()
-
-    def flush(self):
-        for stream in self.streams:
-            stream.flush()
-
-
-def make_logger(log_path: str):
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    log_file = open(log_path, "a", encoding="utf-8")
-    tee = Tee(sys.__stdout__, log_file)
-    return log_file, tee
-
-def make_incremental_log_path(log_dir: str, base_name: str = "main_metadata", ext: str = ".log.txt") -> str:
-    os.makedirs(log_dir, exist_ok=True)
-    i = 1
-    while True:
-        candidate = os.path.join(log_dir, f"{base_name}_{i:04d}{ext}")
-        if not os.path.exists(candidate):
-            return candidate
-        i += 1
 
 
 def determine_durations(protocol, times_up, times_down):
@@ -255,43 +220,7 @@ def load_dataset_list(path):
             "Name": str,
             "Date": str,
             "Process": bool
-        }
-    )
-
-
-def make_paths(dataset: pd.Series, directories: dict) -> dict:
-    """
-    Build paths for a single experiment row.
-
-    Parameters
-    ----------
-    dataset : pandas Series
-        A single row (experiment) from the preprocess DataFrame.
-    directories : dict
-        Base directories dictionary.
-
-    Returns
-    -------
-    dict
-        Paths for tiffs, suite2p, piezo, and output.
-    """
-    subject = str(dataset.Name)
-    date = str(dataset.Date)
-    paths = {
-        "raw": directories["raw"].format(Name=subject, Date=date),
-        "suite2p": directories["suite2p"].format(Name=subject, Date=date),
-        "output": directories["output"].format(Name=subject, Date=date),
-    }
-
-    if not os.path.exists(paths["suite2p"]):
-        paths["suite2p"] = None
-        print(
-            f"NOTE: Suite2p directory for {dataset['Name']} {dataset['Date']} not found. Skipping.\n\n"
-        )
-        return paths
-
-    os.makedirs(paths["output"], exist_ok=True)
-    return paths
+        })
 
 
 def parse_args():
@@ -541,8 +470,8 @@ def preprocess(config: dict, datasets: pd.DataFrame):
     # Alternative fallback:
     # log_dir = os.path.join(os.getcwd(), "logs")
 
-    session_log_path = make_incremental_log_path(log_dir, base_name="main_metadata", ext=".txt")
-    log_file, tee = make_logger(session_log_path)
+    session_log_path = general.make_incremental_log_path(log_dir, base_name="main_metadata", ext=".txt")
+    log_file, tee = general.make_logger(session_log_path)
     try:
         with redirect_stdout(tee), redirect_stderr(tee):
             for i in range(len(datasets)):
@@ -550,8 +479,9 @@ def preprocess(config: dict, datasets: pd.DataFrame):
                     continue
 
                 print(f"Processing {datasets.loc[i]['Name']} {datasets.loc[i]['Date']}...")
-                paths = make_paths(datasets.loc[i], config["directories"])
-                db = suite2p_compat.load_parameters_recording(paths["suite2p"])[0]
+                paths = general.make_paths(datasets.loc[i], config["directories"])
+                plane_folder = glob.glob(os.path.join(paths["suite2p"], "plane*"))[-1]
+                db = suite2p_compat.load_parameters(plane_folder)[0]
                 process_metadata_directory(paths["raw"], paths["output"], db)
     finally:
         log_file.close()
