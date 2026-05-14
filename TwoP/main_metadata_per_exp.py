@@ -24,7 +24,7 @@ def determine_durations(protocol, times_up, times_down):
         n_pairs = min(len(times_down), len(times_up))
         duration = times_up[:n_pairs] - times_down[:n_pairs]
         isi = times_down[1:n_pairs] - times_up[:n_pairs-1]
-    elif protocol == "circles":
+    elif protocol in ("circles", "sparse"):
         starts = np.sort(np.concatenate((times_up, times_down)), axis=0)
         duration = np.diff(starts, axis=0)
         duration = np.append(duration, np.nanmedian(duration))
@@ -48,25 +48,28 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
     """
     n_down = len(times_down)
     n_up = len(times_up)
-    mismatch = False
+    mismatch = 0
 
     if protocol == "gratings":
-        mismatch = (n_down != num_trials) or (n_down != n_up)
-    elif protocol in ("circles", "fullField"):
-        mismatch = (n_down + n_up) != num_trials
+        down = n_down - num_trials
+        up = n_up - num_trials
+        if abs(down) > abs(up):
+            mismatch = down
+        elif abs(down) < abs(up):
+            mismatch = up
+    elif protocol in ("circles", "fullField", "sparse"):
+        mismatch = (n_down + n_up) - num_trials
 
     # Only run diagnostics when mismatch exists.
-    if mismatch:
-        print("  Timing mismatch detected:")
-        print(f"    num_trials: {num_trials}")
-        print(f"    len(times_down): {n_down}")
-        print(f"    len(times_up): {n_up}")
+    if mismatch != 0:
+        print("    Timing mismatch detected:")
+        print(f"      num_trials: {num_trials}")
+        print(f"      times_down ({n_down}) + times_up ({n_up}) = {n_down + n_up}")
     else:
-        print("  No timing mismatch detected.")
+        print("    No timing mismatch detected.")
 
     if not outliers:  # outliers were manually set to False (or never existed)
         return mismatch, outliers
-
 
     duration, isi, starts = determine_durations(protocol, times_up, times_down)
     med_duration = np.nanmedian(duration)
@@ -76,9 +79,9 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
     bad_duration_idx = np.where(bad_duration)[0]
     bad_duration_times = starts[bad_duration]
     if len(bad_duration_times) > 0:
-        print(f"  Outliers: duration > 0.1 s from median {med_duration:.6f} s:")
-        print(f"    Times: {bad_duration_times.tolist() if len(bad_duration_times) else []}")
-        print(f"    Indices: {bad_duration_idx.tolist() if len(bad_duration_idx) else []}")
+        print(f"    Outliers: duration > 0.1 s from median {med_duration:.6f} s:")
+        print(f"      Times: {bad_duration_times.tolist() if len(bad_duration_times) else []}")
+        print(f"      Indices: {bad_duration_idx.tolist() if len(bad_duration_idx) else []}")
     else:
         outliers = False
 
@@ -92,10 +95,11 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
         bad_isi = (isi < (p10 - 0.5)) | (isi > (p90 + 0.5))
         bad_isi_times = starts[1:][bad_isi]  # start times of following stimulus
         if len(bad_isi_times) > 0:
-            print(f"  ISI < p10-0.5 s or > p90+0.5 s from {med_isi:.6f} s (next stimulus start times):")
-            print(f"    {bad_isi_times.tolist() if len(bad_isi_times) else []}")
+            print(f"    ISI < p10-0.5 s or > p90+0.5 s from {med_isi:.6f} s (next stimulus start times):")
+            print(f"      {bad_isi_times.tolist() if len(bad_isi_times) else []}")
+            outliers = True
         else:
-            outliers = False
+            outliers = outliers or False
 
     return mismatch, outliers
 
@@ -114,23 +118,16 @@ def review_timing_with_user(stimulus_name, num_trials, times_up, times_down, tim
     times_up = np.asarray(times_up).copy()
     bad_trials = []
     outliers = True
+    remove_stims = None
 
     while True:
         # Run your diagnostics on current vectors
         mismatch, outliers = report_timing_mismatch(stimulus_name, times_down, times_up, num_trials, outliers)
-        if not mismatch and not outliers:
+        if mismatch == 0 and not outliers:
             break
 
         # Plot current state
-        plt.figure(figsize=(12, 4))
-        # try:
-        #     manager = plt.get_current_fig_manager()
-        #     manager.window.wm_geometry("+2000+100")
-        # except Exception:
-        #     try:
-        #         manager.window.setGeometry(2200, 100, 1200, 500)
-        #     except Exception:
-        #         pass
+        fig = plt.figure(figsize=(12, 4))
         plt.plot(time_nidaq, photodiode, color="0.2", lw=1, label="photodiode")
         if len(times_down):
             plt.plot(times_down, np.full(len(times_down), np.nanpercentile(photodiode, 70)), "rv", label="times_down")
@@ -143,16 +140,37 @@ def review_timing_with_user(stimulus_name, num_trials, times_up, times_down, tim
         plt.tight_layout()
         # plt.show(block=False)
 
-        print("\n--- Timing review ---")
-        print("Entering debugger. Edit `times_down` and/or `times_up` as needed.")
-        print("times_down = np.delete(times_down, [])   # remove by indices")
-        print("times_up = np.delete(times_up, [])   # remove by indices")
-        print("outliers = False")
-        print("bad_trials = []")
+        if mismatch < 0:  # more stimuli than TTL pulses
+            print("    Too many stimuli. Delete from end (e) or beginning (b) or do nothing (N) if manually corrected?")
+            user_response = {'value': None}
+
+            def on_key(event):
+                if event.key in ('e', 'b'):
+                    user_response['value'] = event.key
+
+            fig.canvas.mpl_connect('key_press_event', on_key)
+            plt.show(block=False)
+
+            # Wait for user input while keeping workspace accessible
+            while user_response['value'] is None:
+                plt.pause(0.1)
+
+            remove_stims = user_response['value']
+            if not outliers:
+                plt.close("all")
+                break
+
+        if mismatch > 0 or outliers:  # more TTL pulses than stimuli, or duration/ISI outliers
+            print("\n    --- Timing review ---")
+            print("    Entering debugger. Edit `times_down` and/or `times_up` as needed.")
+            print("    times_down = np.delete(times_down, [], axis=0)   # remove by indices")
+            print("    times_up = np.delete(times_up, [], axis=0)   # remove by indices")
+            print("    outliers = False")
+            print("    bad_trials = []")
 
         plt.close("all")  # ALWAYS SET BREAKPOINT HERE!
 
-    return times_up, times_down, bad_trials
+    return times_up, times_down, bad_trials, remove_stims
 
 
 def correct_times_stimuli(stimulus_name, times_up, times_down):
@@ -163,7 +181,8 @@ def correct_times_stimuli(stimulus_name, times_up, times_down):
             times_up = times_up[times_up[:, 0] > times_down[0], 0]
         if times_down[-1] > times_up[-1]:  # if photodiode goes down at the end, ignore those
             times_down = times_down[times_down[:, 0] < times_up[-1]]
-    # elif stimulus_name == "circles": # New circle starts with every switch -> no rules.
+
+    # No rules like this for other stimuli.
 
     return times_up, times_down
 
@@ -194,7 +213,7 @@ def find_violation_trials(protocol, photodiode_up: np.ndarray, photodiode_down: 
             candidates = np.where(photodiode_up > vt)[0]
             if len(candidates) > 0:
                 indices.append(candidates[0])
-    elif protocol in ("circles", "fullField"):
+    elif protocol in ("circles", "fullField", "sparse"):
         for vt in violation_up:
             candidates = np.where(photodiode_down < vt)[0]
             if len(candidates) > 0:
@@ -289,10 +308,7 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
     num_planes = db["nplanes"]
 
     for ind_exp, f_exp in enumerate(data_paths):
-        if ind_exp < 0:
-            continue
         exp = os.path.split(f_exp)[-1]
-        print(f"  Experiment: {exp}")
 
         exp_folder = os.path.join(bonsai_folder, exp)
         if not os.path.isdir(exp_folder):
@@ -316,31 +332,48 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         np.save(os.path.join(exp_output_folder, "time_arduino.npy"), time_arduino)
 
         # Gets stimulus information.
-        # Types: Gratings, Circles, Retinal, Spont
+        # Types: Gratings, Circles, Retinal, Spont, Sparse
         properties_file = glob.glob(os.path.join(exp_folder, "props*.csv"))
         property_names = np.loadtxt(properties_file[0], dtype=str, delimiter=",", ndmin=2).T[0]
+
         stimuli, num_trials, protocol, times_stim_bonsai = extract_data.process_stimulus(property_names[0], exp_folder)
+        print(f"  Experiment: {exp} - {protocol}")
         if times_stim_bonsai is not None:
             np.save(os.path.join(exp_output_folder, f"{protocol}.timestamps_bonsai.npy"),
                     times_stim_bonsai / NIDAQ_SAMPLINGRATE)
 
         # Stimulus times.
         if not "Screen" in protocol:
-            bad_trials, photodiode_down, photodiode_up = extract_stimulus_times(
+            photodiode_down, photodiode_up, bad_trials, remove_stims = extract_stimulus_times(
                 nidaq[:, chans_nidaq == "photodiode"], time_nidaq, num_trials, protocol,
                 os.path.join(output_folder, exp, "plots"))
 
-            # Add photodiode-based timing results directly to stimulusResults
+            # Add photodiode-based timing results directly to stimuli
             if protocol == "gratings":
                 times_stim = photodiode_down
                 stimuli[f"{protocol}.intervals.npy"] = np.column_stack((photodiode_down, photodiode_up))
-            elif protocol in ("circles", "fullField"):
+            elif protocol in ("circles", "fullField", "sparse"):
                 times_stim = np.sort(np.concatenate((photodiode_down, photodiode_up)), axis=0)
                 stimuli[f"{protocol}.times.npy"] = times_stim
 
             stimuli[f"{protocol}.badTrials.npy"] = bad_trials
 
-        stimuli[f"recording.{protocol}_intervals.npy"] = np.atleast_2d([0, time_nidaq[-1,0]]).T
+            diff_times_trials = num_trials - len(times_stim)
+            if diff_times_trials > 0:  # more trials than TTL pulses
+                if remove_stims == "e":  # remove from end
+                    for key in stimuli.keys():
+                        if key.startswith(protocol + ".") and not key in (f"{protocol}.intervals.npy",
+                                                                          f"{protocol}.times.npy"):
+                            stimuli[key] = stimuli[key][:-diff_times_trials]
+                elif remove_stims == "b":  # remove from beginning
+                    for key in stimuli.keys():
+                        if key.startswith(protocol + ".") and not key in (f"{protocol}.intervals.npy",
+                                                                          f"{protocol}.times.npy"):
+                            stimuli[key] = stimuli[key][diff_times_trials:]
+                else:
+                    print(f"    WARNING: {diff_times_trials} more stimuli than TTL pulses. NOT CORRECTED.")
+
+        stimuli[f"recording.{protocol}_intervals.npy"] = np.atleast_2d([0, time_nidaq[-1,0]])
 
         # Save stimulus-related information
         for key, value in stimuli.items():
@@ -376,13 +409,19 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         times_body = extract_data.assign_frame_time(camera_body, time_arduino, th=0.5, plot=False)
 
         # Bonsai log: extract video frame times.
-        event_names = ["Video$", "Video,[0-9]*", "Analog*"]
-        if "Spont" in property_names[0]:
-            event_names = ["VideoFrame", "Video,[0-9]*", "NiDaq*"]
-        event_times = extract_data.get_recorded_video_times(
-            exp_folder, event_names, ["EyeVid", "BodyVid", "NI"])
-        times_eye_bonsai = event_times["EyeVid"].astype(float).reshape(-1,1) / NIDAQ_SAMPLINGRATE
-        times_body_bonsai = event_times["BodyVid"].astype(float).reshape(-1,1) / NIDAQ_SAMPLINGRATE
+        event_names = ["Video$", "Video,[0-9]*"]
+        time_chan = "Analog*"
+        if property_names[0] in ("Spont", "Sparse"):
+            event_names = ["VideoFrame", "Video,[0-9]*"]
+            time_chan = "NiDaq*"
+        event_logs, nt = extract_data.get_recorded_video_times(exp_folder, event_names, time_chan)
+        # Rename columns.
+        output_names = ["EyeVid", "BodyVid"]
+        event_logs = {output_names[i]: event_logs[event_names[i]]
+                       for i in range(len(event_names))}
+
+        times_eye_bonsai = event_logs["EyeVid"].astype(float).reshape(-1,1) / NIDAQ_SAMPLINGRATE
+        times_body_bonsai = event_logs["BodyVid"].astype(float).reshape(-1,1) / NIDAQ_SAMPLINGRATE
 
         np.save(os.path.join(exp_output_folder, "eye.timestamps.npy"), times_eye)
         np.save(os.path.join(exp_output_folder, "eye.timestamps_bonsai.npy"), times_eye_bonsai)
@@ -392,7 +431,7 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         np.save(os.path.join(exp_output_folder, "body.timestamps_bonsai.npy"), times_body_bonsai)
         np.save(os.path.join(exp_output_folder, "body.nframes.npy"), nframes_body)
 
-        np.save(os.path.join(exp_output_folder, "bonsai.ntimestamps.npy"), len(event_times["NI"]))
+        np.save(os.path.join(exp_output_folder, "bonsai.ntimestamps.npy"), nt)
 
         # Times of imaged frames.
         time_plane, plane_delays = extract_frametimes(
@@ -422,16 +461,15 @@ def extract_stimulus_times(signal, time_nidaq, num_trials, protocol, plot_folder
 
     # (3) Let user review data if problematic.
     # NOTE: SET BREAKPOINT IN THIS FUNCTION!
-    photodiode_up, photodiode_down, invalid_trials = review_timing_with_user(
-        protocol, num_trials, photodiode_up, photodiode_down, time_nidaq,
-        signal[:, 0])
+    photodiode_up, photodiode_down, invalid_trials, remove_stims = review_timing_with_user(
+        protocol, num_trials, photodiode_up, photodiode_down, time_nidaq, signal[:, 0])
 
-    # (4) Identify trials where violations (short switches of photodiode) occur.
+    # (4) Identify trials where violations identified earlier occur.
     violation_trials = find_violation_trials(protocol, photodiode_up, photodiode_down, violation_up, violation_down)
 
     bad_trials = np.zeros((num_trials, 1), dtype=bool)
     bad_trials[np.array(sorted(set(invalid_trials + violation_trials)), dtype=int)] = True
-    return bad_trials, photodiode_down, photodiode_up
+    return photodiode_down, photodiode_up, bad_trials, remove_stims
 
 
 def extract_frametimes(frameclock: ndarray, time: ndarray, num_frames: int, num_planes: int):
@@ -470,10 +508,12 @@ def preprocess(config: dict, datasets: pd.DataFrame):
     try:
         with redirect_stdout(tee), redirect_stderr(tee):
             for i in range(len(datasets)):
+                if i < 12:
+                    continue
                 if not datasets.loc[i]["Process"]:
                     continue
 
-                print(f"Processing {datasets.loc[i]['Name']} {datasets.loc[i]['Date']}...")
+                print(f"\n\nProcessing {datasets.loc[i]['Name']} {datasets.loc[i]['Date']}...")
                 paths = general.make_paths(datasets.loc[i], config["directories"])
                 plane_folder = glob.glob(os.path.join(paths["suite2p"], "plane*"))[-1]
                 db = suite2p_compat.load_parameters(plane_folder)[0]
