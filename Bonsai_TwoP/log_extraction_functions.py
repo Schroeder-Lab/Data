@@ -73,7 +73,7 @@ def get_stimulus_info(log_folder, props=None):
     return stimuli
 
 
-def get_sparse_noise(filePath, size=None):
+def get_sparse_noise(filePath):
     """
     Pulls the sparse noise from the directory.
 
@@ -95,17 +95,18 @@ def get_sparse_noise(filePath, size=None):
     filePath_ = get_file_in_directory(filePath, "sparse")
     sparse = np.fromfile(filePath_, dtype=np.dtype("b")).astype(float)
 
-    if size is None:
-        # Gets experimental details (size of the screen) from the props file.
-        dirs = glob.glob(os.path.join(filePath, "props*.csv"))
-        if len(dirs) == 0:
-            print("ERROR: no props file given")
-            return None
-        # Gets the size of the squares from the props.
-        size = np.loadtxt(dirs[0], delimiter=",", dtype=str)
-        size = size[1:].astype(int)
+    # Gets experimental details (size of the screen) from the props file.
+    dirs = glob.glob(os.path.join(filePath, "props*.csv"))
+    if len(dirs) == 0:
+        print("ERROR: no props file given")
+        return None
+    # Gets the size of the squares from the props.
+    size = np.loadtxt(dirs[0], delimiter=",", dtype=str)
+    size = size[-6:].astype(int)
+
     # Reassigns values in the sparse array.
-    sparse[sparse == -128] = 0.5
+    sparse[sparse == 0] = -1
+    sparse[sparse == -128] = 0
     sparse[sparse == -1] = 1
     # Reshapes the sparse array to represent the size of the screen and where
     # within this grid the black or white squares appeared.
@@ -113,4 +114,5 @@ def get_sparse_noise(filePath, size=None):
         sparse, (int(len(sparse) / (size[1] * size[0])), size[0], size[1])
     )
     # Rearranges the sparse map.
-    return np.moveaxis(np.flip(sparse, 2), -1, 1)
+    sparse = np.moveaxis(np.flip(sparse, 2), -1, 1)
+    return sparse
