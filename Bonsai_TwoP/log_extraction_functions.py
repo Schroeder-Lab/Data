@@ -10,14 +10,17 @@ import pandas as pd
 import scipy as sp
 import os
 import numpy as np
+
+
 from TwoP.general import get_file_in_directory
+from Bonsai_TwoP import extract_data
 
 
-def get_stimulus_info(filePath, props=None):
+def get_stimulus_info(log_folder, props=None):
     """
     Parameters
     ----------
-    filePath : str
+    log_folder : str
         the path of the log file.
     props : np.array of str
         the names of the properties to extract, if None looks for a file.
@@ -32,7 +35,7 @@ def get_stimulus_info(filePath, props=None):
     """
     # Get stimulus variables from props file (if not provided).
     if props is None:
-        dirs = glob.glob(os.path.join(filePath, "props*.csv"))
+        dirs = glob.glob(os.path.join(log_folder, "props*.csv"))
         if len(dirs) == 0:
             print("ERROR: no props file given")
             return None
@@ -41,10 +44,8 @@ def get_stimulus_info(filePath, props=None):
 
     props = np.atleast_1d(props)
 
-    # Gets recorded data from the log file.
-    log_paths = glob.glob(os.path.join(filePath, "Log*"))
-    if not log_paths:
-        return None
+    event_logs = extract_data.get_log_entry(log_folder, props[0], "Analog*")[0]
+    event_logs = event_logs[props[0]]
 
     # Build one regex per prop: prop=<value>
     # Value chars follow your existing pattern.
@@ -53,24 +54,23 @@ def get_stimulus_info(filePath, props=None):
         for prop in props
     }
 
-    rows = []
-    with open(log_paths[0], "r", newline="") as f:
-        for line_no, line in enumerate(f):
-            record = {"line": line_no}
-            all_found = True
+    events = []
+    for idx, row in event_logs.iterrows():
+        record = {"timestamp": row["timestamp"]}
+        all_found = True
 
-            for prop, pat in patterns.items():
-                m = pat.search(line)
-                if m is None:
-                    all_found = False
-                    break
-                record[prop] = m.group(1)
+        for prop, pat in patterns.items():
+            m = pat.search(row["value"])
+            if m is None:
+                all_found = False
+                break
+            record[prop] = m.group(1)
 
-            if all_found:
-                rows.append(record)
+        if all_found:
+            events.append(record)
 
-    # Stable column order: line first, then props in input order
-    return pd.DataFrame(rows, columns=["line", *props.tolist()])
+    stimuli = pd.DataFrame(events)
+    return stimuli
 
 
 def get_sparse_noise(filePath, size=None):

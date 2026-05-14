@@ -1,3 +1,5 @@
+import bisect
+
 import numpy as np
 from matplotlib import pyplot as plt
 import csv
@@ -320,13 +322,13 @@ def detect_wheel_move(move_a, move_b, timestamps, rev_res=1024, total_track=59.8
     return velocity
 
 
-def get_log_entry(filePath, entryString):
+def get_log_entry(log_folder, event_names, time_channel=None):
     """
     Parameters
     ----------
-    filePath : str
+    log_folder : str
         the path of the log file.
-    entryString : the string of the entry to look for
+    event_names : the string of the entry to look for
 
     Returns
     -------
@@ -335,21 +337,43 @@ def get_log_entry(filePath, entryString):
         props and their values.
 
     """
-    file = glob.glob(os.path.join(filePath, "Log*.csv"))
+    file = glob.glob(os.path.join(log_folder, "Log*.csv"))
     if len(file) == 0:
+        print(f"    No log file found in {log_folder}")
         return None
 
-    data = []
+    event_names = [event_names] if isinstance(event_names, str) else event_names
+    data = {name: [] for name in event_names}
     with open(file[0], newline="") as csvfile:
-        for rowN, row in enumerate(csv.reader(csvfile, delimiter=" ", quotechar="|")):
+        for i, row in enumerate(csv.reader(csvfile, delimiter=" ", quotechar="|")):
             full_row = "".join(row)
-            for pattern in entryString:
+            for pattern in event_names:
                 if re.findall(pattern, full_row):
-                    data.append({pattern: f"{rowN},{full_row}"})
+                    data[pattern].append({"row": i, "value": full_row})
 
-    data = pd.DataFrame(data)
+    # Convert to dictionary of DataFrames
+    data = {name: pd.DataFrame(values) for name, values in data.items()}
 
-    return data
+    # if time_channel not None, extract all lines numbers where time_channel appears in rows of file
+    nt = None
+    if time_channel is not None:
+        time_rows = []
+        with open(file[0], newline="") as csvfile:
+            for i, row in enumerate(csv.reader(csvfile, delimiter=" ", quotechar="|")):
+                full_row = "".join(row)
+                if re.findall(time_channel, full_row):
+                    time_rows.append(i)
+        nt = len(time_rows)
+
+        for event in event_names:
+            # Rename column "row" to "timestamp"
+            data[event].rename(columns={"row": "timestamp"}, inplace=True)
+            # Update timestamp values based on time_rows
+            data[event]["timestamp"] = data[event]["timestamp"].apply(
+                lambda row_val: max(0, bisect.bisect_right(time_rows, row_val) - 1)
+            )
+
+    return data, nt
 
 
 # @jit(forceobj=True)
@@ -522,13 +546,13 @@ def save_stimuli(saveDirectory, stimulusTypes, stimulusProps):
             np.save(os.path.join(saveDirectory, f), np.vstack(props_df[f]))
 
 
-def get_recorded_video_times(file_path, event_names, output_names):
+def get_recorded_video_times(log_folder, event_names, time_channel):
     """
     Gets the recorded video times from the log files that bonsai is saving
 
     Parameters
     ----------
-    file_path : str
+    log_folder : str
         The directory where the log file resides.
     event_names : list (str)
         The terms used to represent the different video recordings .Last has to be the Nidaq.
@@ -540,34 +564,9 @@ def get_recorded_video_times(file_path, event_names, output_names):
     None.
 
     """
-    log = get_log_entry(file_path, event_names)
-    log_df = pd.DataFrame(log)
+    event_logs, nt = get_log_entry(log_folder, event_names, time_channel)
 
-    # Rename columns from regex event names to desired output names.
-    rename_map = {event_names[i]: output_names[i] for i in range(len(event_names))}
-    log_df.rename(columns=rename_map, inplace=True)
-    ni_name = output_names[-1]
+    event_times = {event: event_logs[event].timestamp.to_numpy().reshape(-1, 1).astype(float)
+                   for event in event_logs.keys()}
 
-    # Replace NI column non-NaN entries with sequential counters.
-    ni_occ_idx = log_df.index[log_df[ni_name].notna()]
-    log_df.loc[ni_occ_idx, ni_name] = np.arange(len(ni_occ_idx))
-
-    # Forward-fill NI values: each row gets the most recent NI value seen so far
-    ni_filled = log_df[ni_name].fillna(method='ffill')
-    n_ni = log_df[ni_name].max() + 1 if log_df[ni_name].notna().any() else 0
-
-    # Build output: for each non-NI stream, find preceding NI frame index
-    event_times = {}
-    for col_name in output_names[:-1]:
-        if col_name not in log_df.columns:
-            event_times[col_name] = np.ones(int(n_ni)) * np.nan
-            continue
-
-        # Get NI value for each event occurrence
-        event_mask = log_df[col_name].notna()
-        event_times[col_name] = ni_filled[event_mask].values
-
-    # Add NI stream itself
-    event_times[ni_name] = np.arange(int(n_ni))
-
-    return event_times
+    return event_times, nt
