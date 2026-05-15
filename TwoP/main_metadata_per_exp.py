@@ -24,7 +24,7 @@ def determine_durations(protocol, times_up, times_down):
         n_pairs = min(len(times_down), len(times_up))
         duration = times_up[:n_pairs] - times_down[:n_pairs]
         isi = times_down[1:n_pairs] - times_up[:n_pairs-1]
-    elif protocol in ("circles", "sparse"):
+    elif protocol in ("circles", "luminance", "sparse"):
         starts = np.sort(np.concatenate((times_up, times_down)), axis=0)
         duration = np.diff(starts, axis=0)
         duration = np.append(duration, np.nanmedian(duration))
@@ -57,7 +57,7 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
             mismatch = down
         elif abs(down) < abs(up):
             mismatch = up
-    elif protocol in ("circles", "fullField", "sparse"):
+    elif protocol in ("circles", "fullField", "luminance", "sparse"):
         mismatch = (n_down + n_up) - num_trials
 
     # Only run diagnostics when mismatch exists.
@@ -213,7 +213,7 @@ def find_violation_trials(protocol, photodiode_up: np.ndarray, photodiode_down: 
             candidates = np.where(photodiode_up > vt)[0]
             if len(candidates) > 0:
                 indices.append(candidates[0])
-    elif protocol in ("circles", "fullField", "sparse"):
+    elif protocol in ("circles", "fullField", "luminance", "sparse"):
         for vt in violation_up:
             candidates = np.where(photodiode_down < vt)[0]
             if len(candidates) > 0:
@@ -352,7 +352,7 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
             if protocol == "gratings":
                 times_stim = photodiode_down
                 stimuli[f"{protocol}.intervals.npy"] = np.column_stack((photodiode_down, photodiode_up))
-            elif protocol in ("circles", "fullField", "sparse"):
+            elif protocol in ("circles", "fullField", "luminance", "sparse"):
                 times_stim = np.sort(np.concatenate((photodiode_down, photodiode_up)), axis=0)
                 stimuli[f"{protocol}.times.npy"] = times_stim
 
