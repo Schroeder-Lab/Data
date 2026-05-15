@@ -399,6 +399,10 @@ def get_arduino_data(arduinoDirectory, sampling_rate, plot=False):
     arduinoFilePath = general.get_file_in_directory(arduinoDirectory, "ArduinoInput")
     # Loads the arduino data.
     csvChannels = np.loadtxt(arduinoFilePath, delimiter=",")
+
+    if len(csvChannels) == 0:
+        return None, None, None
+
     # convert time to second (always in ms)
     arduinoTime = (csvChannels[:, -1] / sampling_rate).reshape(-1, 1)
 
