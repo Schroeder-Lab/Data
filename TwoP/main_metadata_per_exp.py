@@ -75,7 +75,7 @@ def report_timing_mismatch(protocol, times_down, times_up, num_trials, outliers)
     med_duration = np.nanmedian(duration)
 
     # Times where duration is 0.1 s shorter or longer than median.
-    bad_duration = np.abs(duration - med_duration) > np.max(0.1 * med_duration, 0.1)
+    bad_duration = np.abs(duration - med_duration) > np.max([0.1 * med_duration, 0.1])
     bad_duration_idx = np.where(bad_duration)[0]
     bad_duration_times = starts[bad_duration]
     if len(bad_duration_times) > 0:
@@ -178,7 +178,7 @@ def correct_times_stimuli(stimulus_name, times_up, times_down):
         # Gratings start with black squares (times_down) and end with white square (times_up).
         # If number of starts and ends doesn't match, ignore the excess.
         if times_up[0] < times_down[0]:  # if photodiode goes up first, ignore those
-            times_up = times_up[times_up[:, 0] > times_down[0], 0]
+            times_up = times_up[times_up[:, 0] > times_down[0]]
         if times_down[-1] > times_up[-1]:  # if photodiode goes down at the end, ignore those
             times_down = times_down[times_down[:, 0] < times_up[-1]]
 
@@ -413,7 +413,7 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         # Bonsai log: extract video frame times.
         event_names = ["Video$", "Video,[0-9]*"]
         time_chan = "Analog*"
-        if property_names[0] in ("Spont", "Sparse"):
+        if property_names[0] in ("Spont", "SpontGrey", "Sparse"):
             event_names = ["VideoFrame", "Video,[0-9]*"]
             time_chan = "NiDaq*"
         event_logs, nt = extract_data.get_recorded_video_times(exp_folder, event_names, time_chan)

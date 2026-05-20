@@ -20,7 +20,7 @@ file_names = {
     "body": ["body.timestamps.npy", "body.timestamps_bonsai.npy", "body.nframes.npy"],
     "wheel": ["wheel.velocity.npy"],
 }
-protocols = ["gratings", "circles", "fullField", "darkScreen", "grayScreen", "sparse", "luminance"]
+protocols = ["gratings", "circles", "fullField", "darkScreen", "greyScreen", "sparse", "luminance"]
 
 
 def combine_metadata(path, exp_atropine):
@@ -219,67 +219,68 @@ def sync_bonsai_to_daq(data, stimuli):
         mse = result[1][0] / len(times_bonsai) if len(result[1]) > 0 else np.nan
         regression_bonsai["stimuli"].append((m, c, mse))
 
+    # FOLLOWING CODE NOT CURRENTLY USED
     # Go through videos: just compare dt and offset of first frame
-    for video in ("eye", "body"):
-        for i in range(len(stimuli)):
-            times_TTL = data[video][f"{video}.timestamps.npy"][i]
-            if times_TTL is None or len(times_TTL) == 0:
-                print(f"  Exp {i}: {video} video: no TTL times found.")
-                regression_bonsai[f"{video}"].append(None)
-                continue
-
-            times_bonsai = data[video][f"{video}.timestamps_bonsai.npy"][i]
-            if times_bonsai is None:
-                print(f"  Exp {i}: {video} video: no bonsai timestamps found.")
-                regression_bonsai[f"{video}"].append(None)
-                continue
-
-            dt_TTL = np.median(np.diff(times_TTL, axis=0))
-            dt_bonsai = np.median(np.diff(times_bonsai, axis=0))
-
-            time_arduino = data["time"]["time_arduino.npy"][i]
-            times_diff = len(times_TTL) - len(times_bonsai)
-            if times_diff < 0:  # more bonsai timestamps than TTL pulses
-                # check whether early or late TTL pulses may be lost (because they continue beyond recording)
-                if times_TTL[0] - dt_TTL > time_arduino[0]:
-                    timepoint_TTL = times_TTL[0, 0]
-                    timepoint_bonsai = times_bonsai[0, 0]
-                elif times_TTL[-1] + dt_TTL < time_arduino[-1]:
-                    timepoint_TTL = times_TTL[-1, 0]
-                    timepoint_bonsai = times_bonsai[-1, 0]
-                else:
-                    print(
-                        f"  Exp {i}: {video} video: #TTL times ({len(times_TTL)}) and #bonsai times ({len(times_bonsai)}) "
-                        f"cannot be matched.")
-                    regression_bonsai[f"{video}"].append(None)
-                    continue
-            elif times_diff > 0:
-                print(f"  Exp {i}: {video} video: #TTL times ({len(times_TTL)}) > #bonsai times ({len(times_bonsai)}).")
-                regression_bonsai[f"{video}"].append(None)
-                continue
-            else:
-                timepoint_TTL = times_TTL[0, 0]
-                timepoint_bonsai = times_bonsai[0, 0]
-
-            # Estimate linear regression between bonsai and TTL times
-            m = dt_TTL / dt_bonsai
-            c = timepoint_TTL - timepoint_bonsai * m
-            regression_bonsai[f"{video}"].append((m, c, 0.0))
-
-    m = [regression_bonsai["eye"][i][0] for i in range(len(regression_bonsai["eye"]))
-         if regression_bonsai["eye"][i] is not None]
-    c = [regression_bonsai["eye"][i][1] for i in range(len(regression_bonsai["eye"]))
-         if regression_bonsai["eye"][i] is not None]
-    if len(m) > 0 or len(c) > 0:
-        print(f"  For eye videos: bonsai factors: {', '.join(str(entry) for entry in m)}; "
-              f"bonsai offsets: {', '.join(str(entry) for entry in c)}")
-    m = [regression_bonsai["body"][i][0] for i in range(len(regression_bonsai["body"]))
-         if regression_bonsai["body"][i] is not None]
-    c = [regression_bonsai["body"][i][1] for i in range(len(regression_bonsai["body"]))
-         if regression_bonsai["body"][i] is not None]
-    if len(m) > 0 or len(c) > 0:
-        print(f"  For body videos: bonsai factors: {', '.join(str(entry) for entry in m)}; "
-              f"bonsai offsets: {', '.join(str(entry) for entry in c)}")
+    # for video in ("eye", "body"):
+    #     for i in range(len(stimuli)):
+    #         times_TTL = data[video][f"{video}.timestamps.npy"][i]
+    #         if times_TTL is None or len(times_TTL) == 0:
+    #             print(f"  Exp {i}: {video} video: no TTL times found.")
+    #             regression_bonsai[f"{video}"].append(None)
+    #             continue
+    #
+    #         times_bonsai = data[video][f"{video}.timestamps_bonsai.npy"][i]
+    #         if times_bonsai is None:
+    #             print(f"  Exp {i}: {video} video: no bonsai timestamps found.")
+    #             regression_bonsai[f"{video}"].append(None)
+    #             continue
+    #
+    #         dt_TTL = np.median(np.diff(times_TTL, axis=0))
+    #         dt_bonsai = np.median(np.diff(times_bonsai, axis=0))
+    #
+    #         time_arduino = data["time"]["time_arduino.npy"][i]
+    #         times_diff = len(times_TTL) - len(times_bonsai)
+    #         if times_diff < 0:  # more bonsai timestamps than TTL pulses
+    #             # check whether early or late TTL pulses may be lost (because they continue beyond recording)
+    #             if times_TTL[0] - dt_TTL > time_arduino[0]:
+    #                 timepoint_TTL = times_TTL[0, 0]
+    #                 timepoint_bonsai = times_bonsai[0, 0]
+    #             elif times_TTL[-1] + dt_TTL < time_arduino[-1]:
+    #                 timepoint_TTL = times_TTL[-1, 0]
+    #                 timepoint_bonsai = times_bonsai[-1, 0]
+    #             else:
+    #                 print(
+    #                     f"  Exp {i}: {video} video: #TTL times ({len(times_TTL)}) and #bonsai times ({len(times_bonsai)}) "
+    #                     f"cannot be matched.")
+    #                 regression_bonsai[f"{video}"].append(None)
+    #                 continue
+    #         elif times_diff > 0:
+    #             print(f"  Exp {i}: {video} video: #TTL times ({len(times_TTL)}) > #bonsai times ({len(times_bonsai)}).")
+    #             regression_bonsai[f"{video}"].append(None)
+    #             continue
+    #         else:
+    #             timepoint_TTL = times_TTL[0, 0]
+    #             timepoint_bonsai = times_bonsai[0, 0]
+    #
+    #         # Estimate linear regression between bonsai and TTL times
+    #         m = dt_TTL / dt_bonsai
+    #         c = timepoint_TTL - timepoint_bonsai * m
+    #         regression_bonsai[f"{video}"].append((m, c, 0.0))
+    #
+    # m = [regression_bonsai["eye"][i][0] for i in range(len(regression_bonsai["eye"]))
+    #      if regression_bonsai["eye"][i] is not None]
+    # c = [regression_bonsai["eye"][i][1] for i in range(len(regression_bonsai["eye"]))
+    #      if regression_bonsai["eye"][i] is not None]
+    # if len(m) > 0 or len(c) > 0:
+    #     print(f"  For eye videos (only FYI, not used): bonsai factors: {', '.join(str(entry) for entry in m)}; "
+    #           f"bonsai offsets: {', '.join(str(entry) for entry in c)}")
+    # m = [regression_bonsai["body"][i][0] for i in range(len(regression_bonsai["body"]))
+    #      if regression_bonsai["body"][i] is not None]
+    # c = [regression_bonsai["body"][i][1] for i in range(len(regression_bonsai["body"]))
+    #      if regression_bonsai["body"][i] is not None]
+    # if len(m) > 0 or len(c) > 0:
+    #     print(f"  For body videos (only FYI, not used): bonsai factors: {', '.join(str(entry) for entry in m)}; "
+    #           f"bonsai offsets: {', '.join(str(entry) for entry in c)}")
 
     return regression_bonsai
 
@@ -335,6 +336,7 @@ def collect_stim_data(path, exp_folder, is_atropine, rec_durations):
 
 def select_video_times(video_name, data_video, data_time,
                        num_exp, rec_durations, regression_bonsai):
+    print(f"  Videos: {video_name}")
     t_arduino = data_time["time_arduino.npy"]
     nframes_cumsum = np.cumsum(data_video[f"{video_name}.nframes.npy"])
     times = np.ones((nframes_cumsum[-1], 1)) * np.nan
@@ -353,6 +355,7 @@ def select_video_times(video_name, data_video, data_time,
         elif len(times_TTL) == n:
             times[idx_start:nframes_cumsum[i]] = times_TTL + exp_start
             source[idx_start:nframes_cumsum[i]] = np.ones((n, 1))
+            print(f"    Exp {i}: use TTL")
         # (2) If TTL pulses from arduino closely match number of video frames, and TTL pulses clearly start after 0 or
         # end before recording, take TTL pulses and add missing time points
         elif abs(len(times_TTL) - n) < 20:
@@ -361,15 +364,17 @@ def select_video_times(video_name, data_video, data_time,
             n_missing = n - len(times_TTL)
             if n_missing < 0:
                 if n_missing > -5:
-                    print(f"    Warning: {video_name} video has {-n_missing} extra TTLs. -> delete at end")
+                    print(f"    Exp {i}: use TTL; video has {-n_missing} extra TTLs. -> delete TTLs at end")
                     times[idx_start:nframes_cumsum[i]] = times_TTL[:n] + exp_start
                 else:
                     use_bonsai = True
             elif times_TTL[0] > t_arduino[i][0] + dt:  # video started after recording -> add time points to the end
+                print(f"    Exp {i}: use TTL; video has {n_missing} fewer TTLs. -> add TTLs to end")
                 extra_times = times_TTL[-1] + (np.arange(1, n_missing + 1) * dt).reshape(-1, 1)
                 times[idx_start:nframes_cumsum[i]] = np.vstack((times_TTL, extra_times)) + exp_start
                 source[nframes_cumsum[i] - n_missing: nframes_cumsum[i]] = np.ones((n_missing, 1)) * 2
             elif times_TTL[-1] < t_arduino[i][-1] - dt:  # video ended before end of recording -> add time points to the start
+                print(f"    Exp {i}: use TTL; video has {n_missing} fewer TTLs. -> add TTLs to start")
                 extra_times = times_TTL[0] - (np.arange(-n_missing, 0) * dt).reshape(-1, 1)
                 times[idx_start:nframes_cumsum[i]] = np.vstack((extra_times, times_TTL)) + exp_start
                 source[:n_missing] = np.ones((n_missing, 1)) * 2
@@ -380,7 +385,7 @@ def select_video_times(video_name, data_video, data_time,
 
         # (3) Use timestamps recorded by bonsai log file (if good enough)
         if use_bonsai:
-            times_TTL = data_video[f"{video_name}.timestamps_bonsai.npy"][i]
+            times_bonsai = data_video[f"{video_name}.timestamps_bonsai.npy"][i]
             # conditions:
             # (1) MSE from linear regression of stimulus times is small
             # Remove: (1) number of timestamps from bonsai log file is similar to number of timestamps from nidaq (up to 100 ms difference);
@@ -403,20 +408,22 @@ def select_video_times(video_name, data_video, data_time,
                 c = np.mean(np.array(c))
                 mse = np.mean(np.array(mse))
 
-            if mse < 1e-2 and n - len(times_TTL) <= 5:
+            if mse < 1e-2 and n - len(times_bonsai) <= 5:
                 source[idx_start:nframes_cumsum[i]] = np.ones((n, 1)) * 3
-                if len(times_TTL) < n:
-                    dt = np.median(np.diff(times_TTL, axis=0))
-                    extra_times = times_TTL[-1] + (np.arange(1, n - len(times_TTL) + 1) * dt).reshape(-1, 1)
-                    t = np.vstack((times_TTL, extra_times)) * m + c
+                if len(times_bonsai) < n:
+                    n_missing = n - len(times_bonsai)
+                    print(f"    Exp {i}: use bonsai log (corrected via stimulus times); log has {n_missing} fewer entries. -> add times to end")
+                    dt = np.median(np.diff(times_bonsai, axis=0))
+                    extra_times = times_bonsai[-1] + (np.arange(1, n_missing + 1) * dt).reshape(-1, 1)
+                    t = np.vstack((times_bonsai, extra_times)) * m + c
                     times[idx_start:nframes_cumsum[i]] = t + exp_start
-                    n_missing = n - len(times_TTL)
                     source[nframes_cumsum[i] - n_missing: nframes_cumsum[i]] = np.ones((n_missing, 1)) * 4
                 else:
-                    t = times_TTL * m + c
+                    print(f"    Exp {i}: use bonsai log (corrected via stimulus times)")
+                    t = times_bonsai * m + c
                     times[idx_start:nframes_cumsum[i]] = t + exp_start
             else:
-                print(f"  Warning: could not find good timestamps for {video_name} in experiment {i + 1}.")
+                print(f"    Exp {i}: could not find usable timestamps.")
 
         exp_start += rec_durations[i] + GAP
 
@@ -432,7 +439,7 @@ def preprocess(config: dict, datasets: pd.DataFrame):
     try:
         with redirect_stdout(tee), redirect_stderr(tee):
             for i in range(len(datasets)):
-                # if i < 35:
+                # if i < 3 or i > 4:
                 #     continue
                 if not datasets.loc[i]["Process"]:
                     continue
