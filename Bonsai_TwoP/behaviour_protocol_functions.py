@@ -66,7 +66,7 @@ def stimulus_gratings(directory):
         "gratings.spatialF.npy": stimuli.SFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
         "gratings.temporalF.npy": stimuli.TFreq.to_numpy().reshape(-1, 1).astype(float).copy(),
         "gratings.contrast.npy": stimuli.Contrast.to_numpy().reshape(-1, 1).astype(float).copy(),
-        "gratingsExp.description.npy": "Gratings"
+        "gratingsExp.description.csv": "Gratings"
     }
 
     if reward is not None:

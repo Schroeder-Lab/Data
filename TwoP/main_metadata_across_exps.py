@@ -138,7 +138,7 @@ def combine_stimuli(path, rec_durations, stimuli):
                         np.savetxt(os.path.join(path, key), trial_data, fmt="%s", delimiter=",")
                     else:
                         np.save(os.path.join(path, key), trial_data)
-                elif key == f"{protocol}Exp.description.npy":  # description was introduced for atropine experiments
+                elif key == f"{protocol}Exp.description.csv":  # description was introduced for atropine experiments
                     trial_data = []
                     for i in idx_exp:
                         d = stimuli[i].get(key)
@@ -147,7 +147,7 @@ def combine_stimuli(path, rec_durations, stimuli):
                         else:
                             trial_data.append(d)
 
-                    np.save(os.path.join(path, key), np.array(trial_data).reshape(-1, 1))
+                    np.savetxt(os.path.join(path, key), trial_data, fmt="%s", delimiter=",")
 
         rec_intervals = np.zeros((0, 2))
         for i in idx_exp:
@@ -324,7 +324,7 @@ def collect_stim_data(path, exp_folder, is_atropine, rec_durations):
                     stim_data[file_name] = np.load(file_path)
 
             if is_atropine:
-                key = f"{protocol}Exp.description.npy"
+                key = f"{protocol}Exp.description.csv"
                 if key in stim_data.keys():
                     stim_data[key] = stim_data[key] + "Atropine"
                 else:

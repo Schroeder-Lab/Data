@@ -378,8 +378,11 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
 
         # Save stimulus-related information
         for key, value in stimuli.items():
-            save_path = os.path.join(exp_output_folder, key)
-            np.save(save_path, np.asarray(value))
+            if key.endswith(".csv"):
+                np.savetxt(os.path.join(exp_output_folder, key), value, fmt="%s", delimiter=",")
+            else:
+                save_path = os.path.join(exp_output_folder, key)
+                np.save(save_path, np.asarray(value))
 
         if protocol == "fullField":
             cycle = np.array(
