@@ -109,7 +109,7 @@ def combine_stimuli(path, rec_durations, stimuli):
         for i in idx_exp:
             missing_keys = all_keys - set(stimuli[i].keys())
             if missing_keys:
-                print(f"    Experiment {i}: missing keys {missing_keys}")
+                print(f"  Experiment {i}: missing keys {missing_keys}")
 
         all_keys.discard(f"{protocol}.timestamps_bonsai.npy")
         all_keys.discard("protocol")
@@ -463,7 +463,7 @@ def load_dataset_list(path):
         "Atropine": str,
         "Process": bool
     })
-    df["Atropine"] = df["Atropine"].apply(ast.literal_eval)
+    df["Atropine"] = df["Atropine"].fillna("[]").apply(ast.literal_eval)
     return df
 
 

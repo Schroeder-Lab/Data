@@ -138,7 +138,7 @@ def review_timing_with_user(stimulus_name, num_trials, times_up, times_down, tim
         plt.ylabel("photodiode")
         plt.legend(loc="best")
         plt.tight_layout()
-        # plt.show(block=False)
+        plt.show(block=False)
 
         if mismatch < 0:  # more stimuli than TTL pulses
             print("    Too many stimuli. Delete from end (e) or beginning (b) or do nothing (N) if manually corrected?")
@@ -379,7 +379,12 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
         # Save stimulus-related information
         for key, value in stimuli.items():
             if key.endswith(".csv"):
-                np.savetxt(os.path.join(exp_output_folder, key), value, fmt="%s", delimiter=",")
+                np.savetxt(
+                    os.path.join(exp_output_folder, key),
+                    np.atleast_1d(value),
+                    fmt="%s",
+                    delimiter=",",
+                )
             else:
                 save_path = os.path.join(exp_output_folder, key)
                 np.save(save_path, np.asarray(value))
@@ -398,9 +403,9 @@ def process_metadata_directory(bonsai_folder: str, output_folder: str, db: dict)
             np.savetxt(csv_path, stim_names.ravel(), fmt="%s", delimiter=",")
 
         # Get number of video frames
-        vfile = glob.glob(os.path.join(f_exp, "Video[0-9]*.avi"))[0]  # eye
+        vfile = glob.glob(os.path.join(exp_folder, "Video[0-9]*.avi"))[0]  # eye
         video_eye = cv2.VideoCapture(vfile)
-        vfile = glob.glob(os.path.join(f_exp, "Video[a-zA-Z]*.avi"))[0]  # body
+        vfile = glob.glob(os.path.join(exp_folder, "Video[a-zA-Z]*.avi"))[0]  # body
         video_body = cv2.VideoCapture(vfile)
         # number of frames
         nframes_eye = int(video_eye.get(cv2.CAP_PROP_FRAME_COUNT))

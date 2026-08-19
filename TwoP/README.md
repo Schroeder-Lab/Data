@@ -19,5 +19,5 @@ metadata (constructed in next step).
 ## Metadata (Bonsai files)
 1. Run `python main_metadata_per_exp.py`. Set breakpoint as described! Adapt `preprocess.yaml`.
 2. Run `python main_metadata_across_exp.py` to combine extracted metadata across experiments.
-3. Delte stimulus information for bad experiments.
+3. Delete stimulus information for bad experiments.
 4. Uplpoad data to NAS.
